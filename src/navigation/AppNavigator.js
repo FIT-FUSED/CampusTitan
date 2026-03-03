@@ -1,0 +1,315 @@
+// App Navigator
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { View, Text, StyleSheet, Platform, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS } from '../theme';
+import { useAuth } from '../services/AuthContext';
+import * as Haptics from 'expo-haptics';
+
+// Auth screens
+import LoginScreen from '../screens/auth/LoginScreen';
+import RegisterScreen from '../screens/auth/RegisterScreen';
+import OnboardingScreen from '../screens/auth/OnboardingScreen';
+
+// Main screens
+import HomeScreen from '../screens/home/HomeScreen';
+import NutritionScreen from '../screens/nutrition/NutritionScreen';
+import FoodLogScreen from '../screens/nutrition/FoodLogScreen';
+import FoodScannerScreen from '../screens/nutrition/FoodScannerScreen';
+import FitnessScreen from '../screens/fitness/FitnessScreen';
+import LogActivityScreen from '../screens/fitness/LogActivityScreen';
+import WellnessScreen from '../screens/wellness/WellnessScreen';
+import MoodLogScreen from '../screens/wellness/MoodLogScreen';
+import JournalScreen from '../screens/wellness/JournalScreen';
+import JournalEntryScreen from '../screens/wellness/JournalEntryScreen';
+import WellnessCircleScreen from '../screens/wellness/WellnessCircleScreen';
+import EnvironmentScreen from '../screens/environment/EnvironmentScreen';
+import AnalyticsScreen from '../screens/analytics/AnalyticsScreen';
+import ProfileScreen from '../screens/profile/ProfileScreen';
+import SettingsScreen from '../screens/profile/SettingsScreen';
+import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
+
+const Stack = createStackNavigator();
+const Tab = createBottomTabNavigator();
+
+function CustomTabBar({ state, descriptors, navigation }) {
+    const insets = useSafeAreaInsets();
+
+    return (
+        <View style={[tabStyles.container, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+            <View style={tabStyles.bar}>
+                {state.routes.map((route, index) => {
+                    const { options } = descriptors[route.key];
+                    const isFocused = state.index === index;
+
+                    const icons = {
+                        Home: { focused: 'home', unfocused: 'home-outline' },
+                        Nutrition: { focused: 'nutrition', unfocused: 'nutrition-outline' },
+                        Fitness: { focused: 'fitness', unfocused: 'fitness-outline' },
+                        Wellness: { focused: 'heart', unfocused: 'heart-outline' },
+                        More: { focused: 'grid', unfocused: 'grid-outline' },
+                    };
+
+                    const iconSet = icons[route.name] || { focused: 'ellipse', unfocused: 'ellipse-outline' };
+
+                    return (
+                        <View key={route.key} style={tabStyles.tabItem}>
+                            <View
+                                style={[
+                                    tabStyles.tabButton,
+                                    isFocused && tabStyles.tabButtonActive,
+                                ]}
+                            >
+                                <TouchableOpacity
+                                    activeOpacity={0.7}
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        navigation.navigate(route.name);
+                                    }}
+                                    style={tabStyles.touchArea}
+                                >
+                                    <Ionicons
+                                        name={isFocused ? iconSet.focused : iconSet.unfocused}
+                                        size={22}
+                                        color={isFocused ? COLORS.primary : COLORS.textMuted}
+                                    />
+                                    <Text style={[
+                                        tabStyles.tabLabel,
+                                        isFocused && tabStyles.tabLabelActive,
+                                    ]}>
+                                        {route.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                            {isFocused && <View style={tabStyles.indicator} />}
+                        </View>
+                    );
+                })}
+            </View>
+        </View>
+    );
+}
+
+function HomeTabs() {
+    return (
+        <Tab.Navigator
+            tabBar={(props) => <CustomTabBar {...props} />}
+            screenOptions={{ headerShown: false }}
+        >
+            <Tab.Screen name="Home" component={HomeStack} />
+            <Tab.Screen name="Nutrition" component={NutritionStack} />
+            <Tab.Screen name="Fitness" component={FitnessStack} />
+            <Tab.Screen name="Wellness" component={WellnessStack} />
+            <Tab.Screen name="More" component={MoreStack} />
+        </Tab.Navigator>
+    );
+}
+
+function HomeStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="HomeMain" component={HomeScreen} />
+        </Stack.Navigator>
+    );
+}
+
+function NutritionStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="NutritionMain" component={NutritionScreen} />
+            <Stack.Screen name="FoodLog" component={FoodLogScreen} />
+            <Stack.Screen name="FoodScanner" component={FoodScannerScreen} />
+        </Stack.Navigator>
+    );
+}
+
+function FitnessStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="FitnessMain" component={FitnessScreen} />
+            <Stack.Screen name="LogActivity" component={LogActivityScreen} />
+        </Stack.Navigator>
+    );
+}
+
+function WellnessStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="WellnessMain" component={WellnessScreen} />
+            <Stack.Screen name="MoodLog" component={MoodLogScreen} />
+            <Stack.Screen name="Journal" component={JournalScreen} />
+            <Stack.Screen name="JournalEntry" component={JournalEntryScreen} />
+            <Stack.Screen name="WellnessCircle" component={WellnessCircleScreen} />
+        </Stack.Navigator>
+    );
+}
+
+function MoreStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="MoreMain" component={MoreMenu} />
+            <Stack.Screen name="Environment" component={EnvironmentScreen} />
+            <Stack.Screen name="Analytics" component={AnalyticsScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+        </Stack.Navigator>
+    );
+}
+
+function MoreMenu({ navigation }) {
+    const { isAdmin } = useAuth();
+    const items = [
+        { icon: '🌍', label: 'Environment', screen: 'Environment', color: COLORS.accentLight },
+        { icon: '📊', label: 'Campus Analytics', screen: 'Analytics', color: COLORS.primaryLight },
+        { icon: '👤', label: 'Profile', screen: 'Profile', color: COLORS.coral },
+        { icon: '⚙️', label: 'Settings', screen: 'Settings', color: COLORS.orange },
+    ];
+    if (isAdmin) {
+        items.unshift({ icon: '🛡️', label: 'Admin Dashboard', screen: 'AdminDashboard', color: COLORS.error });
+    }
+    return (
+        <View style={{ flex: 1, backgroundColor: COLORS.background, paddingTop: Platform.OS === 'ios' ? 60 : 40 }}>
+            <Text style={{ fontSize: FONT_SIZES.xxl, ...FONTS.bold, color: COLORS.text, paddingHorizontal: SPACING.lg, marginBottom: SPACING.xl }}>More</Text>
+            {items.map((item, i) => (
+                <TouchableOpacity
+                    key={i}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        navigation.navigate(item.screen);
+                    }}
+                    style={moreStyles.item}
+                >
+                    <View style={[moreStyles.iconBg, { backgroundColor: item.color + '22' }]}>
+                        <Text style={{ fontSize: 22 }}>{item.icon}</Text>
+                    </View>
+                    <Text style={moreStyles.label}>{item.label}</Text>
+                    <Text style={moreStyles.arrow}>›</Text>
+                </TouchableOpacity>
+            ))}
+        </View>
+    );
+}
+
+export default function AppNavigator() {
+    const { user, loading, isOnboarded } = useAuth();
+
+    if (loading) {
+        return (
+            <View style={{ flex: 1, backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: COLORS.primary, fontSize: 24, ...FONTS.bold }}>FitFusion</Text>
+                <Text style={{ color: COLORS.textSecondary, marginTop: 8 }}>Loading...</Text>
+            </View>
+        );
+    }
+
+    return (
+        <NavigationContainer>
+            <Stack.Navigator
+                screenOptions={{
+                    headerShown: false,
+                    animationEnabled: Platform.OS !== 'web' // Disable animations on web to avoid pointerEvents issues
+                }}
+            >
+                {!user ? (
+                    isOnboarded ? (
+                        <>
+                            <Stack.Screen name="Login" component={LoginScreen} />
+                            <Stack.Screen name="Register" component={RegisterScreen} />
+                        </>
+                    ) : (
+                        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+                    )
+                ) : (
+                    <Stack.Screen name="MainApp" component={HomeTabs} />
+                )}
+            </Stack.Navigator>
+        </NavigationContainer>
+    );
+}
+
+const tabStyles = StyleSheet.create({
+    container: {
+        backgroundColor: COLORS.surface + 'F5',
+        borderTopWidth: 1,
+        borderTopColor: COLORS.glassBorder,
+    },
+    bar: {
+        flexDirection: 'row',
+        paddingTop: 12,
+        paddingHorizontal: SPACING.sm,
+    },
+    tabItem: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    tabButton: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 4,
+        paddingHorizontal: 12,
+        borderRadius: BORDER_RADIUS.lg,
+    },
+    tabButtonActive: {
+        backgroundColor: COLORS.primary + '15',
+    },
+    touchArea: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    tabLabel: {
+        fontSize: 10,
+        ...FONTS.medium,
+        color: COLORS.textMuted,
+        marginTop: 2,
+    },
+    tabLabelActive: {
+        color: COLORS.primary,
+        ...FONTS.semiBold,
+    },
+    indicator: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: COLORS.primary,
+        marginTop: 2,
+    },
+});
+
+const moreStyles = StyleSheet.create({
+    item: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: SPACING.md,
+        paddingHorizontal: SPACING.lg,
+        marginHorizontal: SPACING.lg,
+        marginBottom: SPACING.sm,
+        backgroundColor: COLORS.surface,
+        borderRadius: BORDER_RADIUS.md,
+        borderWidth: 1,
+        borderColor: COLORS.glassBorder,
+    },
+    iconBg: {
+        width: 40,
+        height: 40,
+        borderRadius: BORDER_RADIUS.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: SPACING.md,
+    },
+    label: {
+        flex: 1,
+        fontSize: FONT_SIZES.lg,
+        color: COLORS.text,
+        ...FONTS.medium,
+    },
+    arrow: {
+        fontSize: 24,
+        color: COLORS.textMuted,
+    },
+});
