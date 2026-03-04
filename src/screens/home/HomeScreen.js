@@ -254,7 +254,7 @@ export default function HomeScreen({ navigation }) {
                 )}
 
                 {/* Environment Quick View */}
-                {envData && (
+                {!!envData && (
                     <>
                         <SectionHeader title="Campus Environment" />
                         <GradientCard gradient={COLORS.gradientCard} style={styles.envCard}>

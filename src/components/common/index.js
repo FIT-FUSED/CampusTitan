@@ -1,6 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS } from '../../theme';
 
@@ -16,7 +15,6 @@ export function GradientCard({ children, gradient, style, onPress }) {
                 end={{ x: 1, y: 1 }}
                 style={[styles.gradientCard, style]}
             >
-                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                 {children}
             </LinearGradient>
         </View>
@@ -50,16 +48,16 @@ export function StatCard({ title, value, unit, icon, color, subtitle, onPress })
             }}
             style={[styles.statCard, { borderLeftColor: color || COLORS.primary, borderLeftWidth: 3 }]}
         >
-            <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
+
             <View style={styles.statCardHeader}>
                 <Text style={[styles.statCardTitle, { color: COLORS.textSecondary }]}>{title}</Text>
-                {icon && <Text style={{ fontSize: 18 }}>{icon}</Text>}
+                {!!icon && <Text style={{ fontSize: 18 }}>{icon}</Text>}
             </View>
             <View style={styles.statCardValueRow}>
                 <Text style={[styles.statCardValue, { color: color || COLORS.text }]}>{value}</Text>
-                {unit && <Text style={styles.statCardUnit}>{unit}</Text>}
+                {!!unit && <Text style={styles.statCardUnit}>{unit}</Text>}
             </View>
-            {subtitle && <Text style={styles.statCardSubtitle}>{subtitle}</Text>}
+            {!!subtitle && <Text style={styles.statCardSubtitle}>{subtitle}</Text>}
         </TouchableOpacity>
     );
 }

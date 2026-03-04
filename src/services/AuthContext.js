@@ -33,21 +33,27 @@ export function AuthProvider({ children }) {
 
     async function login(email, password) {
         const result = await authService.login(email, password);
-        setUser(result.user);
+        const userWithMeta = await authService.getCurrentUser();
+        setUser(userWithMeta);
         setIsOnboarded(true);
         return result;
     }
 
     async function register(userData) {
         const result = await authService.register(userData);
-        setUser(result.user);
+        const userWithMeta = await authService.getCurrentUser();
+        setUser(userWithMeta);
         setIsOnboarded(true);
         return result;
     }
 
     async function logout() {
-        await authService.logout();
-        setUser(null);
+        try {
+            await authService.logout();
+        } finally {
+            setUser(null);
+            // We keep isOnboarded as true so they see Login not Onboarding
+        }
     }
 
     async function updateProfile(updates) {

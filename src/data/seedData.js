@@ -20,8 +20,19 @@ function simpleHash(str) {
 const DEMO_HASH = simpleHash('demo123');
 
 // Campus metadata
-export const HOSTELS = ['Hostel A', 'Hostel B', 'Hostel C', 'Hostel D', 'Hostel E'];
-export const DEPARTMENTS = ['Computer Science', 'Mechanical', 'Electrical', 'Civil', 'Electronics'];
+export const COLLEGES = [
+    // IITs
+    'IIT Kharagpur', 'IIT Bombay', 'IIT Madras', 'IIT Kanpur', 'IIT Delhi', 'IIT Guwahati', 'IIT Roorkee',
+    'IIT Ropar', 'IIT Bhubaneswar', 'IIT Gandhinagar', 'IIT Hyderabad', 'IIT Jodhpur', 'IIT Patna', 'IIT Indore',
+    'IIT Mandi', 'IIT (BHU) Varanasi', 'IIT Palakkad', 'IIT Tirupati', 'IIT Dhanbad', 'IIT Bhilai', 'IIT Goa',
+    'IIT Jammu', 'IIT Dharwad',
+    // NITs
+    'NIT Trichy', 'NIT Karnataka (Surathkal)', 'NIT Rourkela', 'NIT Warangal', 'NIT Calicut', 'VNIT Nagpur',
+    'MNIT Jaipur', 'NIT Kurukshetra', 'NIT Silchar', 'NIT Durgapur', 'MNNIT Allahabad', 'NIT Jalandhar',
+    'NIT Meghalaya', 'MANIT Bhopal', 'NIT Raipur', 'NIT Agartala', 'NIT Goa', 'NIT Jamshedpur', 'NIT Patna',
+    'NIT Hamirpur', 'NIT Puducherry', 'NIT Uttarakhand', 'NIT Srinagar', 'NIT Delhi', 'NIT Mizoram',
+    'NIT Nagaland', 'NIT Manipur', 'NIT Sikkim', 'NIT Arunachal Pradesh', 'NIT Andhra Pradesh'
+];
 export const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
 export const CAMPUS_ZONES = ['Main Ground', 'Sports Complex', 'Gym', 'Library Area', 'Food Court', 'Academic Block'];
 
@@ -38,8 +49,7 @@ export const SAMPLE_USERS = [
         weight: 70,
         fitnessLevel: 'intermediate',
         dietaryPreferences: 'Vegetarian',
-        hostel: 'Hostel A',
-        department: 'Computer Science',
+        college: 'IIT Bombay',
         year: '2nd Year',
         role: 'student',
         avatarColor: '#6C5CE7',
@@ -55,8 +65,7 @@ export const SAMPLE_USERS = [
         weight: 55,
         fitnessLevel: 'beginner',
         dietaryPreferences: 'Non-Vegetarian',
-        hostel: 'Hostel C',
-        department: 'Electronics',
+        college: 'NIT Trichy',
         year: '3rd Year',
         role: 'student',
         avatarColor: '#00CEC9',
@@ -72,8 +81,7 @@ export const SAMPLE_USERS = [
         weight: 80,
         fitnessLevel: 'intermediate',
         dietaryPreferences: 'Vegetarian',
-        hostel: 'Faculty Quarters',
-        department: 'Administration',
+        college: 'IIT Delhi',
         year: 'Staff',
         role: 'admin',
         avatarColor: '#FF6B6B',
@@ -277,20 +285,16 @@ export const WELLNESS_CIRCLES = [
 
 // Generate campus analytics (anonymized)
 export function generateCampusAnalytics() {
-    const hostelStats = HOSTELS.map(hostel => ({
-        hostel,
+    // Just pick a few colleges for the stats to not make it enormous
+    const selectedColleges = [COLLEGES[0], COLLEGES[1], COLLEGES[23], COLLEGES[24]];
+    const collegeStats = selectedColleges.map(college => ({
+        college,
         avgDailySteps: randomBetween(4000, 10000),
         avgCaloriesConsumed: randomBetween(1800, 2500),
         avgActivityMinutes: randomBetween(20, 60),
         avgMoodScore: (randomBetween(28, 42) / 10).toFixed(1),
         participationRate: randomBetween(30, 85),
         activeUsers: randomBetween(40, 120),
-    }));
-
-    const departmentStats = DEPARTMENTS.map(dept => ({
-        department: dept,
-        avgActivityMinutes: randomBetween(15, 55),
-        participationRate: randomBetween(25, 75),
         topActivity: ['gym', 'running', 'sports', 'yoga', 'cycling'][randomBetween(0, 4)],
     }));
 
@@ -302,5 +306,5 @@ export function generateCampusAnalytics() {
         avgCalories: randomBetween(1800, 2400),
     }));
 
-    return { hostelStats, departmentStats, weeklyTrends };
+    return { collegeStats, weeklyTrends };
 }

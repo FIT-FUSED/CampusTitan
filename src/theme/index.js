@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 // FitFusion Design System
 export const COLORS = {
   // Primary palette
@@ -94,34 +96,62 @@ export const BORDER_RADIUS = {
 };
 
 export const SHADOWS = {
-  small: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  medium: {
-    shadowColor: '#6C5CE7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  large: {
-    shadowColor: '#6C5CE7',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  glow: {
-    shadowColor: '#6C5CE7',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
-  },
+  small: Platform.select({
+    ios: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+    },
+    android: {
+      elevation: 3,
+    },
+    web: {
+      boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
+    },
+  }),
+  medium: Platform.select({
+    ios: {
+      shadowColor: '#6C5CE7',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+    },
+    android: {
+      elevation: 5,
+    },
+    web: {
+      boxShadow: '0px 4px 8px rgba(108, 92, 231, 0.2)',
+    },
+  }),
+  large: Platform.select({
+    ios: {
+      shadowColor: '#6C5CE7',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.3,
+      shadowRadius: 16,
+    },
+    android: {
+      elevation: 8,
+    },
+    web: {
+      boxShadow: '0px 8px 16px rgba(108, 92, 231, 0.3)',
+    },
+  }),
+  glow: Platform.select({
+    ios: {
+      shadowColor: '#6C5CE7',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.5,
+      shadowRadius: 20,
+    },
+    android: {
+      elevation: 10,
+    },
+    web: {
+      boxShadow: '0px 0px 20px rgba(108, 92, 231, 0.5)',
+    },
+  }),
 };
 
 export const CARD_STYLE = {

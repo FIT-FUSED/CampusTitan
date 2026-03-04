@@ -1,125 +1,186 @@
-import axios from 'axios';
-import { Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
-import config from './config';
-
-const API_URL = config.BASE_URL;
-const TOKEN_KEY = 'fitfusion_auth_token';
-const isWeb = Platform.OS === 'web';
-
-// Helper to get auth token
-const getToken = async () => {
-    if (isWeb) {
-        return localStorage.getItem(TOKEN_KEY);
-    } else {
-        return await SecureStore.getItemAsync(TOKEN_KEY);
-    }
-};
-
-// Axios instance with auth header
-const api = axios.create({
-    baseURL: API_URL
-});
-
-api.interceptors.request.use(async (config) => {
-    const token = await getToken();
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-});
+import { supabase } from './supabase';
 
 class Database {
     // User-specific
-    async getUsers() { return []; } // Should be admin only route
+    async getUsers() {
+        const { data, error } = await supabase.from('users').select('*');
+        if (error) { console.error(error); return []; }
+        return data;
+    }
     async addUser(user) { return null; } // Handled by auth.js register
-    async getUserByEmail(email) { return null; } // Handled by auth.js login
+    async getUserByEmail(email) {
+        const { data, error } = await supabase.from('users').select('*').eq('email', email).single();
+        if (error) return null;
+        return data;
+    }
 
     // Food logs
     async getFoodLogs(userId) {
-        const res = await api.get('/food');
-        return res.data;
+        // userId parameter might not be strictly needed if using RLS, but passing it for the query
+        const { data, error } = await supabase.from('food_logs').select('*').eq('user_id', userId).order('date', { ascending: false });
+        if (error) { console.error(error); return []; }
+        // Supabase returns dates as strings, let's format if needed, but for now just return
+        return data.map(log => ({ ...log, mealType: log.meal_type, foodName: log.food_name, isVeg: log.is_veg }));
     }
+
     async addFoodLog(log) {
-        const res = await api.post('/food', log);
-        return res.data;
+        const insertLog = {
+            ...log,
+            user_id: log.userId,
+            meal_type: log.mealType,
+            food_name: log.foodName,
+            is_veg: log.isVeg
+        };
+        delete insertLog.userId;
+        delete insertLog.mealType;
+        delete insertLog.foodName;
+        delete insertLog.isVeg;
+        delete insertLog.id; // Supabase generates ID
+
+        const { data, error } = await supabase.from('food_logs').insert([insertLog]).select().single();
+        if (error) { console.error(error); throw error; }
+        return { ...data, mealType: data.meal_type, foodName: data.food_name, isVeg: data.is_veg };
     }
+
     async deleteFoodLog(id) {
-        const res = await api.delete(`/food/${id}`);
-        return res.data;
+        const { error } = await supabase.from('food_logs').delete().eq('id', id);
+        if (error) { console.error(error); throw error; }
+        return { message: 'Deleted' };
     }
-    async getAllFoodLogs() { return this.getFoodLogs(); }
+    async getAllFoodLogs() {
+        const { data: { user } } = await supabase.auth.getUser();
+        return this.getFoodLogs(user?.id);
+    }
 
     // Activities
     async getActivities(userId) {
-        const res = await api.get('/activities');
-        return res.data;
+        const { data, error } = await supabase.from('activities').select('*').eq('user_id', userId).order('date', { ascending: false });
+        if (error) { console.error(error); return []; }
+        return data.map(act => ({ ...act, caloriesBurned: act.calories_burned }));
     }
+
     async addActivity(activity) {
-        const res = await api.post('/activities', activity);
-        return res.data;
+        const insertAct = {
+            ...activity,
+            user_id: activity.userId,
+            calories_burned: activity.caloriesBurned
+        };
+        delete insertAct.userId;
+        delete insertAct.caloriesBurned;
+        delete insertAct.id;
+
+        const { data, error } = await supabase.from('activities').insert([insertAct]).select().single();
+        if (error) { console.error(error); throw error; }
+        return { ...data, caloriesBurned: data.calories_burned };
     }
+
     async deleteActivity(id) {
-        const res = await api.delete(`/activities/${id}`);
-        return res.data;
+        const { error } = await supabase.from('activities').delete().eq('id', id);
+        if (error) { console.error(error); throw error; }
+        return { message: 'Deleted' };
     }
-    async getAllActivities() { return this.getActivities(); }
+
+    async getAllActivities() {
+        const { data: { user } } = await supabase.auth.getUser();
+        return this.getActivities(user?.id);
+    }
 
     // Mood logs
     async getMoodLogs(userId) {
-        const res = await api.get('/mood');
-        return res.data;
+        const { data, error } = await supabase.from('mood_logs').select('*').eq('user_id', userId).order('date', { ascending: false });
+        if (error) { console.error(error); return []; }
+        return data;
     }
+
     async addMoodLog(log) {
-        const res = await api.post('/mood', log);
-        return res.data;
+        const insertLog = { ...log, user_id: log.userId };
+        delete insertLog.userId;
+        delete insertLog.id;
+
+        const { data, error } = await supabase.from('mood_logs').insert([insertLog]).select().single();
+        if (error) { console.error(error); throw error; }
+        return data;
     }
+
     async deleteMoodLog(id) {
-        const res = await api.delete(`/mood/${id}`);
-        return res.data;
+        const { error } = await supabase.from('mood_logs').delete().eq('id', id);
+        if (error) { console.error(error); throw error; }
+        return { message: 'Deleted' };
     }
-    async getAllMoodLogs() { return this.getMoodLogs(); }
+
+    async getAllMoodLogs() {
+        const { data: { user } } = await supabase.auth.getUser();
+        return this.getMoodLogs(user?.id);
+    }
 
     // Journals
     async getJournals(userId) {
-        const res = await api.get('/journals');
-        return res.data;
+        const { data, error } = await supabase.from('journals').select('*').eq('user_id', userId).order('date', { ascending: false });
+        if (error) { console.error(error); return []; }
+        return data;
     }
+
     async addJournal(journal) {
-        const res = await api.post('/journals', journal);
-        return res.data;
+        const insertJ = { ...journal, user_id: journal.userId };
+        delete insertJ.userId;
+        delete insertJ.id;
+
+        const { data, error } = await supabase.from('journals').insert([insertJ]).select().single();
+        if (error) { console.error(error); throw error; }
+        return data;
     }
+
     async updateJournal(id, updates) {
-        const res = await api.put(`/journals/${id}`, updates);
-        return res.data;
+        const { data, error } = await supabase.from('journals').update(updates).eq('id', id).select().single();
+        if (error) { console.error(error); throw error; }
+        return data;
     }
+
     async deleteJournal(id) {
-        const res = await api.delete(`/journals/${id}`);
-        return res.data;
+        const { error } = await supabase.from('journals').delete().eq('id', id);
+        if (error) { console.error(error); throw error; }
+        return { message: 'Deleted' };
     }
 
     // Environmental data
     async getEnvData() {
-        const res = await api.get('/env');
-        return res.data;
+        // Will rely on the old seeded logic as Supabase mapping for env might be overkill
+        // If needed in the future, can create table
+        return [];
     }
     async addEnvData(data) {
-        const res = await api.post('/env', data);
-        return res.data;
+        return null;
     }
 
     // Wellness circles
     async getWellnessCircles() {
-        const res = await api.get('/wellness-circles');
-        return res.data;
+        const { data, error } = await supabase.from('wellness_circles').select('*');
+        if (error) { console.error(error); return []; }
+        return data.map(wc => ({ ...wc, maxParticipants: wc.max_participants }));
     }
+
     async addWellnessCircle(circle) {
-        const res = await api.post('/wellness-circles', circle);
-        return res.data;
+        const insertC = { ...circle, max_participants: circle.maxParticipants, created_by: circle.createdBy };
+        delete insertC.maxParticipants;
+        delete insertC.createdBy;
+        delete insertC.id;
+
+        const { data, error } = await supabase.from('wellness_circles').insert([insertC]).select().single();
+        if (error) { console.error(error); throw error; }
+        return { ...data, maxParticipants: data.max_participants };
     }
+
     async joinWellnessCircle(id) {
-        const res = await api.post(`/wellness-circles/${id}/join`);
-        return res.data;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Not logged in");
+
+        const { data, error } = await supabase.from('circle_participants').insert([{
+            circle_id: id,
+            user_id: user.id
+        }]);
+
+        if (error) { console.error(error); throw error; }
+        return { message: "Joined successfully" };
     }
 
     // Seeded flag
@@ -131,8 +192,9 @@ class Database {
 
     // Campus Analytics
     async getCampusAnalytics() {
-        const res = await api.get('/analytics/campus');
-        return res.data;
+        // Could be a complex SQL query via Supabase RPC, but for now we'll fetch basic data if required
+        // We can just keep using the generated seed data for dummy analytics if preferred.
+        return null;
     }
 }
 
