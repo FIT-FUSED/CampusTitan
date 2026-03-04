@@ -41,12 +41,10 @@ function CustomTabBar({ state, descriptors, navigation }) {
     const insets = useSafeAreaInsets();
 
     return (
-        <View style={[tabStyles.container, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-            <View style={tabStyles.bar}>
+        <View style={[tabStyles.wrapper, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <View style={tabStyles.pill}>
                 {state.routes.map((route, index) => {
-                    const { options } = descriptors[route.key];
                     const isFocused = state.index === index;
-
                     const icons = {
                         Home: { focused: 'home', unfocused: 'home-outline' },
                         Nutrition: { focused: 'nutrition', unfocused: 'nutrition-outline' },
@@ -54,40 +52,27 @@ function CustomTabBar({ state, descriptors, navigation }) {
                         Wellness: { focused: 'heart', unfocused: 'heart-outline' },
                         More: { focused: 'grid', unfocused: 'grid-outline' },
                     };
-
                     const iconSet = icons[route.name] || { focused: 'ellipse', unfocused: 'ellipse-outline' };
 
                     return (
-                        <View key={route.key} style={tabStyles.tabItem}>
-                            <View
-                                style={[
-                                    tabStyles.tabButton,
-                                    isFocused && tabStyles.tabButtonActive,
-                                ]}
-                            >
-                                <TouchableOpacity
-                                    activeOpacity={0.7}
-                                    onPress={() => {
-                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                        navigation.navigate(route.name);
-                                    }}
-                                    style={tabStyles.touchArea}
-                                >
-                                    <Ionicons
-                                        name={isFocused ? iconSet.focused : iconSet.unfocused}
-                                        size={22}
-                                        color={isFocused ? COLORS.primary : COLORS.textMuted}
-                                    />
-                                    <Text style={[
-                                        tabStyles.tabLabel,
-                                        isFocused && tabStyles.tabLabelActive,
-                                    ]}>
-                                        {route.name}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                            {isFocused && <View style={tabStyles.indicator} />}
-                        </View>
+                        <TouchableOpacity
+                            key={route.key}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                navigation.navigate(route.name);
+                            }}
+                            style={[tabStyles.tab, isFocused && tabStyles.tabActive]}
+                        >
+                            <Ionicons
+                                name={isFocused ? iconSet.focused : iconSet.unfocused}
+                                size={22}
+                                color={isFocused ? COLORS.primary : COLORS.textSecondary}
+                            />
+                            {isFocused && (
+                                <Text style={tabStyles.tabLabel}>{route.name}</Text>
+                            )}
+                        </TouchableOpacity>
                     );
                 })}
             </View>
@@ -237,50 +222,39 @@ export default function AppNavigator() {
 }
 
 const tabStyles = StyleSheet.create({
-    container: {
-        backgroundColor: COLORS.surface + 'F5',
-        borderTopWidth: 1,
-        borderTopColor: COLORS.glassBorder,
-    },
-    bar: {
-        flexDirection: 'row',
-        paddingTop: 12,
-        paddingHorizontal: SPACING.sm,
-    },
-    tabItem: {
-        flex: 1,
+    wrapper: {
+        position: 'absolute',
+        bottom: 0, left: 0, right: 0,
         alignItems: 'center',
+        paddingHorizontal: SPACING.lg,
     },
-    tabButton: {
+    pill: {
+        flexDirection: 'row',
+        backgroundColor: COLORS.surface,
+        borderRadius: BORDER_RADIUS.round,
+        paddingVertical: 12,
+        paddingHorizontal: SPACING.md,
+        borderWidth: 1,
+        borderColor: COLORS.glassBorder,
+        ...SHADOWS.medium,
+        gap: SPACING.xs,
+    },
+    tab: {
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 4,
-        paddingHorizontal: 12,
-        borderRadius: BORDER_RADIUS.lg,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: BORDER_RADIUS.round,
     },
-    tabButtonActive: {
+    tabActive: {
         backgroundColor: COLORS.primary + '15',
     },
-    touchArea: {
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
     tabLabel: {
-        fontSize: 10,
-        ...FONTS.medium,
-        color: COLORS.textMuted,
-        marginTop: 2,
-    },
-    tabLabelActive: {
+        fontSize: 12,
+        ...FONTS.bold,
         color: COLORS.primary,
-        ...FONTS.semiBold,
-    },
-    indicator: {
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: COLORS.primary,
-        marginTop: 2,
+        marginLeft: 8,
     },
 });
 

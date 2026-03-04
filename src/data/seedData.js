@@ -52,7 +52,7 @@ export const SAMPLE_USERS = [
         college: 'IIT Bombay',
         year: '2nd Year',
         role: 'student',
-        avatarColor: '#6C5CE7',
+        avatarColor: '#F0A500',
     },
     {
         id: 'user_2',
@@ -68,7 +68,7 @@ export const SAMPLE_USERS = [
         college: 'NIT Trichy',
         year: '3rd Year',
         role: 'student',
-        avatarColor: '#00CEC9',
+        avatarColor: '#10B981',
     },
     {
         id: 'admin_1',
@@ -84,7 +84,7 @@ export const SAMPLE_USERS = [
         college: 'IIT Delhi',
         year: 'Staff',
         role: 'admin',
-        avatarColor: '#FF6B6B',
+        avatarColor: '#EF4444',
     },
 ];
 

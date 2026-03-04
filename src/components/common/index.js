@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
         ...SHADOWS.small,
     },
     statCard: {
-        backgroundColor: 'rgba(20, 20, 40, 0.4)',
+        backgroundColor: 'rgba(26, 26, 26, 0.6)',
         borderRadius: BORDER_RADIUS.md,
         padding: SPACING.lg,
         borderWidth: 1,

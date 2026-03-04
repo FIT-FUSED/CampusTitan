@@ -1,57 +1,57 @@
 import { Platform } from 'react-native';
 
-// FitFusion Design System
+// CampusTitan Design System — Warm Amber & Emerald on Charcoal
 export const COLORS = {
-  // Primary palette
-  primary: '#6C5CE7',
-  primaryLight: '#A29BFE',
-  primaryDark: '#5A4BD1',
+  // Primary — Warm Amber/Gold
+  primary: '#F0A500',
+  primaryLight: '#FFCB5C',
+  primaryDark: '#D4910A',
 
-  // Accent colors
-  accent: '#00CEC9',
-  accentLight: '#55EFC4',
-  accentDark: '#00B894',
+  // Accent — Emerald Green
+  accent: '#10B981',
+  accentLight: '#34D399',
+  accentDark: '#059669',
 
   // Warm accents
-  coral: '#FF6B6B',
-  coralLight: '#FF8E8E',
-  orange: '#FDCB6E',
-  orangeLight: '#FFEAA7',
+  coral: '#EF4444',
+  coralLight: '#F87171',
+  orange: '#F59E0B',
+  orangeLight: '#FCD34D',
 
-  // Background (Dark mode first)
-  background: '#0A0A1A',
-  surface: '#141428',
-  surfaceLight: '#1E1E3A',
-  surfaceElevated: '#252545',
+  // Background — Rich Charcoal (warm undertone)
+  background: '#0D0D0D',
+  surface: '#1A1A1A',
+  surfaceLight: '#262626',
+  surfaceElevated: '#2E2E2E',
 
-  // Text
-  text: '#FFFFFF',
-  textSecondary: '#A0A0C0',
-  textMuted: '#6B6B8D',
-  textInverse: '#0A0A1A',
+  // Text — Warm neutrals
+  text: '#F5F5F5',
+  textSecondary: '#9CA3AF',
+  textMuted: '#6B7280',
+  textInverse: '#0D0D0D',
 
   // Status
-  success: '#00B894',
-  warning: '#FDCB6E',
-  error: '#FF6B6B',
-  info: '#74B9FF',
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#EF4444',
+  info: '#3B82F6',
 
-  // Glassmorphism
-  glass: 'rgba(255, 255, 255, 0.05)',
-  glassBorder: 'rgba(255, 255, 255, 0.1)',
-  glassHighlight: 'rgba(255, 255, 255, 0.15)',
+  // Glassmorphism — warmer
+  glass: 'rgba(255, 255, 255, 0.04)',
+  glassBorder: 'rgba(255, 255, 255, 0.08)',
+  glassHighlight: 'rgba(255, 255, 255, 0.12)',
 
-  // Chart colors
-  chartColors: ['#6C5CE7', '#00CEC9', '#FF6B6B', '#FDCB6E', '#55EFC4', '#A29BFE', '#74B9FF'],
+  // Chart colors — warm diverse palette
+  chartColors: ['#F0A500', '#10B981', '#EF4444', '#F59E0B', '#8B5CF6', '#EC4899', '#3B82F6'],
 
-  // Gradients (as arrays for LinearGradient)
-  gradientPrimary: ['#6C5CE7', '#A29BFE'],
-  gradientAccent: ['#00CEC9', '#55EFC4'],
-  gradientCoral: ['#FF6B6B', '#FF8E8E'],
-  gradientSunset: ['#F093FB', '#F5576C'],
-  gradientOcean: ['#4FACFE', '#00F2FE'],
-  gradientDark: ['#0A0A1A', '#141428'],
-  gradientCard: ['rgba(30, 30, 58, 0.8)', 'rgba(20, 20, 40, 0.6)'],
+  // Gradients
+  gradientPrimary: ['#F0A500', '#D4910A'],
+  gradientAccent: ['#10B981', '#059669'],
+  gradientCoral: ['#EF4444', '#DC2626'],
+  gradientSunset: ['#F59E0B', '#EF4444'],
+  gradientOcean: ['#10B981', '#3B82F6'],
+  gradientDark: ['#0D0D0D', '#1A1A1A'],
+  gradientCard: ['rgba(26, 26, 26, 0.9)', 'rgba(20, 20, 20, 0.7)'],
 };
 
 export const SPACING = {
@@ -100,62 +100,46 @@ export const SHADOWS = {
     ios: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
+      shadowOpacity: 0.3,
       shadowRadius: 4,
     },
-    android: {
-      elevation: 3,
-    },
-    web: {
-      boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
-    },
+    android: { elevation: 3 },
+    web: { boxShadow: '0px 2px 4px rgba(0,0,0,0.2)' },
   }),
   medium: Platform.select({
     ios: {
-      shadowColor: '#6C5CE7',
+      shadowColor: '#F0A500',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.2,
+      shadowOpacity: 0.15,
       shadowRadius: 8,
     },
-    android: {
-      elevation: 5,
-    },
-    web: {
-      boxShadow: '0px 4px 8px rgba(108, 92, 231, 0.2)',
-    },
+    android: { elevation: 5 },
+    web: { boxShadow: '0px 4px 8px rgba(240,165,0,0.15)' },
   }),
   large: Platform.select({
     ios: {
-      shadowColor: '#6C5CE7',
+      shadowColor: '#F0A500',
       shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.3,
+      shadowOpacity: 0.2,
       shadowRadius: 16,
     },
-    android: {
-      elevation: 8,
-    },
-    web: {
-      boxShadow: '0px 8px 16px rgba(108, 92, 231, 0.3)',
-    },
+    android: { elevation: 8 },
+    web: { boxShadow: '0px 8px 16px rgba(240,165,0,0.2)' },
   }),
   glow: Platform.select({
     ios: {
-      shadowColor: '#6C5CE7',
+      shadowColor: '#F0A500',
       shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.5,
+      shadowOpacity: 0.4,
       shadowRadius: 20,
     },
-    android: {
-      elevation: 10,
-    },
-    web: {
-      boxShadow: '0px 0px 20px rgba(108, 92, 231, 0.5)',
-    },
+    android: { elevation: 10 },
+    web: { boxShadow: '0px 0px 20px rgba(240,165,0,0.4)' },
   }),
 };
 
 export const CARD_STYLE = {
-  backgroundColor: 'rgba(20, 20, 40, 0.6)',
+  backgroundColor: 'rgba(26, 26, 26, 0.8)',
   borderRadius: BORDER_RADIUS.lg,
   borderWidth: 1,
   borderColor: COLORS.glassBorder,
@@ -172,25 +156,25 @@ export const GLASS_STYLE = {
   overflow: 'hidden',
 };
 
-// Mood emojis
+// Mood emojis — warm palette
 export const MOOD_EMOJIS = [
-  { emoji: '😄', label: 'Great', value: 5, color: '#55EFC4' },
-  { emoji: '🙂', label: 'Good', value: 4, color: '#00CEC9' },
-  { emoji: '😐', label: 'Okay', value: 3, color: '#FDCB6E' },
-  { emoji: '😔', label: 'Low', value: 2, color: '#FF8E8E' },
-  { emoji: '😢', label: 'Bad', value: 1, color: '#FF6B6B' },
+  { emoji: '😄', label: 'Great', value: 5, color: '#10B981' },
+  { emoji: '🙂', label: 'Good', value: 4, color: '#34D399' },
+  { emoji: '😐', label: 'Okay', value: 3, color: '#F59E0B' },
+  { emoji: '😔', label: 'Low', value: 2, color: '#F87171' },
+  { emoji: '😢', label: 'Bad', value: 1, color: '#EF4444' },
 ];
 
-// Activity types
+// Activity types — warm palette
 export const ACTIVITY_TYPES = [
-  { id: 'gym', label: 'Gym Workout', icon: 'fitness-center', color: '#6C5CE7' },
-  { id: 'running', label: 'Running', icon: 'directions-run', color: '#00CEC9' },
-  { id: 'cycling', label: 'Cycling', icon: 'pedal-bike', color: '#FDCB6E' },
-  { id: 'sports', label: 'Sports', icon: 'sports-soccer', color: '#FF6B6B' },
-  { id: 'yoga', label: 'Yoga', icon: 'self-improvement', color: '#55EFC4' },
-  { id: 'swimming', label: 'Swimming', icon: 'pool', color: '#74B9FF' },
-  { id: 'walking', label: 'Walking', icon: 'directions-walk', color: '#A29BFE' },
-  { id: 'other', label: 'Other', icon: 'sports', color: '#F093FB' },
+  { id: 'gym', label: 'Gym Workout', icon: 'fitness-center', color: '#F0A500' },
+  { id: 'running', label: 'Running', icon: 'directions-run', color: '#EF4444' },
+  { id: 'cycling', label: 'Cycling', icon: 'pedal-bike', color: '#F59E0B' },
+  { id: 'sports', label: 'Sports', icon: 'sports-soccer', color: '#10B981' },
+  { id: 'yoga', label: 'Yoga', icon: 'self-improvement', color: '#8B5CF6' },
+  { id: 'swimming', label: 'Swimming', icon: 'pool', color: '#3B82F6' },
+  { id: 'walking', label: 'Walking', icon: 'directions-walk', color: '#FFCB5C' },
+  { id: 'other', label: 'Other', icon: 'sports', color: '#EC4899' },
 ];
 
 // Meal types

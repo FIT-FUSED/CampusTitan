@@ -11,11 +11,11 @@ import { CAMPUS_ZONES } from '../../data/seedData';
 const { width } = Dimensions.get('window');
 
 function getAQIColor(aqi) {
-    if (aqi <= 50) return '#55EFC4';
-    if (aqi <= 100) return '#FDCB6E';
-    if (aqi <= 150) return '#FF8E8E';
-    if (aqi <= 200) return '#FF6B6B';
-    return '#D63031';
+    if (aqi <= 50) return '#34D399';
+    if (aqi <= 100) return '#F59E0B';
+    if (aqi <= 150) return '#F87171';
+    if (aqi <= 200) return '#EF4444';
+    return '#B91C1C';
 }
 
 function getAQILabel(aqi) {
@@ -85,11 +85,11 @@ export default function EnvironmentScreen({ navigation }) {
                             </View>
                             <View style={styles.aqiScale}>
                                 {[
-                                    { range: '0-50', label: 'Good', color: '#55EFC4' },
-                                    { range: '51-100', label: 'Moderate', color: '#FDCB6E' },
-                                    { range: '101-150', label: 'Unhealthy*', color: '#FF8E8E' },
-                                    { range: '151-200', label: 'Unhealthy', color: '#FF6B6B' },
-                                    { range: '200+', label: 'V. Unhealthy', color: '#D63031' },
+                                    { range: '0-50', label: 'Good', color: '#34D399' },
+                                    { range: '51-100', label: 'Moderate', color: '#F59E0B' },
+                                    { range: '101-150', label: 'Unhealthy*', color: '#F87171' },
+                                    { range: '151-200', label: 'Unhealthy', color: '#EF4444' },
+                                    { range: '200+', label: 'V. Unhealthy', color: '#B91C1C' },
                                 ].map((item, i) => (
                                     <View key={i} style={styles.aqiScaleItem}>
                                         <View style={[styles.aqiScaleDot, { backgroundColor: item.color }]} />

@@ -123,7 +123,7 @@ export default function SettingsScreen({ navigation }) {
                 <AnimatedButton
                     title="Logout"
                     onPress={handleLogout}
-                    gradient={[COLORS.error, '#D63031']}
+                    gradient={[COLORS.error, '#B91C1C']}
                     icon="👋"
                     style={{ marginHorizontal: SPACING.lg, marginTop: SPACING.xxl }}
                 />
