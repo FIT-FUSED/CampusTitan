@@ -15,6 +15,10 @@ class AuthService {
                     data: {
                         name: userData.name,
                         college: userData.college,
+                        age: userData.age,
+                        height: userData.height,
+                        weight: userData.weight,
+                        gender: userData.gender
                     }
                 }
             });
@@ -31,13 +35,16 @@ class AuthService {
                             email: userData.email,
                             name: userData.name,
                             college: userData.college,
+                            age: userData.age,
+                            height: userData.height,
+                            weight: userData.weight,
+                            gender: userData.gender,
                             role: 'student'
                         }
                     ]);
 
                 if (profileError) {
                     console.error("Profile creation error (safe to ignore if table missing):", profileError);
-                    // We can still use the account because we saved name/college in metadata above
                 }
             }
 
@@ -66,7 +73,6 @@ class AuthService {
             await supabase.auth.signOut();
         } catch (error) {
             console.error('Logout error:', error);
-            // We want to return anyway so the app can reset state
         }
     }
 
@@ -77,7 +83,6 @@ class AuthService {
 
             const user = session.user;
 
-            // Optional: fetch additional profile info from `users` table
             const { data: profile, error } = await supabase
                 .from('users')
                 .select('*')
@@ -93,6 +98,10 @@ class AuthService {
                 ...user,
                 name: user.user_metadata?.name || user.email?.split('@')[0],
                 college: user.user_metadata?.college || 'Not set',
+                age: user.user_metadata?.age,
+                height: user.user_metadata?.height,
+                weight: user.user_metadata?.weight,
+                gender: user.user_metadata?.gender,
                 role: user.user_metadata?.role || 'student'
             };
         } catch (error) {

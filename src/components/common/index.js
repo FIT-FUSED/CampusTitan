@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform, FlatList } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS } from '../../theme';
@@ -128,9 +129,6 @@ export function InputField({ label, value, onChangeText, placeholder, secureText
         </View>
     );
 }
-
-// We'll use a simpler TextInput approach
-import { TextInput } from 'react-native';
 
 export function StyledInput({ label, value, onChangeText, placeholder, secureTextEntry, keyboardType, multiline, style, icon }) {
     return (
@@ -419,4 +417,105 @@ const styles = StyleSheet.create({
         color: COLORS.text,
         ...FONTS.bold,
     },
+    scrollPickerContainer: {
+        marginVertical: SPACING.md,
+        width: '100%',
+    },
+    scrollPickerLabel: {
+        fontSize: FONT_SIZES.sm,
+        ...FONTS.medium,
+        color: COLORS.textSecondary,
+        marginBottom: SPACING.sm,
+        textAlign: 'center',
+    },
+    scrollPickerFrame: {
+        flex: 1,
+        backgroundColor: COLORS.surfaceLight,
+        borderRadius: BORDER_RADIUS.lg,
+        borderWidth: 1,
+        borderColor: COLORS.glassBorder,
+        overflow: 'hidden',
+    },
+    scrollPickerSelection: {
+        position: 'absolute',
+        top: '50%',
+        marginTop: -20,
+        height: 40,
+        width: '100%',
+        backgroundColor: COLORS.primary + '15',
+        borderTopWidth: 1,
+        borderBottomWidth: 1,
+        borderColor: COLORS.primary + '33',
+    },
+    scrollPickerItem: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    scrollPickerText: {
+        fontSize: FONT_SIZES.lg,
+        color: COLORS.textMuted,
+        ...FONTS.medium,
+    },
+    scrollPickerTextActive: {
+        fontSize: FONT_SIZES.xl,
+        color: COLORS.primary,
+        ...FONTS.bold,
+    },
 });
+
+// Scroll Picker for numeric values
+export function ScrollPicker({ data, value, onValueChange, label, height = 150 }) {
+    const itemHeight = 40;
+    const padding = (height - itemHeight) / 2;
+    const flatListRef = useRef(null);
+
+    useEffect(() => {
+        const index = data.indexOf(value);
+        if (index !== -1 && flatListRef.current) {
+            flatListRef.current.scrollToIndex({ index, animated: false, viewPosition: 0.5 });
+        }
+    }, [data, value]);
+
+    const onMomentumScrollEnd = (event) => {
+        const y = event.nativeEvent.contentOffset.y;
+        const index = Math.round(y / itemHeight);
+        if (data[index] !== undefined && data[index] !== value) {
+            onValueChange(data[index]);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+    };
+
+    return (
+        <View style={[styles.scrollPickerContainer, { height }]}>
+            {label && <Text style={styles.scrollPickerLabel}>{label}</Text>}
+            <View style={styles.scrollPickerFrame}>
+                <View style={styles.scrollPickerSelection} />
+                <FlatList
+                    ref={flatListRef}
+                    data={data}
+                    keyExtractor={(item) => item.toString()}
+                    showsVerticalScrollIndicator={false}
+                    snapToInterval={itemHeight}
+                    decelerationRate="fast"
+                    onMomentumScrollEnd={onMomentumScrollEnd}
+                    contentContainerStyle={{ paddingVertical: padding }}
+                    getItemLayout={(_, index) => ({
+                        length: itemHeight,
+                        offset: itemHeight * index,
+                        index,
+                    })}
+                    renderItem={({ item }) => (
+                        <View style={[styles.scrollPickerItem, { height: itemHeight }]}>
+                            <Text style={[
+                                styles.scrollPickerText,
+                                item === value && styles.scrollPickerTextActive
+                            ]}>
+                                {item}
+                            </Text>
+                        </View>
+                    )}
+                />
+            </View>
+        </View>
+    );
+}
