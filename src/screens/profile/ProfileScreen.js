@@ -8,6 +8,11 @@ import { useAuth } from '../../services/AuthContext';
 
 const { width } = Dimensions.get('window');
 
+function capitalize(str) {
+    if (!str) return '—';
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
 export default function ProfileScreen({ navigation }) {
     const { user } = useAuth();
 
@@ -40,6 +45,11 @@ export default function ProfileScreen({ navigation }) {
                         <View style={styles.profileInfo}>
                             <Text style={styles.profileName}>{user.name}</Text>
                             <Text style={styles.profileEmail}>{user.email}</Text>
+                            {!!user.college && (
+                                <View style={styles.collegeBadge}>
+                                    <Text style={styles.collegeText}>🏛️ {user.college}</Text>
+                                </View>
+                            )}
                             <View style={styles.roleBadge}>
                                 <Text style={styles.roleText}>{user.role === 'admin' ? '🛡️ Admin' : '🎓 Student'}</Text>
                             </View>
@@ -62,27 +72,12 @@ export default function ProfileScreen({ navigation }) {
                 <SectionHeader title="Personal Information" />
                 <View style={styles.infoCard}>
                     {[
-                        { label: 'Gender', value: user.gender, icon: '👤' },
-                        { label: 'Fitness Level', value: user.fitnessLevel?.charAt(0).toUpperCase() + user.fitnessLevel?.slice(1), icon: '💪' },
-                        { label: 'Dietary Preference', value: user.dietaryPreferences, icon: '🥗' },
+                        { label: 'Gender', value: capitalize(user.gender), icon: user.gender === 'female' ? '👩' : '👨' },
+                        { label: 'College', value: user.college, icon: '🏛️' },
+                        { label: 'Fitness Level', value: capitalize(user.fitnessLevel), icon: '💪' },
+                        { label: 'Dietary Preference', value: user.dietaryPreferences || '—', icon: '🥗' },
                     ].map((item, i) => (
-                        <View key={i} style={styles.infoRow}>
-                            <Text style={styles.infoIcon}>{item.icon}</Text>
-                            <Text style={styles.infoLabel}>{item.label}</Text>
-                            <Text style={styles.infoValue}>{item.value || '—'}</Text>
-                        </View>
-                    ))}
-                </View>
-
-                {/* Campus Info */}
-                <SectionHeader title="Campus Details" />
-                <View style={styles.infoCard}>
-                    {[
-                        { label: 'Hostel', value: user.hostel, icon: '🏠' },
-                        { label: 'Department', value: user.department, icon: '🎓' },
-                        { label: 'Year', value: user.year, icon: '📅' },
-                    ].map((item, i) => (
-                        <View key={i} style={styles.infoRow}>
+                        <View key={i} style={[styles.infoRow, i === 3 && { borderBottomWidth: 0 }]}>
                             <Text style={styles.infoIcon}>{item.icon}</Text>
                             <Text style={styles.infoLabel}>{item.label}</Text>
                             <Text style={styles.infoValue}>{item.value || '—'}</Text>
@@ -104,8 +99,14 @@ const styles = StyleSheet.create({
     profileInfo: { marginLeft: SPACING.lg, flex: 1 },
     profileName: { color: COLORS.text, fontSize: FONT_SIZES.xxl, ...FONTS.bold },
     profileEmail: { color: COLORS.text, fontSize: FONT_SIZES.sm, opacity: 0.7, marginTop: 2 },
-    roleBadge: {
+    collegeBadge: {
         alignSelf: 'flex-start', marginTop: SPACING.sm,
+        backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.xs, borderRadius: BORDER_RADIUS.round,
+    },
+    collegeText: { color: COLORS.text, fontSize: FONT_SIZES.xs, ...FONTS.semiBold },
+    roleBadge: {
+        alignSelf: 'flex-start', marginTop: SPACING.xs,
         backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: SPACING.md,
         paddingVertical: SPACING.xs, borderRadius: BORDER_RADIUS.round,
     },
@@ -124,3 +125,4 @@ const styles = StyleSheet.create({
     infoLabel: { flex: 1, color: COLORS.textSecondary, fontSize: FONT_SIZES.md },
     infoValue: { color: COLORS.text, fontSize: FONT_SIZES.md, ...FONTS.medium },
 });
+

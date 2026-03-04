@@ -192,9 +192,76 @@ class Database {
 
     // Campus Analytics
     async getCampusAnalytics() {
-        // Could be a complex SQL query via Supabase RPC, but for now we'll fetch basic data if required
-        // We can just keep using the generated seed data for dummy analytics if preferred.
         return null;
+    }
+
+    // College Leaderboard
+    async getLeaderboard(college) {
+        if (!college) return [];
+        try {
+            // Fetch all users from the same college
+            const { data: users, error } = await supabase
+                .from('users')
+                .select('id, name, college, height, weight, age, gender')
+                .eq('college', college);
+
+            if (error || !users) {
+                console.error('Leaderboard fetch error:', error);
+                return [];
+            }
+
+            // For each user, compute a health score
+            const scored = await Promise.all(users.map(async (u) => {
+                let score = 0;
+
+                // 1. Activity score (up to 40 pts)
+                try {
+                    const acts = await this.getActivities(u.id);
+                    const totalMinutes = acts.reduce((sum, a) => sum + (a.duration || 0), 0);
+                    const activeDays = new Set(acts.map(a => a.date)).size;
+                    score += Math.min(totalMinutes / 10, 25); // up to 25 pts for total minutes
+                    score += Math.min(activeDays * 3, 15); // up to 15 pts for consistency
+                    u.activeDays = activeDays;
+                } catch (e) {
+                    u.activeDays = 0;
+                }
+
+                // 2. Food logging score (up to 25 pts)
+                try {
+                    const foods = await this.getFoodLogs(u.id);
+                    const loggedDays = new Set(foods.map(f => f.date)).size;
+                    score += Math.min(loggedDays * 2, 25);
+                } catch (e) { }
+
+                // 3. Mood tracking score (up to 15 pts)
+                try {
+                    const moods = await this.getMoodLogs(u.id);
+                    const moodDays = new Set(moods.map(m => m.date)).size;
+                    score += Math.min(moodDays * 2, 15);
+                } catch (e) { }
+
+                // 4. BMI score (up to 20 pts) - closer to healthy range = more points
+                if (u.weight && u.height) {
+                    const bmi = u.weight / ((u.height / 100) ** 2);
+                    u.bmi = bmi.toFixed(1);
+                    if (bmi >= 18.5 && bmi < 25) score += 20; // Normal
+                    else if (bmi >= 16 && bmi < 18.5) score += 12; // Underweight
+                    else if (bmi >= 25 && bmi < 30) score += 10; // Overweight
+                    else score += 5; // Obese or severely underweight
+                } else {
+                    u.bmi = null;
+                }
+
+                return { ...u, healthScore: Math.round(score) };
+            }));
+
+            // Sort by health score descending
+            scored.sort((a, b) => b.healthScore - a.healthScore);
+            return scored;
+        } catch (e) {
+            console.error('Leaderboard error:', e);
+            return [];
+        }
     }
 }
 

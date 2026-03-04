@@ -32,6 +32,7 @@ import AnalyticsScreen from '../screens/analytics/AnalyticsScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import SettingsScreen from '../screens/profile/SettingsScreen';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
+import LeaderboardScreen from '../screens/leaderboard/LeaderboardScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -157,6 +158,7 @@ function MoreStack() {
             <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+            <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
         </Stack.Navigator>
     );
 }
@@ -164,6 +166,7 @@ function MoreStack() {
 function MoreMenu({ navigation }) {
     const { isAdmin } = useAuth();
     const items = [
+        { icon: '🏆', label: 'Leaderboard', screen: 'Leaderboard', color: COLORS.orange },
         { icon: '🌍', label: 'Environment', screen: 'Environment', color: COLORS.accentLight },
         { icon: '📊', label: 'Campus Analytics', screen: 'Analytics', color: COLORS.primaryLight },
         { icon: '👤', label: 'Profile', screen: 'Profile', color: COLORS.coral },

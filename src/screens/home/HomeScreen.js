@@ -124,6 +124,7 @@ export default function HomeScreen({ navigation }) {
                         <View style={styles.headerText}>
                             <Text style={styles.greeting}>{greeting()}</Text>
                             <Text style={styles.userName}>{user?.name?.split(' ')[0] || 'User'} 👋</Text>
+                            {!!user?.college && <Text style={styles.collegeBadge}>🏛️ {user.college}</Text>}
                         </View>
                     </View>
                     <View style={styles.dateBadge}>
@@ -304,6 +305,7 @@ const styles = StyleSheet.create({
     headerText: { marginLeft: SPACING.md },
     greeting: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
     userName: { fontSize: FONT_SIZES.xl, ...FONTS.bold, color: COLORS.text },
+    collegeBadge: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, ...FONTS.medium, marginTop: 2 },
     dateBadge: {
         backgroundColor: COLORS.surface,
         paddingHorizontal: SPACING.md,
