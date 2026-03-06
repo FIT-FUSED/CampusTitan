@@ -1,36 +1,41 @@
 # FitFusion — Campus Wellness & Fitness Tracker
 
-A React Native (Expo) app for campus wellness: nutrition, activity, mood, environment, and step tracking.
+A comprehensive React Native (Expo) application designed for holistic campus wellness, featuring advanced tracking for nutrition, physical activity, mental wellness, environmental metrics, and AI-driven coaching.
 
-## Features
+## Core Features
 
-- 🍎 **Nutrition**
-  - Food logging with macro tracking
-  - Barcode scanner for quick entry
-  - Daily calorie and macro goals
+- **Advanced Nutrition Tracking**
+  - Vision-based food logging utilizing the Gemini API for autonomous portion estimation and dish identification.
+  - Integration with the USDA API to calculate exact macronutrients and the Nutrient Rich Foods (NRF9.3) density score.
+  - Barcode scanner for quick manual entry.
+  - Daily caloric and macronutrient goal management.
 
-- 🏃 **Activity**
-  - Manual workout logging
-  - Calorie burn estimation
-  - Weekly activity sparkline
+- **Activity & Step Tracking**
+  - Real-time pedometer tracking with native permission handling via Expo Sensors.
+  - On-demand step increment fallback for Expo Go compatibility.
+  - Manual workout logging with calorie burn estimation.
+  - Weekly activity visualization and sparklines.
 
-- 😊 **Mood & Journal**
-  - Daily mood check-ins
-  - Personal journal entries
+- **Mental Wellness & Journaling**
+  - Predictive mental wellness scoring powered by a custom PyTorch Neural Network based on user behavioral data (screen time, sleep quality, activity levels).
+  - Daily qualitative mood check-ins.
+  - Secure personal journal entries.
 
-- 👟 **Steps**
-  - Real-time step tracking (with permission handling)
-  - On-demand step increment for Expo Go compatibility
+- **Autonomous AI Health Coach**
+  - A locally hosted, LoRA-fine-tuned Llama 3 (8B) model providing strict, personalized health adjustments.
+  - Asynchronous daily report generation utilizing a 7-day rolling context window, compressed via Gemini to eliminate LLM hallucination.
 
-- 🌍 **Environment**
-  - Campus AQI, temperature, humidity, noise
-  - Health recommendations based on conditions
+- **Environmental Awareness**
+  - Real-time campus API integration for AQI, temperature, humidity, and noise levels.
+  - Contextual health recommendations based on current environmental conditions.
 
 ## Tech Stack
 
 - **Frontend:** React Native, Expo (~54), Expo Router, Expo Sensors, Expo Secure Store
-- **Backend:** Node.js, Express, SQLite
-- **UI:** Custom theme, expo-linear-gradient, expo-blur
+- **Application Backend:** Node.js, Express, SQLite
+- **Machine Learning Microservices:** Python, PyTorch, Ollama (GGUF Inference)
+- **External APIs:** Google Gemini 2.5 Flash, USDA FoodData Central
+- **UI Architecture:** Custom theme system, expo-linear-gradient, expo-blur
 
 ## Development
 
@@ -38,23 +43,15 @@ A React Native (Expo) app for campus wellness: nutrition, activity, mood, enviro
 - Node.js (npm)
 - Expo CLI
 - Expo Go or EAS Dev Client
+- Python 3.10+ (For ML Microservices)
+- Ollama (For local LLM inference)
 
-### Quick Start
+### Quick Start (Frontend)
 
 ```bash
 npm install
-npm start          # Expo Go
+npm start          # Run via Expo Go
 
-
-### Step Tracking Notes
-
-- **Expo Go:** Physical Activity permission may not prompt; steps increment on tap is used as fallback.
-- **Dev Client:** Full native permission prompt and live pedometer updates.
-- **SensorService** handles both modes gracefully.
-
-## Project Structure
-
-```
 src/
 ├── components/
 │   └── common/
@@ -73,8 +70,13 @@ src/
 ├── navigation/
 ├── theme/
 └── data/
-```
 
-## License
+ml_services/
+├── titan_ml_interface.py        # Unified API wrapper for backend integration
+├── context_engine.py            # Context compression and LLM prompting logic
+├── nutrition_score.py           # Vision processing and NRF9.3 calculation
+├── mental_wellness_predictor.py # PyTorch neural network inference
+├── Modelfile                    # Llama 3 system instructions and parameters
+├── best_model.pth               # Trained PyTorch weights
+└── scaler.pkl                   # Feature normalization scaler
 
-MIT
