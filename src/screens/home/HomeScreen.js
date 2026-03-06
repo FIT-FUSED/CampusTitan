@@ -144,6 +144,30 @@ export default function HomeScreen({ navigation }) {
                     </View>
                 </View>
 
+                {/* ─── QUIZ CTA ─── */}
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => navigation.navigate('WellnessQuiz')}
+                    style={s.quizCard}
+                >
+                    <LinearGradient
+                        colors={[COLORS.primary, COLORS.accent]}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                        style={s.quizGradient}
+                    >
+                        <View style={s.quizContent}>
+                            <Text style={s.quizEmoji}>🧠</Text>
+                            <View style={{ flex: 1, marginLeft: SPACING.md }}>
+                                <Text style={s.quizTitle}>Daily Wellness Check</Text>
+                                <Text style={s.quizSub}>Earn points & train your AI predictor!</Text>
+                            </View>
+                            <View style={s.quizBtn}>
+                                <Text style={s.quizBtnText}>Start</Text>
+                            </View>
+                        </View>
+                    </LinearGradient>
+                </TouchableOpacity>
+
                 {/* ─── BENTO GRID ─── */}
                 <View style={s.bentoGrid}>
                     {/* Row 1: Two rings side by side */}
@@ -300,6 +324,23 @@ const s = StyleSheet.create({
     heroBadgeText: { fontSize: FONT_SIZES.xs, color: COLORS.primary, ...FONTS.semiBold },
     heroRight: { alignItems: 'center' },
     heroDate: { fontSize: FONT_SIZES.xs, color: COLORS.textMuted, ...FONTS.medium, marginTop: 4 },
+
+    // ─── Quiz CTA ───
+    quizCard: {
+        marginHorizontal: SPACING.lg, marginBottom: SPACING.xl,
+        borderRadius: BORDER_RADIUS.xl, overflow: 'hidden',
+        ...SHADOWS.medium,
+    },
+    quizGradient: { padding: SPACING.lg },
+    quizContent: { flexDirection: 'row', alignItems: 'center' },
+    quizEmoji: { fontSize: 36 },
+    quizTitle: { fontSize: FONT_SIZES.md, ...FONTS.bold, color: COLORS.textInverse },
+    quizSub: { fontSize: FONT_SIZES.xs, ...FONTS.medium, color: COLORS.textInverse, opacity: 0.8, marginTop: 2 },
+    quizBtn: {
+        backgroundColor: COLORS.textInverse, paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.sm, borderRadius: BORDER_RADIUS.round
+    },
+    quizBtnText: { color: COLORS.primary, ...FONTS.bold, fontSize: FONT_SIZES.sm },
 
     // ─── Bento ───
     bentoGrid: { paddingHorizontal: SPACING.lg, gap: CARD_GAP },

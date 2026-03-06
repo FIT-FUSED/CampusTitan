@@ -14,6 +14,20 @@ class Database {
         return data;
     }
 
+    // Wellness Model Data
+    async saveWellnessData(userId, dataDict) {
+        const insertObj = {
+            user_id: userId,
+            ...dataDict
+        };
+        const { data, error } = await supabase.from('user_wellness_data').insert([insertObj]).select().single();
+        if (error) {
+            console.error('saveWellnessData error:', error);
+            throw error;
+        }
+        return data;
+    }
+
     // Food logs
     async getFoodLogs(userId) {
         // userId parameter might not be strictly needed if using RLS, but passing it for the query

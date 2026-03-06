@@ -8,6 +8,7 @@ import { useAuth } from '../../services/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import db from '../../services/database';
 import { format, subDays } from 'date-fns';
+import SleepTracker from './SleepTracker';
 
 export default function WellnessScreen({ navigation }) {
     const { user } = useAuth();
@@ -82,6 +83,9 @@ export default function WellnessScreen({ navigation }) {
                     )}
                 </GradientCard>
 
+                {/* Sleep Tracker */}
+                <SleepTracker />
+
                 {/* Quick Actions */}
                 <View style={styles.actions}>
                     <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('MoodLog')}>
@@ -100,6 +104,12 @@ export default function WellnessScreen({ navigation }) {
                         <LinearGradient colors={COLORS.gradientAccent} style={styles.actionGradient}>
                             <Text style={styles.actionEmoji}>🤝</Text>
                             <Text style={styles.actionLabel}>Circles</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('DailyJournal')}>
+                        <LinearGradient colors={COLORS.gradientSunset} style={styles.actionGradient}>
+                            <Text style={styles.actionEmoji}>🧠</Text>
+                            <Text style={styles.actionLabel}>AI Journal</Text>
                         </LinearGradient>
                     </TouchableOpacity>
                 </View>

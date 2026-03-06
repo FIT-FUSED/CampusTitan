@@ -1,13 +1,15 @@
 // Fitness Tracking Screen
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, RefreshControl, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, ACTIVITY_TYPES } from '../../theme';
 import { GradientCard, StatCard, SectionHeader, AnimatedButton, ProgressBar } from '../../components/common';
 import { useAuth } from '../../services/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import db from '../../services/database';
-import { format, subDays } from 'date-fns';
+import { format, subDays, startOfDay } from 'date-fns';
+import { Pedometer } from 'expo-sensors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -16,6 +18,57 @@ export default function FitnessScreen({ navigation }) {
     const [activities, setActivities] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
     const [selectedFilter, setSelectedFilter] = useState('week');
+
+    // Automation state
+    const [steps, setSteps] = useState(0);
+    const [kms, setKms] = useState(0);
+    const [exerciseMins, setExerciseMins] = useState('');
+
+    useEffect(() => {
+        const loadExercise = async () => {
+            const saved = await AsyncStorage.getItem('@exercise_mins_week');
+            if (saved) setExerciseMins(saved);
+        };
+        loadExercise();
+    }, []);
+
+    useEffect(() => {
+        let isMounted = true;
+        const initPedometer = async () => {
+            try {
+                const { status } = await Pedometer.requestPermissionsAsync();
+                if (status === 'granted') {
+                    const isAvailable = await Pedometer.isAvailableAsync();
+                    if (isAvailable) {
+                        const end = new Date();
+                        const start = startOfDay(new Date());
+                        const result = await Pedometer.getStepCountAsync(start, end);
+                        if (result && isMounted) {
+                            setSteps(result.steps);
+                            const calcKms = parseFloat((result.steps / 1300).toFixed(2));
+                            setKms(calcKms);
+                            await AsyncStorage.setItem('@kms_walked_daily', calcKms.toString());
+                        }
+
+                        // Fallback manual watch
+                        Pedometer.watchStepCount(async (watch) => {
+                            if (isMounted) {
+                                // Since getStepCountAsync doesn't always live-update reliably, 
+                                // we combine the initial fetch with the session delta
+                                const total = (result?.steps || 0) + watch.steps;
+                                setSteps(total);
+                                const newKMs = parseFloat((total / 1300).toFixed(2));
+                                setKms(newKMs);
+                                await AsyncStorage.setItem('@kms_walked_daily', newKMs.toString());
+                            }
+                        });
+                    }
+                }
+            } catch (e) { console.log('Pedometer failed:', e); }
+        };
+        initPedometer();
+        return () => { isMounted = false; };
+    }, []);
 
     const loadData = useCallback(async () => {
         if (!user) return;
@@ -111,6 +164,33 @@ export default function FitnessScreen({ navigation }) {
                         </View>
                     </View>
                 </GradientCard>
+
+                {/* --- Automations --- */}
+                <SectionHeader title="Daily Auto-Tracking" />
+                <View style={styles.statsGrid}>
+                    <StatCard title="Total Steps" value={steps} icon="🚶" color={COLORS.success} />
+                    <StatCard title="Distance Logged" value={kms} unit="km" icon="📍" color={COLORS.primary} />
+                </View>
+
+                {/* --- Manual Overrides --- */}
+                <SectionHeader title="Weekly Goals" />
+                <View style={[styles.statsGrid, { alignItems: 'center' }]}>
+                    <View style={styles.inputCard}>
+                        <Text style={styles.inputLabel}>Exercise (min/week)</Text>
+                        <TextInput
+                            style={styles.manualInput}
+                            keyboardType="numeric"
+                            value={exerciseMins}
+                            placeholder="0"
+                            placeholderTextColor={COLORS.textMuted}
+                            onChangeText={(t) => {
+                                setExerciseMins(t);
+                                AsyncStorage.setItem('@exercise_mins_week', t);
+                            }}
+                        />
+                    </View>
+                    <StatCard title="Sessions" value={weekSessions} icon="💪" color={COLORS.primary} />
+                </View>
 
                 {/* Stats Grid */}
                 <SectionHeader title="This Week" />
@@ -214,6 +294,12 @@ const styles = StyleSheet.create({
     summaryUnit: { color: COLORS.text, fontSize: FONT_SIZES.xs, textAlign: 'center', opacity: 0.7 },
     summaryDivider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.2)' },
     statsGrid: { flexDirection: 'row', paddingHorizontal: SPACING.lg, gap: SPACING.md },
+    inputCard: {
+        flex: 1, backgroundColor: COLORS.surface, padding: SPACING.md,
+        borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.glassBorder
+    },
+    inputLabel: { color: COLORS.textMuted, fontSize: 10, ...FONTS.bold, textTransform: 'uppercase', marginBottom: 4 },
+    manualInput: { color: COLORS.primary, fontSize: 24, ...FONTS.bold, padding: 0 },
     chartContainer: {
         flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end',
         marginHorizontal: SPACING.lg, backgroundColor: COLORS.surface,
