@@ -118,3 +118,14 @@ web-build/
 
 # EAS
 eas-build-metadata.json
+
+echo "*.gguf" >> .gitignore
+echo "*.pth" >> .gitignore
+echo "*.pkl" >> .gitignore
+echo ".env" >> .gitignore
+echo "__pycache__/" >> .gitignore
+*.gguf
+*.pth
+*.pkl
+.env
+__pycache__/
