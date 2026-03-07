@@ -15,6 +15,19 @@ from sklearn.preprocessing import StandardScaler
 path = "C:/Users/Asus/CampusTitan/ScreenTime vs MentalWellness.csv"
 df = pd.read_csv(path)
 
+# ---------------------------------------------------------
+# NEW: Convert Weekly Features to Daily Features
+# ---------------------------------------------------------
+if "exercise_minutes_per_week" in df.columns:
+    df["exercise_minutes_per_day"] = df["exercise_minutes_per_week"] / 7.0
+    df = df.drop(columns=["exercise_minutes_per_week"])
+
+if "social_hours_per_week" in df.columns:
+    df["social_hours_per_day"] = df["social_hours_per_week"] / 7.0
+    df = df.drop(columns=["social_hours_per_week"])
+
+# ---------------------------------------------------------
+
 target = "mental_wellness_index_0_100"
 
 y = df[target]
@@ -29,13 +42,10 @@ categorical_cols = []
 numeric_cols = []
 
 for col in X.columns:
-
     if X[col].dtype == "object":
         categorical_cols.append(col)
-
     elif X[col].nunique() <= threshold:
         categorical_cols.append(col)
-
     else:
         numeric_cols.append(col)
 
@@ -92,10 +102,8 @@ y_val = torch.tensor(y_val.to_numpy(dtype=np.float32)).view(-1,1)
 # ==============================
 
 class Net(nn.Module):
-
     def __init__(self, input_dim):
         super(Net, self).__init__()
-
         self.model = nn.Sequential(
             nn.Linear(input_dim, 12),
             nn.ReLU(),
@@ -131,42 +139,33 @@ patience_counter = 0
 # ==============================
 
 for epoch in range(epochs):
-
     model.train()
     permutation = torch.randperm(X_train.size()[0])
-
     epoch_loss = 0
 
     for i in range(0, X_train.size()[0], batch_size):
-
         indices = permutation[i:i+batch_size]
-
         batch_x = X_train[indices]
         batch_y = y_train[indices]
 
         optimizer.zero_grad()
-
         outputs = model(batch_x)
         loss = criterion(outputs, batch_y)
-
         loss.backward()
         optimizer.step()
 
         epoch_loss += loss.item()
 
     epoch_loss /= (X_train.size()[0] / batch_size)
-
     train_losses.append(epoch_loss)
 
     # Validation
     model.eval()
-
     with torch.no_grad():
         val_pred = model(X_val)
         val_loss = criterion(val_pred, y_val).item()
 
     val_losses.append(val_loss)
-
     print(f"Epoch {epoch} | Train Loss: {epoch_loss:.4f} | Val Loss: {val_loss:.4f}")
 
     # Save best model
@@ -174,7 +173,6 @@ for epoch in range(epochs):
         best_val_loss = val_loss
         patience_counter = 0
         torch.save(model.state_dict(), "best_model.pth")
-
     else:
         patience_counter += 1
 
@@ -201,7 +199,6 @@ plt.show()
 # ==============================
 
 model.load_state_dict(torch.load("best_model.pth"))
-
 model.eval()
 
 with torch.no_grad():
@@ -211,15 +208,4 @@ predictions = predictions.numpy().flatten()
 y_val_np = y_val.numpy().flatten()
 
 rmse = np.sqrt(((predictions - y_val_np) ** 2).mean())
-
 print("RMSE:", rmse)
-
-# ==============================
-# Prediction vs Actual plot
-# ==============================
-
-plt.scatter(y_val_np, predictions)
-plt.xlabel("Actual")
-plt.ylabel("Predicted")
-plt.title("Predicted vs Actual")
-plt.show()

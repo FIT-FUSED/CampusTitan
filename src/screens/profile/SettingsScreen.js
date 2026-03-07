@@ -1,6 +1,8 @@
 // Settings Screen
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity, Alert, Switch } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Picker } from '@react-native-picker/picker';
 import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS } from '../../theme';
 import { Header, AnimatedButton } from '../../components/common';
 import { useAuth } from '../../services/AuthContext';
@@ -12,6 +14,32 @@ export default function SettingsScreen({ navigation }) {
     const [mealReminders, setMealReminders] = useState(true);
     const [activityReminders, setActivityReminders] = useState(true);
     const [dataSharing, setDataSharing] = useState(true);
+    const [occupation, setOccupation] = useState('Student');
+    const [workMode, setWorkMode] = useState('Onsite');
+    const [profileLoaded, setProfileLoaded] = useState(false);
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                const raw = await AsyncStorage.getItem('@wellness_profile');
+                if (!mounted) return;
+                if (raw) {
+                    const p = JSON.parse(raw);
+                    setOccupation(p?.occupation || 'Student');
+                    setWorkMode(p?.workMode || 'Onsite');
+                }
+            } finally {
+                if (mounted) setProfileLoaded(true);
+            }
+        })();
+        return () => { mounted = false; };
+    }, []);
+
+    async function saveWellnessProfile() {
+        await AsyncStorage.setItem('@wellness_profile', JSON.stringify({ occupation, workMode }));
+        Alert.alert('Saved', 'Wellness profile updated.');
+    }
 
     function handleLogout() {
         Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -92,6 +120,34 @@ export default function SettingsScreen({ navigation }) {
                         <Text style={styles.goalLabel}>Water Intake</Text>
                         <Text style={styles.goalValue}>8 glasses</Text>
                     </View>
+                </View>
+
+                {/* Wellness Profile */}
+                <Text style={styles.sectionTitle}>Wellness Profile</Text>
+                <View style={styles.settingsCard}>
+                    <Text style={styles.pickerLabel}>Occupation</Text>
+                    <View style={styles.pickerWrap}>
+                        <Picker selectedValue={occupation} onValueChange={setOccupation}>
+                            <Picker.Item label="Student" value="Student" />
+                            <Picker.Item label="Corporate" value="Corporate" />
+                            <Picker.Item label="Freelancer" value="Freelancer" />
+                            <Picker.Item label="Other" value="Other" />
+                        </Picker>
+                    </View>
+                    <Text style={[styles.pickerLabel, { marginTop: SPACING.md }]}>Work Mode</Text>
+                    <View style={styles.pickerWrap}>
+                        <Picker selectedValue={workMode} onValueChange={setWorkMode}>
+                            <Picker.Item label="Onsite" value="Onsite" />
+                            <Picker.Item label="Remote" value="Remote" />
+                            <Picker.Item label="Hybrid" value="Hybrid" />
+                        </Picker>
+                    </View>
+                    <AnimatedButton
+                        title="Save Wellness Profile"
+                        onPress={saveWellnessProfile}
+                        style={{ marginTop: SPACING.lg }}
+                        disabled={!profileLoaded}
+                    />
                 </View>
 
                 {/* About */}
@@ -201,4 +257,6 @@ const styles = StyleSheet.create({
     },
     dangerIcon: { fontSize: 18, marginRight: SPACING.md },
     dangerText: { color: COLORS.error, fontSize: FONT_SIZES.md, ...FONTS.medium },
+    pickerLabel: { color: COLORS.textSecondary, fontSize: FONT_SIZES.sm, ...FONTS.semiBold, marginBottom: SPACING.xs },
+    pickerWrap: { borderWidth: 1, borderColor: COLORS.glassBorder, borderRadius: BORDER_RADIUS.md, overflow: 'hidden', backgroundColor: COLORS.surfaceLight },
 });
