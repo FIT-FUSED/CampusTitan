@@ -89,7 +89,7 @@ def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_k
     
     try:
         response_1 = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-1.5-flash',
             contents=[image, prompt_1],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -132,8 +132,8 @@ def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_k
     prompt_2 = f"Review the options and return the exact ID matching '{food_name}'. Return -1 if no safe match.\n{options_text}"
     
     response_2 = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=[image, prompt_2],
+        model='gemini-1.5-flash',
+        contents=[prompt_2],
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=USDASelection,
@@ -180,6 +180,8 @@ def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_k
         final_nutrition[key] = round(final_nutrition[key] * multiplier, 2)
         
     final_nutrition["Nutrition Density"] = calculate_nrf93(final_nutrition)
+    final_nutrition["food_name"] = selected_food["description"]
+    final_nutrition["portion_g"] = portion_g
 
     return final_nutrition
 
