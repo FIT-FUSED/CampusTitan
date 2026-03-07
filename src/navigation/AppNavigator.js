@@ -35,6 +35,7 @@ import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import LeaderboardScreen from '../screens/leaderboard/LeaderboardScreen';
 import WellnessQuizScreen from '../screens/wellness/WellnessQuizScreen';
 import DailyJournalScreen from '../screens/wellness/DailyJournalScreen';
+import DailyWellnessCheckInScreen from '../screens/wellness/DailyWellnessCheckInScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -133,6 +134,7 @@ function WellnessStack() {
             <Stack.Screen name="JournalEntry" component={JournalEntryScreen} />
             <Stack.Screen name="WellnessCircle" component={WellnessCircleScreen} />
             <Stack.Screen name="DailyJournal" component={DailyJournalScreen} />
+            <Stack.Screen name="DailyWellnessCheckIn" component={DailyWellnessCheckInScreen} />
         </Stack.Navigator>
     );
 }

@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-// CampusTitan Design System — Warm Amber & Emerald on Charcoal
+// CampusTitan Design System — Warm Amber & Emerald on Light Slate
 export const COLORS = {
   // Primary — Warm Amber/Gold
   primary: '#F0A500',
@@ -18,17 +18,17 @@ export const COLORS = {
   orange: '#F59E0B',
   orangeLight: '#FCD34D',
 
-  // Background — Rich Charcoal (warm undertone)
-  background: '#0D0D0D',
-  surface: '#1A1A1A',
-  surfaceLight: '#262626',
-  surfaceElevated: '#2E2E2E',
+  // Background — Premium Off-White
+  background: '#F8F9FA',
+  surface: '#FFFFFF',
+  surfaceLight: '#F1F3F5',
+  surfaceElevated: '#E9ECEF',
 
-  // Text — Warm neutrals
-  text: '#F5F5F5',
-  textSecondary: '#9CA3AF',
-  textMuted: '#6B7280',
-  textInverse: '#0D0D0D',
+  // Text — Deep Charcoal
+  text: '#1A1A1A',
+  textSecondary: '#4B5563',
+  textMuted: '#9CA3AF',
+  textInverse: '#FFFFFF',
 
   // Status
   success: '#10B981',
@@ -36,10 +36,10 @@ export const COLORS = {
   error: '#EF4444',
   info: '#3B82F6',
 
-  // Glassmorphism — warmer
-  glass: 'rgba(255, 255, 255, 0.04)',
-  glassBorder: 'rgba(255, 255, 255, 0.08)',
-  glassHighlight: 'rgba(255, 255, 255, 0.12)',
+  // Glassmorphism — subtle cloudy for light mode
+  glass: 'rgba(0, 0, 0, 0.02)',
+  glassBorder: 'rgba(0, 0, 0, 0.05)',
+  glassHighlight: 'rgba(0, 0, 0, 0.08)',
 
   // Chart colors — warm diverse palette
   chartColors: ['#F0A500', '#10B981', '#EF4444', '#F59E0B', '#8B5CF6', '#EC4899', '#3B82F6'],
@@ -50,8 +50,8 @@ export const COLORS = {
   gradientCoral: ['#EF4444', '#DC2626'],
   gradientSunset: ['#F59E0B', '#EF4444'],
   gradientOcean: ['#10B981', '#3B82F6'],
-  gradientDark: ['#0D0D0D', '#1A1A1A'],
-  gradientCard: ['rgba(26, 26, 26, 0.9)', 'rgba(20, 20, 20, 0.7)'],
+  gradientDark: ['#F8F9FA', '#E9ECEF'],
+  gradientCard: ['#FFFFFF', '#F8F9FA'],
 };
 
 export const SPACING = {
@@ -100,49 +100,49 @@ export const SHADOWS = {
     ios: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.3,
+      shadowOpacity: 0.1,
       shadowRadius: 4,
     },
     android: { elevation: 3 },
-    web: { boxShadow: '0px 2px 4px rgba(0,0,0,0.2)' },
+    web: { boxShadow: '0px 2px 4px rgba(0,0,0,0.05)' },
   }),
   medium: Platform.select({
     ios: {
-      shadowColor: '#F0A500',
+      shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
+      shadowOpacity: 0.08,
       shadowRadius: 8,
     },
     android: { elevation: 5 },
-    web: { boxShadow: '0px 4px 8px rgba(240,165,0,0.15)' },
+    web: { boxShadow: '0px 4px 8px rgba(0,0,0,0.08)' },
   }),
   large: Platform.select({
     ios: {
-      shadowColor: '#F0A500',
+      shadowColor: '#000',
       shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.2,
+      shadowOpacity: 0.12,
       shadowRadius: 16,
     },
     android: { elevation: 8 },
-    web: { boxShadow: '0px 8px 16px rgba(240,165,0,0.2)' },
+    web: { boxShadow: '0px 8px 16px rgba(0,0,0,0.12)' },
   }),
   glow: Platform.select({
     ios: {
       shadowColor: '#F0A500',
       shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.4,
-      shadowRadius: 20,
+      shadowOpacity: 0.2,
+      shadowRadius: 15,
     },
-    android: { elevation: 10 },
-    web: { boxShadow: '0px 0px 20px rgba(240,165,0,0.4)' },
+    android: { elevation: 8 },
+    web: { boxShadow: '0px 0px 15px rgba(240,165,0,0.2)' },
   }),
 };
 
 export const CARD_STYLE = {
-  backgroundColor: 'rgba(26, 26, 26, 0.8)',
+  backgroundColor: '#FFFFFF',
   borderRadius: BORDER_RADIUS.lg,
   borderWidth: 1,
-  borderColor: COLORS.glassBorder,
+  borderColor: '#E9ECEF',
   padding: SPACING.lg,
   ...SHADOWS.small,
 };

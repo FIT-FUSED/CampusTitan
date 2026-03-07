@@ -1,4 +1,7 @@
 import { supabase } from './supabase';
+import axios from 'axios';
+import config from './config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 class Database {
     // User-specific
@@ -26,6 +29,28 @@ class Database {
             throw error;
         }
         return data;
+    }
+
+    async predictWellness(metrics) {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const url = `${config.BASE_URL}/wellness/predict`;
+            console.log('>>> predictWellness URL:', url);
+            console.log('>>> Session exists:', !!session);
+            console.log('>>> Token preview:', session?.access_token ? session.access_token.slice(0, 30) + '...' : 'none');
+            console.log('>>> Metrics keys:', Object.keys(metrics));
+            const response = await axios.post(url, metrics, {
+                headers: {
+                    Authorization: `Bearer ${session?.access_token}`
+                }
+            });
+            console.log('>>> predictWellness response status:', response.status);
+            return response.data;
+        } catch (error) {
+            console.error('>>> predictWellness error:', error.response?.data || error.message);
+            console.error('>>> Full axios error:', error);
+            throw error;
+        }
     }
 
     // Food logs
@@ -274,6 +299,52 @@ class Database {
             return scored;
         } catch (e) {
             console.error('Leaderboard error:', e);
+            return [];
+        }
+    }
+
+    // Daily Wellness Logs (Local Storage)
+    async getDailyWellnessLog(date) {
+        try {
+            const logs = await AsyncStorage.getItem('@daily_wellness_logs');
+            if (!logs) return null;
+            const parsed = JSON.parse(logs);
+            return parsed.find(l => l.date === date);
+        } catch (e) {
+            console.error('getDailyWellnessLog error:', e);
+            return null;
+        }
+    }
+
+    async saveDailyWellnessLog(log) {
+        try {
+            const logsStr = await AsyncStorage.getItem('@daily_wellness_logs');
+            let logs = logsStr ? JSON.parse(logsStr) : [];
+            // Update existing or add new
+            const existingIndex = logs.findIndex(l => l.date === log.date);
+            if (existingIndex >= 0) {
+                logs[existingIndex] = { ...logs[existingIndex], ...log };
+            } else {
+                logs.push(log);
+            }
+            await AsyncStorage.setItem('@daily_wellness_logs', JSON.stringify(logs));
+            return log;
+        } catch (e) {
+            console.error('saveDailyWellnessLog error:', e);
+            throw e;
+        }
+    }
+
+    async getWellnessHistory(days = 7) {
+        try {
+            const logsStr = await AsyncStorage.getItem('@daily_wellness_logs');
+            if (!logsStr) return [];
+            const logs = JSON.parse(logsStr);
+            // Sort by date descending
+            logs.sort((a, b) => new Date(b.date) - new Date(a.date));
+            return logs.slice(0, days);
+        } catch (e) {
+            console.error('getWellnessHistory error:', e);
             return [];
         }
     }

@@ -90,7 +90,7 @@ android {
     namespace 'com.g4ur4v.FitFusion'
     defaultConfig {
         applicationId 'com.g4ur4v.FitFusion'
-        minSdkVersion rootProject.ext.minSdkVersion
+        minSdkVersion 26
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0.0"

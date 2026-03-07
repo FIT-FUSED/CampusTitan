@@ -2,13 +2,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, RefreshControl, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, ACTIVITY_TYPES } from '../../theme';
+import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS, ACTIVITY_TYPES } from '../../theme';
 import { GradientCard, StatCard, SectionHeader, AnimatedButton, ProgressBar } from '../../components/common';
 import { useAuth } from '../../services/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import db from '../../services/database';
 import { format, subDays, startOfDay } from 'date-fns';
-import { Pedometer } from 'expo-sensors';
+import sensorService from '../../services/SensorService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
@@ -22,6 +22,7 @@ export default function FitnessScreen({ navigation }) {
     // Automation state
     const [steps, setSteps] = useState(0);
     const [kms, setKms] = useState(0);
+    const [calories, setCalories] = useState(0);
     const [exerciseMins, setExerciseMins] = useState('');
 
     useEffect(() => {
@@ -32,42 +33,23 @@ export default function FitnessScreen({ navigation }) {
         loadExercise();
     }, []);
 
+    // Subscribe to SensorService for consistent step tracking
     useEffect(() => {
-        let isMounted = true;
-        const initPedometer = async () => {
-            try {
-                const { status } = await Pedometer.requestPermissionsAsync();
-                if (status === 'granted') {
-                    const isAvailable = await Pedometer.isAvailableAsync();
-                    if (isAvailable) {
-                        const end = new Date();
-                        const start = startOfDay(new Date());
-                        const result = await Pedometer.getStepCountAsync(start, end);
-                        if (result && isMounted) {
-                            setSteps(result.steps);
-                            const calcKms = parseFloat((result.steps / 1300).toFixed(2));
-                            setKms(calcKms);
-                            await AsyncStorage.setItem('@kms_walked_daily', calcKms.toString());
-                        }
-
-                        // Fallback manual watch
-                        Pedometer.watchStepCount(async (watch) => {
-                            if (isMounted) {
-                                // Since getStepCountAsync doesn't always live-update reliably, 
-                                // we combine the initial fetch with the session delta
-                                const total = (result?.steps || 0) + watch.steps;
-                                setSteps(total);
-                                const newKMs = parseFloat((total / 1300).toFixed(2));
-                                setKms(newKMs);
-                                await AsyncStorage.setItem('@kms_walked_daily', newKMs.toString());
-                            }
-                        });
-                    }
-                }
-            } catch (e) { console.log('Pedometer failed:', e); }
+        const init = async () => {
+            await sensorService.loadPersistedSteps();
+            setSteps(sensorService.getTodaySteps());
+            setKms(sensorService.getKm());
+            setCalories(sensorService.getCalories());
         };
-        initPedometer();
-        return () => { isMounted = false; };
+        init();
+
+        const onSteps = (newSteps) => {
+            setSteps(newSteps);
+            setKms(sensorService.getKm());
+            setCalories(sensorService.getCalories());
+        };
+        sensorService.addListener(onSteps);
+        return () => sensorService.removeListener(onSteps);
     }, []);
 
     const loadData = useCallback(async () => {
@@ -164,6 +146,14 @@ export default function FitnessScreen({ navigation }) {
                         </View>
                     </View>
                 </GradientCard>
+
+                {/* Today's quick stats */}
+                <SectionHeader title="Today" />
+                <View style={styles.statsGrid}>
+                    <StatCard title="Total Steps" value={steps} icon="🚶" color={COLORS.success} />
+                    <StatCard title="Distance Logged" value={kms} unit="km" icon="📍" color={COLORS.primary} />
+                    <StatCard title="Calories Burned" value={calories} unit="kcal" icon="🔥" color={COLORS.coral} />
+                </View>
 
                 {/* --- Automations --- */}
                 <SectionHeader title="Daily Auto-Tracking" />
@@ -288,10 +278,10 @@ const styles = StyleSheet.create({
     headerTitle: { fontSize: FONT_SIZES.xxl, ...FONTS.bold, color: COLORS.text },
     logButton: { paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg },
     summaryCard: { marginHorizontal: SPACING.lg, marginBottom: SPACING.md },
-    summaryLabel: { color: COLORS.text, fontSize: FONT_SIZES.sm, ...FONTS.medium, opacity: 0.8, marginBottom: SPACING.md },
+    summaryLabel: { color: COLORS.textInverse, fontSize: FONT_SIZES.sm, ...FONTS.medium, opacity: 0.9, marginBottom: SPACING.md },
     summaryRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
-    summaryValue: { color: COLORS.text, fontSize: FONT_SIZES.xxxl, ...FONTS.bold, textAlign: 'center' },
-    summaryUnit: { color: COLORS.text, fontSize: FONT_SIZES.xs, textAlign: 'center', opacity: 0.7 },
+    summaryValue: { color: COLORS.textInverse, fontSize: FONT_SIZES.xxxl, ...FONTS.bold, textAlign: 'center' },
+    summaryUnit: { color: COLORS.textInverse, fontSize: FONT_SIZES.xs, textAlign: 'center', opacity: 0.8 },
     summaryDivider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.2)' },
     statsGrid: { flexDirection: 'row', paddingHorizontal: SPACING.lg, gap: SPACING.md },
     inputCard: {
@@ -305,6 +295,7 @@ const styles = StyleSheet.create({
         marginHorizontal: SPACING.lg, backgroundColor: COLORS.surface,
         padding: SPACING.lg, paddingBottom: SPACING.sm,
         borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.glassBorder, height: 140,
+        ...SHADOWS.small,
     },
     chartBar: { alignItems: 'center' },
     chartValue: { color: COLORS.textMuted, fontSize: 9, marginBottom: 4 },
@@ -313,6 +304,7 @@ const styles = StyleSheet.create({
     breakdownContainer: {
         marginHorizontal: SPACING.lg, backgroundColor: COLORS.surface,
         borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.glassBorder, padding: SPACING.lg,
+        ...SHADOWS.small,
     },
     breakdownItem: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

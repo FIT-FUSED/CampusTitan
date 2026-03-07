@@ -17,6 +17,11 @@ class MainActivity : ReactActivity() {
     // This is required for expo-splash-screen.
     setTheme(R.style.AppTheme);
     super.onCreate(null)
+    try {
+      val clazz = Class.forName("dev.matinzd.healthconnect.permissions.HealthConnectPermissionDelegate")
+      val method = clazz.getMethod("setPermissionDelegate", ReactActivity::class.java)
+      method.invoke(null, this)
+    } catch (_: Throwable) { }
   }
 
   /**

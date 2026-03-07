@@ -1,5 +1,3 @@
-import * as ScreenTimeModule from '../../modules/expo-screen-time';
-
 // Common Android package names
 const CATEGORY_MAP = {
     // Work / Study
@@ -20,30 +18,42 @@ const CATEGORY_MAP = {
     'com.whatsapp': 'leisure_screen_hours',
 };
 
-export async function checkAndRequestPermission() {
+function getScreenTimeModule() {
     try {
-        if (!ScreenTimeModule || !ScreenTimeModule.hasUsagePermission) {
-            console.log("UsageStats Native Module not available (Expo Go?)");
-            return false;
-        }
-        const hasPermission = ScreenTimeModule.hasUsagePermission();
-        if (!hasPermission) {
-            ScreenTimeModule.requestUsagePermission();
-            return false;
-        }
+        return require('../../modules/expo-screen-time');
+    } catch (e) {
+        return null;
+    }
+}
+
+export function hasUsagePermissionSafely() {
+    try {
+        const mod = getScreenTimeModule();
+        if (!mod || typeof mod.hasUsagePermission !== 'function') return false;
+        return !!mod.hasUsagePermission();
+    } catch (e) {
+        return false;
+    }
+}
+
+export function requestUsagePermissionSafely() {
+    try {
+        const mod = getScreenTimeModule();
+        if (!mod || typeof mod.requestUsagePermission !== 'function') return false;
+        mod.requestUsagePermission();
         return true;
-    } catch (error) {
-        console.log("Not running in a native build or module not found");
+    } catch (e) {
         return false;
     }
 }
 
 export function fetchCategorizedScreenTime() {
     try {
-        if (!ScreenTimeModule || !ScreenTimeModule.getDailyUsageStats) {
+        const mod = getScreenTimeModule();
+        if (!mod || typeof mod.getDailyUsageStats !== 'function') {
             return { screen_time_hours: 0, work_screen_hours: 0, leisure_screen_hours: 0 };
         }
-        const stats = ScreenTimeModule.getDailyUsageStats() || {};
+        const stats = mod.getDailyUsageStats() || {};
 
         let totalMs = 0;
         let workMs = 0;

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, MEAL_TYPES } from '../../theme';
+import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS, MEAL_TYPES } from '../../theme';
 import { GradientCard, SectionHeader, AnimatedButton, ProgressBar, Chip } from '../../components/common';
 import { useAuth } from '../../services/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
@@ -230,6 +230,7 @@ const styles = StyleSheet.create({
     macroCard: {
         flex: 1, backgroundColor: COLORS.surface, padding: SPACING.md,
         borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: COLORS.glassBorder,
+        ...SHADOWS.small,
     },
     macroLabel: { color: COLORS.textSecondary, fontSize: FONT_SIZES.xs, ...FONTS.medium },
     macroValue: { fontSize: FONT_SIZES.xl, ...FONTS.bold, marginTop: SPACING.xs },
@@ -238,6 +239,7 @@ const styles = StyleSheet.create({
         marginHorizontal: SPACING.lg, marginTop: SPACING.lg,
         backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg,
         borderWidth: 1, borderColor: COLORS.glassBorder, padding: SPACING.lg,
+        ...SHADOWS.small,
     },
     mealHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
     mealHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
@@ -259,6 +261,7 @@ const styles = StyleSheet.create({
         padding: SPACING.lg, paddingBottom: SPACING.sm,
         borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.glassBorder,
         height: 140,
+        ...SHADOWS.small,
     },
     weekBar: { alignItems: 'center' },
     weekCalValue: { color: COLORS.textMuted, fontSize: 9, marginBottom: 4 },
