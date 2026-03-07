@@ -66,13 +66,52 @@ def calculate_nrf93(nutrition_data: dict) -> float:
 # Phase 3: The ML Pipeline
 # ==========================================
 
+# Models to try in order (separate free-tier quotas per model)
+GEMINI_MODELS = [
+    'models/gemini-2.0-flash',
+    'models/gemini-2.0-flash-lite',
+    'models/gemini-2.5-flash-lite',
+]
+
+def _call_gemini(client, contents, config, max_retries=3):
+    """Call Gemini with automatic retry on 429 and model fallback."""
+    last_error = None
+    
+    for model_name in GEMINI_MODELS:
+        for attempt in range(max_retries):
+            try:
+                print(f"  Trying {model_name} (attempt {attempt + 1}/{max_retries})...")
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=config
+                )
+                print(f"  ✓ Success with {model_name}")
+                return response
+            except Exception as e:
+                error_str = str(e)
+                last_error = e
+                if '429' in error_str or 'RESOURCE_EXHAUSTED' in error_str:
+                    # Rate limited - check if it's per-minute or per-day
+                    if 'PerDay' in error_str or 'limit: 0' in error_str:
+                        print(f"  ✗ {model_name} daily quota exhausted, trying next model...")
+                        break  # Skip retries, try next model
+                    else:
+                        wait_time = min(15 * (attempt + 1), 30)
+                        print(f"  ⏳ Rate limited, waiting {wait_time}s before retry...")
+                        time.sleep(wait_time)
+                else:
+                    raise  # Non-rate-limit error, propagate immediately
+    
+    raise Exception(f"All Gemini models exhausted after retries. Last error: {last_error}")
+
 def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_key: str, usda_key: str):
     client = genai.Client(api_key=gemini_key)
     try:
         image = Image.open(image_path)
-    except FileNotFoundError:
-        print(f"Error: Could not find image at '{image_path}'")
-        return None
+        print(f"Image loaded: {image.size}, mode={image.mode}")
+    except Exception as e:
+        raise Exception(f"Could not open image at '{image_path}': {e}")
 
     print("\n[Step 1] ML Vision & Context Processing...")
     prompt_1 = f"""
@@ -88,8 +127,8 @@ def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_k
     """
     
     try:
-        response_1 = client.models.generate_content(
-            model='gemini-2.5-flash',
+        response_1 = _call_gemini(
+            client,
             contents=[image, prompt_1],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -97,10 +136,10 @@ def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_k
                 temperature=0.0 
             )
         )
+        print(f"Step 1 raw response: {response_1.text}")
         initial_data = json.loads(response_1.text)
     except Exception as e:
-        print(f"Vision API Error: {e}")
-        return None
+        raise Exception(f"Gemini Vision API failed: {e}")
         
     food_name = initial_data["dish_name"]
     portion_g = initial_data["estimated_portion_g"]
@@ -116,24 +155,23 @@ def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_k
     
     usda_response = requests.get(usda_url, params=params)
     if usda_response.status_code != 200:
-        print("USDA API Error.")
-        return None
+        raise Exception(f"USDA API returned status {usda_response.status_code}: {usda_response.text[:200]}")
         
     candidates = usda_response.json().get("foods", [])
     if not candidates: 
-        print("No database matches found.")
-        return None
+        raise Exception(f"No USDA database matches found for '{food_name}'")
 
     options_text = "USDA Database Options:\n"
     for item in candidates:
         options_text += f"- ID: {item['fdcId']} | Name: {item['description']}\n"
+    print(options_text)
 
     print("\n[Step 3] AI Autonomous Verification...")
     prompt_2 = f"Review the options and return the exact ID matching '{food_name}'. Return -1 if no safe match.\n{options_text}"
     
-    response_2 = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=[image, prompt_2],
+    response_2 = _call_gemini(
+        client,
+        contents=[prompt_2],
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=USDASelection,
@@ -141,12 +179,14 @@ def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_k
         )
     )
     
+    print(f"Step 3 raw response: {response_2.text}")
     selected_id = json.loads(response_2.text)["best_match_id"]
     if selected_id == -1: 
-        print("AI rejected all candidates to preserve data integrity.")
-        return None
+        raise Exception(f"AI rejected all USDA candidates for '{food_name}' to preserve data integrity.")
         
     selected_food = next((item for item in candidates if item["fdcId"] == selected_id), None)
+    if not selected_food:
+        raise Exception(f"Selected USDA ID {selected_id} not found in candidates list")
     print(f"-> ML Approved Match: {selected_food['description']}")
 
     print("\n[Step 4] Scaling 34-Column Matrix & Calculating Density...")
@@ -180,6 +220,8 @@ def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_k
         final_nutrition[key] = round(final_nutrition[key] * multiplier, 2)
         
     final_nutrition["Nutrition Density"] = calculate_nrf93(final_nutrition)
+    final_nutrition["food_name"] = selected_food["description"]
+    final_nutrition["portion_g"] = portion_g
 
     return final_nutrition
 
