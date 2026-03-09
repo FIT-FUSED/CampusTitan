@@ -164,12 +164,7 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'nutrition_score_available': nutrition_score is not None,
-        'gemini_key': bool(os.getenv('GEMINI_API_KEY')),
-        'usda_key': bool(os.getenv('USDA_API_KEY'))
     })
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5001))
-    print(f"Starting nutrition server on port {port}")
-    print(f"Nutrition score available: {nutrition_score is not None}")
-    app.run(debug=True, host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5001, debug=True)

@@ -25,6 +25,9 @@ import {
   SHADOWS,
 } from "../../theme";
 import { Avatar, SectionHeader } from "../../components/common";
+import EnvironmentWidget from "../../components/EnvironmentWidget";
+import AIWellnessCoach from "../../components/AIWellnessCoach";
+import CampusZoneRecommender from "../../components/CampusZoneRecommender";
 import { useAuth } from "../../services/AuthContext";
 import db from "../../services/database";
 import sensorService from "../../services/SensorService";
@@ -424,6 +427,9 @@ export default function HomeScreen({ navigation }) {
             </View>
           </LinearGradient>
         </TouchableOpacity>
+
+        {/* ─── AI WELLNESS COACH ─── */}
+        <AIWellnessCoach />
 
         {/* ─── VALUE EXCHANGE CARDS (shown only when check-in is pending) ─── */}
         {!checkInCompleted && (
@@ -858,6 +864,15 @@ export default function HomeScreen({ navigation }) {
             ))}
           </View>
         )}
+
+        {/* ─── ENVIRONMENT & ZONE RECOMMENDER ─── */}
+        <SectionHeader title="Campus Environment" />
+        <CampusZoneRecommender />
+        <EnvironmentWidget
+          onPress={() =>
+            navigation.navigate("Community", { screen: "Environment" })
+          }
+        />
 
         <View style={{ height: 100 }} />
       </ScrollView>

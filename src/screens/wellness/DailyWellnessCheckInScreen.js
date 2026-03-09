@@ -31,6 +31,8 @@ import {
   AnimatedButton,
   GradientCard,
 } from "../../components/common";
+import { useAuth } from "../../services/AuthContext";
+import SyncService from "../../services/SyncService";
 
 function coerceNumber(val, fallback = 0) {
   if (val === null || val === undefined) return fallback;
@@ -85,6 +87,7 @@ function MetricCard({ title, subtitle, right, children }) {
 
 export default function DailyWellnessCheckInScreen({ navigation }) {
   const today = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [locked, setLocked] = useState(false);
@@ -103,7 +106,9 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
   // Dev mode bypass refs
   const headerPressTimer = useRef(null);
   const handleHeaderLongPress = () => {
-    ToastAndroid.show("Dev Mode: Check-in Unlocked", ToastAndroid.SHORT);
+    if (Platform.OS === "android") {
+      ToastAndroid.show("Dev Mode: Check-in Unlocked", ToastAndroid.SHORT);
+    }
     AsyncStorage.removeItem("@last_logged_date");
     AsyncStorage.removeItem("@last_checkin_date");
     setLocked(false);
@@ -255,6 +260,7 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
       const log = {
         date: today,
         timestamp: new Date().toISOString(),
+        userId: user?.id || null,
         occupation: profile.occupation,
         workMode: profile.workMode,
         steps: clamp(coerceNumber(form.steps, 0), 0, 300000),
@@ -273,8 +279,11 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
           usageStats: permissions.usageStats,
         },
       };
-
-      await db.saveDailyWellnessLog(log);
+      // Delegate to SyncService so the same payload can be handled in an
+      // offline-first way: it always updates local history, and either
+      // talks to the backend immediately (online) or enqueues for later
+      // flush (offline) without blocking the UI.
+      await SyncService.submitWellnessCheckin(log);
       await AsyncStorage.setItem("@last_logged_date", today);
       await AsyncStorage.setItem("@last_checkin_date", today);
       setLocked(true);
@@ -335,7 +344,7 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
               )}
               <TouchableOpacity
                 onPress={() =>
-                  navigation.navigate("More", { screen: "Settings" })
+                  navigation.navigate("Community", { screen: "Settings" })
                 }
               >
                 <Text style={styles.profileEdit}>Edit</Text>
@@ -345,7 +354,7 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
             <TouchableOpacity
               style={styles.profilePrompt}
               onPress={() =>
-                navigation.navigate("More", { screen: "Settings" })
+                navigation.navigate("Community", { screen: "Settings" })
               }
             >
               <Text style={styles.profilePromptText}>

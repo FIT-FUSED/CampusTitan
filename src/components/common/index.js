@@ -504,7 +504,7 @@ export function ScrollPicker({ data, value, onValueChange, label, height = 150 }
                 <FlatList
                     ref={flatListRef}
                     data={data}
-                    keyExtractor={(item) => item.toString()}
+                    keyExtractor={(item) => item + ""}
                     showsVerticalScrollIndicator={false}
                     snapToInterval={itemHeight}
                     decelerationRate="fast"

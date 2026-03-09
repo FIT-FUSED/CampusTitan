@@ -1,5 +1,5 @@
-// Campus Analytics Screen
-import React, { useState, useCallback, useMemo } from "react";
+// Campus Analytics Screen - Real Data
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   Platform,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS } from "../../theme";
@@ -18,31 +19,69 @@ import {
   ProgressBar,
 } from "../../components/common";
 import { useFocusEffect } from "@react-navigation/native";
-import { generateCampusAnalytics } from "../../data/seedData";
+import analyticsService from "../../services/AnalyticsService";
 
 const { width } = Dimensions.get("window");
 
 export default function AnalyticsScreen({ navigation }) {
   const [selectedView, setSelectedView] = useState("college");
+  const [analytics, setAnalytics] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // generateCampusAnalytics is pure/synchronous — run once on mount, stable across focus events
-  const raw = useMemo(() => generateCampusAnalytics(), []);
+  const loadAnalytics = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await analyticsService.getCampusAnalytics();
+      setAnalytics(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(loadAnalytics);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <Header title="Campus Analytics" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading analytics...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (error || !analytics) {
+    return (
+      <View style={styles.container}>
+        <Header title="Campus Analytics" />
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Analytics unavailable</Text>
+          <Text style={styles.errorSubtext}>Please check your connection</Text>
+        </View>
+      </View>
+    );
+  }
 
   // Map collegeStats → shape expected by the UI
-  const analytics = useMemo(() => {
-    if (!raw) return null;
-    const hostelStats = (raw.collegeStats || []).map((c) => ({
+  const processedData = useMemo(() => {
+    if (!analytics) return null;
+    const hostelStats = (analytics.collegeStats || []).map((c) => ({
       hostel: c.college,
-      avgDailySteps: c.avgDailySteps,
-      avgCaloriesConsumed: c.avgCaloriesConsumed,
-      avgActivityMinutes: c.avgActivityMinutes,
-      avgMoodScore: c.avgMoodScore,
-      participationRate: c.participationRate,
-      activeUsers: c.activeUsers,
-      topActivity: c.topActivity,
+      avgActivityMinutes: c.avgActivityMinutes || 0,
+      avgCaloriesConsumed: c.avgCaloriesConsumed || 0,
+      avgMoodScore: c.avgMoodScore || '0.0',
+      participationRate: c.participationRate || 0,
+      activeUsers: c.activeUsers || 0,
+      topActivity: c.topActivity || 'None',
     }));
 
-    const departmentStats = (raw.collegeStats || []).map((c) => ({
+    const departmentStats = (analytics.collegeStats || []).map((c) => ({
       department:
         c.college.length > 22 ? c.college.slice(0, 22) + "…" : c.college,
       avgActivityMinutes: c.avgActivityMinutes,
@@ -50,27 +89,16 @@ export default function AnalyticsScreen({ navigation }) {
       topActivity: c.topActivity,
     }));
 
-    return {
-      hostelStats,
-      departmentStats,
-      weeklyTrends: raw.weeklyTrends || [],
-    };
-  }, [raw]);
+    return { hostelStats, departmentStats, weeklyTrends: analytics.weeklyTrends || [] };
+  }, [analytics]);
 
-  if (!analytics) {
+  if (!processedData) {
     return (
       <View style={styles.container}>
-        <Header
-          title="Campus Analytics"
-          subtitle="No data yet"
-          onBack={() => navigation.goBack()}
-        />
-        <View
-          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-        >
-          <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZES.md }}>
-            No analytics data available yet.
-          </Text>
+        <Header title="Campus Analytics" />
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No data available yet</Text>
+          <Text style={styles.emptySubtext}>Start logging activities to see analytics</Text>
         </View>
       </View>
     );
@@ -113,9 +141,9 @@ export default function AnalyticsScreen({ navigation }) {
           <>
             <SectionHeader title="College Activity (min/day)" />
             <View style={styles.barChart}>
-              {analytics.hostelStats.map((h, i) => {
+              {processedData.hostelStats.map((h, i) => {
                 const maxMin = Math.max(
-                  ...analytics.hostelStats.map((s) => s.avgActivityMinutes),
+                  ...processedData.hostelStats.map((s) => s.avgActivityMinutes),
                   1,
                 );
                 const barH = Math.max((h.avgActivityMinutes / maxMin) * 100, 4);
@@ -142,7 +170,7 @@ export default function AnalyticsScreen({ navigation }) {
             </View>
 
             <SectionHeader title="College Details" />
-            {analytics.hostelStats.map((h, i) => (
+            {processedData.hostelStats.map((h, i) => (
               <View key={i} style={styles.hostelCard}>
                 <View style={styles.hostelHeader}>
                   <View
@@ -171,9 +199,9 @@ export default function AnalyticsScreen({ navigation }) {
                 <View style={styles.hostelStats}>
                   <View style={styles.hostelStat}>
                     <Text style={styles.hostelStatValue}>
-                      {h.avgDailySteps.toLocaleString()}
+                      {h.avgActivityMinutes}
                     </Text>
-                    <Text style={styles.hostelStatLabel}>Avg Steps</Text>
+                    <Text style={styles.hostelStatLabel}>Avg Min/Day</Text>
                   </View>
                   <View style={styles.hostelStat}>
                     <Text style={styles.hostelStatValue}>
@@ -208,7 +236,7 @@ export default function AnalyticsScreen({ navigation }) {
         {selectedView === "department" && (
           <>
             <SectionHeader title="Department Activity" />
-            {analytics.departmentStats.map((d, i) => (
+            {processedData.departmentStats.map((d, i) => (
               <View key={i} style={styles.deptCard}>
                 <View style={styles.deptHeader}>
                   <Text style={styles.deptName} numberOfLines={1}>
@@ -271,7 +299,7 @@ export default function AnalyticsScreen({ navigation }) {
           <>
             <SectionHeader title="Campus-wide Weekly Trends" />
             <View style={styles.trendCards}>
-              {analytics.weeklyTrends.map((d, i) => (
+              {processedData.weeklyTrends.map((d, i) => (
                 <View key={i} style={styles.trendCard}>
                   <Text style={styles.trendDay}>{d.day}</Text>
                   <View style={styles.trendStats}>
@@ -511,5 +539,55 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontSize: FONT_SIZES.xs,
     marginTop: SPACING.sm,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.xl,
+  },
+  loadingText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.md,
+    ...FONTS.medium,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.xl,
+  },
+  errorText: {
+    fontSize: FONT_SIZES.lg,
+    color: COLORS.text,
+    ...FONTS.semiBold,
+    textAlign: 'center',
+  },
+  errorSubtext: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.sm,
+    ...FONTS.medium,
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.xl,
+  },
+  emptyText: {
+    fontSize: FONT_SIZES.lg,
+    color: COLORS.text,
+    ...FONTS.semiBold,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.sm,
+    ...FONTS.medium,
+    textAlign: 'center',
   },
 });

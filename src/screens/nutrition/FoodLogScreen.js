@@ -1,5 +1,5 @@
 // Food Log Screen
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,6 @@ import {
   Platform,
   Alert,
   TextInput,
-  FlatList,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -20,79 +19,59 @@ import {
   BORDER_RADIUS,
   MEAL_TYPES,
 } from "../../theme";
-import {
-  Header,
-  AnimatedButton,
-  Chip,
-  StyledInput,
-} from "../../components/common";
+import { Header, AnimatedButton, Chip } from "../../components/common";
 import { useAuth } from "../../services/AuthContext";
 import db from "../../services/database";
-import { FOOD_DATABASE } from "../../data/seedData";
 import { format } from "date-fns";
-import { useFocusEffect } from "@react-navigation/native";
 
-export default function FoodLogScreen({ navigation, route }) {
+export default function FoodLogScreen({ navigation }) {
   const { user } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedMealType, setSelectedMealType] = useState("lunch");
-  const [selectedFood, setSelectedFood] = useState(null);
   const [portion, setPortion] = useState("1");
   const [saving, setSaving] = useState(false);
+  // Manual food entry fields
+  const [foodName, setFoodName] = useState("");
+  const [calories, setCalories] = useState("");
+  const [protein, setProtein] = useState("");
+  const [carbs, setCarbs] = useState("");
+  const [fat, setFat] = useState("");
 
-  useFocusEffect(
-    useCallback(() => {
-      if (route.params?.preselectedFood) {
-        setSelectedFood(route.params.preselectedFood);
-        // Clear params so it doesn't re-select on every focus
-        navigation.setParams({ preselectedFood: null });
-      }
-    }, [route.params]),
-  );
-
-  const filteredFoods = FOOD_DATABASE.filter((f) => {
-    const matchesSearch =
-      !searchQuery || f.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesMeal =
-      f.category === selectedMealType || selectedMealType === "all";
-    return matchesSearch && matchesMeal;
-  });
-
-  async function handleSave() {
-    if (!selectedFood) {
-      Alert.alert("Select Food", "Please select a food item first");
+  const handleSave = async () => {
+    if (!foodName || !calories) {
+      Alert.alert("Missing Info", "Please enter at least food name and calories.");
       return;
     }
     setSaving(true);
-    const portionNum = parseFloat(portion) || 1;
     try {
-      await db.addFoodLog({
-        userId: user.id,
+      const logObject = {
+        food_name: foodName,
+        calories: parseFloat(calories),
+        protein: parseFloat(protein) || 0,
+        carbs: parseFloat(carbs) || 0,
+        fat: parseFloat(fat) || 0,
+        meal_type: selectedMealType,
         date: format(new Date(), "yyyy-MM-dd"),
-        mealType: selectedMealType,
-        foodName: selectedFood.name,
-        calories: Math.round(selectedFood.calories * portionNum),
-        protein: Math.round(selectedFood.protein * portionNum),
-        carbs: Math.round(selectedFood.carbs * portionNum),
-        fat: Math.round(selectedFood.fat * portionNum),
-        portion: portionNum,
-        isVeg: selectedFood.isVeg,
+        portion: parseFloat(portion) || 1,
+      };
+      await db.addFoodLog({
+        ...logObject,
+        user_id: user?.id,
       });
-      Alert.alert("Success! ✅", `${selectedFood.name} logged successfully`, [
-        {
-          text: "Log More",
-          onPress: () => {
-            setSelectedFood(null);
-            setSearchQuery("");
-          },
-        },
-        { text: "Done", onPress: () => navigation.goBack() },
-      ]);
-    } catch (e) {
-      Alert.alert("Error", "Failed to log food");
+      Alert.alert("Success", "Food logged successfully.");
+      // Reset fields
+      setFoodName("");
+      setCalories("");
+      setProtein("");
+      setCarbs("");
+      setFat("");
+      setPortion("1");
+      navigation.goBack();
+    } catch (err) {
+      Alert.alert("Error", "Something went wrong.");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-  }
+  };
 
   return (
     <View style={styles.container}>
@@ -124,149 +103,72 @@ export default function FoodLogScreen({ navigation, route }) {
           ))}
         </ScrollView>
 
-        {/* Search */}
-        <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+        {/* Manual Food Entry Form */}
+        <View style={styles.form}>
+          <Text style={styles.label}>Food Name *</Text>
           <TextInput
-            style={styles.searchInput}
-            placeholder="Search food items..."
-            placeholderTextColor={COLORS.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
+            style={styles.input}
+            value={foodName}
+            onChangeText={setFoodName}
+            placeholder="e.g., Grilled Chicken Breast"
           />
-          {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Text style={styles.clearIcon}>✕</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
 
-        {/* Selected food detail */}
-        {selectedFood && (
-          <View style={styles.selectedCard}>
-            <View style={styles.selectedHeader}>
-              <View
-                style={[
-                  styles.vegBadge,
-                  {
-                    backgroundColor: selectedFood.isVeg
-                      ? COLORS.success + "22"
-                      : COLORS.error + "22",
-                  },
-                ]}
-              >
-                <Text style={{ fontSize: 12 }}>
-                  {selectedFood.isVeg ? "🟢" : "🔴"}
-                </Text>
-              </View>
-              <Text style={styles.selectedName}>{selectedFood.name}</Text>
-              <TouchableOpacity onPress={() => setSelectedFood(null)}>
-                <Text style={styles.closeBtn}>✕</Text>
-              </TouchableOpacity>
+          <Text style={styles.label}>Calories *</Text>
+          <TextInput
+            style={styles.input}
+            value={calories}
+            onChangeText={setCalories}
+            placeholder="e.g., 250"
+            keyboardType="numeric"
+          />
+
+          <View style={styles.row}>
+            <View style={styles.half}>
+              <Text style={styles.label}>Protein (g)</Text>
+              <TextInput
+                style={styles.input}
+                value={protein}
+                onChangeText={setProtein}
+                placeholder="0"
+                keyboardType="numeric"
+              />
             </View>
-
-            <View style={styles.nutrientGrid}>
-              <View style={styles.nutrientItem}>
-                <Text style={[styles.nutrientValue, { color: COLORS.coral }]}>
-                  {Math.round(
-                    selectedFood.calories * (parseFloat(portion) || 1),
-                  )}
-                </Text>
-                <Text style={styles.nutrientLabel}>Calories</Text>
-              </View>
-              <View style={styles.nutrientItem}>
-                <Text style={[styles.nutrientValue, { color: COLORS.primary }]}>
-                  {Math.round(
-                    selectedFood.protein * (parseFloat(portion) || 1),
-                  )}
-                  g
-                </Text>
-                <Text style={styles.nutrientLabel}>Protein</Text>
-              </View>
-              <View style={styles.nutrientItem}>
-                <Text style={[styles.nutrientValue, { color: COLORS.accent }]}>
-                  {Math.round(selectedFood.carbs * (parseFloat(portion) || 1))}g
-                </Text>
-                <Text style={styles.nutrientLabel}>Carbs</Text>
-              </View>
-              <View style={styles.nutrientItem}>
-                <Text style={[styles.nutrientValue, { color: COLORS.orange }]}>
-                  {Math.round(selectedFood.fat * (parseFloat(portion) || 1))}g
-                </Text>
-                <Text style={styles.nutrientLabel}>Fat</Text>
-              </View>
+            <View style={styles.half}>
+              <Text style={styles.label}>Carbs (g)</Text>
+              <TextInput
+                style={styles.input}
+                value={carbs}
+                onChangeText={setCarbs}
+                placeholder="0"
+                keyboardType="numeric"
+              />
             </View>
-
-            <View style={styles.portionRow}>
-              <Text style={styles.portionLabel}>Portion:</Text>
-              {["0.5", "1", "1.5", "2"].map((p) => (
-                <TouchableOpacity
-                  key={p}
-                  style={[
-                    styles.portionBtn,
-                    portion === p && styles.portionBtnActive,
-                  ]}
-                  onPress={() => setPortion(p)}
-                >
-                  <Text
-                    style={[
-                      styles.portionBtnText,
-                      portion === p && styles.portionBtnTextActive,
-                    ]}
-                  >
-                    {p}x
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <AnimatedButton
-              title={saving ? "Saving..." : "Log This Meal"}
-              onPress={handleSave}
-              disabled={saving}
-              icon="✅"
-              style={{ marginTop: SPACING.lg }}
-            />
           </View>
-        )}
 
-        {/* Food list */}
-        <Text style={styles.label}>
-          {selectedMealType.charAt(0).toUpperCase() + selectedMealType.slice(1)}{" "}
-          Items
-          {searchQuery ? ` matching "${searchQuery}"` : ""}
-        </Text>
-        {filteredFoods.map((food, i) => (
-          <TouchableOpacity
-            key={i}
-            style={[
-              styles.foodItem,
-              selectedFood?.name === food.name && styles.foodItemSelected,
-            ]}
-            onPress={() => setSelectedFood(food)}
-          >
-            <View
-              style={[
-                styles.vegDot,
-                { backgroundColor: food.isVeg ? COLORS.success : COLORS.error },
-              ]}
-            />
-            <View style={styles.foodInfo}>
-              <Text style={styles.foodName}>{food.name}</Text>
-              <Text style={styles.foodMeta}>
-                P: {food.protein}g · C: {food.carbs}g · F: {food.fat}g
-              </Text>
-            </View>
-            <View style={styles.foodCalBadge}>
-              <Text style={styles.foodCalText}>{food.calories}</Text>
-              <Text style={styles.foodCalUnit}>kcal</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+          <Text style={styles.label}>Fat (g)</Text>
+          <TextInput
+            style={styles.input}
+            value={fat}
+            onChangeText={setFat}
+            placeholder="0"
+            keyboardType="numeric"
+          />
+          <Text style={styles.label}>Portion</Text>
+          <TextInput
+            style={styles.input}
+            value={portion}
+            onChangeText={setPortion}
+            placeholder="1"
+            keyboardType="numeric"
+          />
 
-        {filteredFoods.length === 0 && (
-          <Text style={styles.noResults}>No food items found 🥺</Text>
-        )}
+          <AnimatedButton
+            title={saving ? "Saving..." : "Save Food Log"}
+            onPress={handleSave}
+            disabled={saving}
+            style={styles.saveButton}
+          />
+        </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -349,53 +251,28 @@ const styles = StyleSheet.create({
     marginTop: SPACING.lg,
     gap: SPACING.sm,
   },
-  portionLabel: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.md,
-    ...FONTS.medium,
-    marginRight: SPACING.sm,
+  portionLabel: {},
+  form: {
+    padding: SPACING.md,
   },
-  portionBtn: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.round,
+  input: {
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.sm,
+    padding: SPACING.sm,
+    fontSize: FONT_SIZES.md,
+    color: COLORS.text,
+    marginBottom: SPACING.md,
     borderWidth: 1,
     borderColor: COLORS.glassBorder,
   },
-  portionBtnActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+  row: {
+    flexDirection: 'row',
+    gap: SPACING.md,
   },
-  portionBtnText: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.sm,
-    ...FONTS.medium,
+  half: {
+    flex: 1,
   },
-  portionBtnTextActive: { color: COLORS.text },
-  foodItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.glassBorder,
-  },
-  foodItemSelected: {
-    backgroundColor: COLORS.primary + "11",
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING.md,
-  },
-  vegDot: { width: 8, height: 8, borderRadius: 4, marginRight: SPACING.md },
-  foodInfo: { flex: 1 },
-  foodName: { color: COLORS.text, fontSize: FONT_SIZES.md, ...FONTS.medium },
-  foodMeta: { color: COLORS.textMuted, fontSize: FONT_SIZES.xs, marginTop: 2 },
-  foodCalBadge: { alignItems: "center" },
-  foodCalText: { color: COLORS.coral, fontSize: FONT_SIZES.lg, ...FONTS.bold },
-  foodCalUnit: { color: COLORS.textMuted, fontSize: FONT_SIZES.xs },
-  noResults: {
-    color: COLORS.textMuted,
-    textAlign: "center",
-    marginTop: SPACING.xxl,
-    fontSize: FONT_SIZES.md,
+  saveButton: {
+    marginTop: SPACING.md,
   },
 });

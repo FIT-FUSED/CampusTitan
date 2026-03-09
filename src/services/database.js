@@ -1,9 +1,11 @@
 import { supabase } from './supabase';
-import axios from 'axios';
-import config from './config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 class Database {
+    get supabase() {
+        return supabase;
+    }
+
     // User-specific
     async getUsers() {
         const { data, error } = await supabase.from('users').select('*');
@@ -17,70 +19,54 @@ class Database {
         return data;
     }
 
-    // Wellness Model Data
-    async saveWellnessData(userId, dataDict) {
-        const insertObj = {
-            user_id: userId,
-            ...dataDict
-        };
-        const { data, error } = await supabase.from('user_wellness_data').insert([insertObj]).select().single();
-        if (error) {
-            console.error('saveWellnessData error:', error);
-            throw error;
-        }
-        return data;
-    }
-
-    async predictWellness(metrics) {
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const url = `${config.BASE_URL}/wellness/predict`;
-            console.log('>>> predictWellness URL:', url);
-            console.log('>>> Session exists:', !!session);
-            console.log('>>> Token preview:', session?.access_token ? session.access_token.slice(0, 30) + '...' : 'none');
-            console.log('>>> Metrics keys:', Object.keys(metrics));
-            const response = await axios.post(url, metrics, {
-                headers: {
-                    Authorization: `Bearer ${session?.access_token}`
-                }
-            });
-            console.log('>>> predictWellness response status:', response.status);
-            return response.data;
-        } catch (error) {
-            console.error('>>> predictWellness error:', error.response?.data || error.message);
-            console.error('>>> Full axios error:', error);
-            throw error;
-        }
-    }
-
     // Food logs
     async getFoodLogs(userId) {
-        // userId parameter might not be strictly needed if using RLS, but passing it for the query
-        const { data, error } = await supabase.from('food_logs').select('*').eq('user_id', userId).order('date', { ascending: false });
+        // userId parameter might not be strictly needed if using RLS, but passing it for query
+        const { data, error } = await supabase
+            .from('food_logs')
+            .select('*')
+            .eq('user_id', userId)
+            .order('date', { ascending: false });
         if (error) { console.error(error); return []; }
-        // Supabase returns dates as strings, let's format if needed, but for now just return
-        return data.map(log => ({ ...log, mealType: log.meal_type, foodName: log.food_name, isVeg: log.is_veg }));
+        return (data || []).map((row) => ({
+            ...row,
+            mealType: row.mealType ?? row.meal_type,
+            foodName: row.foodName ?? row.food_name,
+            isVeg: row.isVeg ?? row.is_veg,
+        }));
     }
 
     async addFoodLog(log) {
-        const insertLog = {
-            ...log,
-            user_id: log.userId,
-            meal_type: log.mealType,
-            food_name: log.foodName,
-            is_veg: log.isVeg
-        };
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const insertLog = { ...log };
+        if (insertLog.userId && !insertLog.user_id) insertLog.user_id = insertLog.userId;
+        if (insertLog.mealType && !insertLog.meal_type) insertLog.meal_type = insertLog.mealType;
+        if (insertLog.foodName && !insertLog.food_name) insertLog.food_name = insertLog.foodName;
+        if (typeof insertLog.isVeg !== 'undefined' && typeof insertLog.is_veg === 'undefined') insertLog.is_veg = insertLog.isVeg;
+
+        insertLog.user_id = user.id;
+
         delete insertLog.userId;
         delete insertLog.mealType;
         delete insertLog.foodName;
         delete insertLog.isVeg;
-        delete insertLog.id; // Supabase generates ID
+        delete insertLog.id;
 
-        const { data, error } = await supabase.from('food_logs').insert([insertLog]).select().single();
+        const { data, error } = await supabase
+            .from('food_logs')
+            .insert([insertLog])
+            .select('*')
+            .single();
         if (error) { console.error(error); throw error; }
-        return { ...data, mealType: data.meal_type, foodName: data.food_name, isVeg: data.is_veg };
+        return {
+            ...data,
+            mealType: data.mealType ?? data.meal_type,
+            foodName: data.foodName ?? data.food_name,
+            isVeg: data.isVeg ?? data.is_veg,
+        };
     }
-
     async deleteFoodLog(id) {
         const { error } = await supabase.from('food_logs').delete().eq('id', id);
         if (error) { console.error(error); throw error; }
@@ -91,34 +77,65 @@ class Database {
         return this.getFoodLogs(user?.id);
     }
 
+    async getAllFoodLogsAdmin() {
+        const { data, error } = await supabase
+            .from('food_logs')
+            .select('*')
+            .order('date', { ascending: false });
+        if (error) { console.error(error); return []; }
+        return (data || []).map((row) => ({
+            ...row,
+            mealType: row.mealType ?? row.meal_type,
+            foodName: row.foodName ?? row.food_name,
+            isVeg: row.isVeg ?? row.is_veg,
+        }));
+    }
+
+    async getAllActivitiesAdmin() {
+        const { data, error } = await supabase
+            .from('activities')
+            .select('*')
+            .order('date', { ascending: false });
+        if (error) { console.error(error); return []; }
+        return (data || []).map(act => ({ ...act, caloriesBurned: act.calories_burned }));
+    }
+
+    async getAllMoodLogsAdmin() {
+        const { data, error } = await supabase
+            .from('mood_logs')
+            .select('*')
+            .order('date', { ascending: false });
+        if (error) { console.error(error); return []; }
+        return data || [];
+    }
+
     // Activities
     async getActivities(userId) {
         const { data, error } = await supabase.from('activities').select('*').eq('user_id', userId).order('date', { ascending: false });
         if (error) { console.error(error); return []; }
         return data.map(act => ({ ...act, caloriesBurned: act.calories_burned }));
     }
+    async addActivity(log) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
 
-    async addActivity(activity) {
-        const insertAct = {
-            ...activity,
-            user_id: activity.userId,
-            calories_burned: activity.caloriesBurned
-        };
-        delete insertAct.userId;
-        delete insertAct.caloriesBurned;
-        delete insertAct.id;
-
-        const { data, error } = await supabase.from('activities').insert([insertAct]).select().single();
+        const insertLog = { ...log, user_id: user.id };
+        // Map camelCase to snake_case for DB columns
+        if (insertLog.caloriesBurned !== undefined && insertLog.calories_burned === undefined) {
+            insertLog.calories_burned = insertLog.caloriesBurned;
+        }
+        delete insertLog.userId;
+        delete insertLog.caloriesBurned;
+        delete insertLog.id;
+        const { data, error } = await supabase.from('activities').insert([insertLog]).select().single();
         if (error) { console.error(error); throw error; }
         return { ...data, caloriesBurned: data.calories_burned };
     }
-
     async deleteActivity(id) {
         const { error } = await supabase.from('activities').delete().eq('id', id);
         if (error) { console.error(error); throw error; }
         return { message: 'Deleted' };
     }
-
     async getAllActivities() {
         const { data: { user } } = await supabase.auth.getUser();
         return this.getActivities(user?.id);
@@ -130,23 +147,22 @@ class Database {
         if (error) { console.error(error); return []; }
         return data;
     }
-
     async addMoodLog(log) {
-        const insertLog = { ...log, user_id: log.userId };
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const insertLog = { ...log, user_id: user.id };
         delete insertLog.userId;
         delete insertLog.id;
-
         const { data, error } = await supabase.from('mood_logs').insert([insertLog]).select().single();
         if (error) { console.error(error); throw error; }
         return data;
     }
-
     async deleteMoodLog(id) {
         const { error } = await supabase.from('mood_logs').delete().eq('id', id);
         if (error) { console.error(error); throw error; }
         return { message: 'Deleted' };
     }
-
     async getAllMoodLogs() {
         const { data: { user } } = await supabase.auth.getUser();
         return this.getMoodLogs(user?.id);
@@ -158,37 +174,41 @@ class Database {
         if (error) { console.error(error); return []; }
         return data;
     }
+    async addJournal(log) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
 
-    async addJournal(journal) {
-        const insertJ = { ...journal, user_id: journal.userId };
-        delete insertJ.userId;
-        delete insertJ.id;
-
-        const { data, error } = await supabase.from('journals').insert([insertJ]).select().single();
+        const insertLog = { ...log, user_id: user.id };
+        delete insertLog.userId;
+        delete insertLog.id;
+        const { data, error } = await supabase.from('journals').insert([insertLog]).select().single();
         if (error) { console.error(error); throw error; }
         return data;
     }
-
-    async updateJournal(id, updates) {
-        const { data, error } = await supabase.from('journals').update(updates).eq('id', id).select().single();
-        if (error) { console.error(error); throw error; }
-        return data;
-    }
-
     async deleteJournal(id) {
         const { error } = await supabase.from('journals').delete().eq('id', id);
         if (error) { console.error(error); throw error; }
         return { message: 'Deleted' };
     }
+    async getAllJournals() {
+        const { data: { user } } = await supabase.auth.getUser();
+        return this.getJournals(user?.id);
+    }
 
     // Environmental data
     async getEnvData() {
-        // Will rely on the old seeded logic as Supabase mapping for env might be overkill
+        // Will rely on old seeded logic as Supabase mapping for env might be overkill
         // If needed in the future, can create table
         return [];
     }
-    async addEnvData(data) {
-        return null;
+
+    async addEnvData(log) {
+        const insertLog = { ...log };
+        delete insertLog.userId;
+        delete insertLog.id;
+        const { data, error } = await supabase.from('environmental_data').insert([insertLog]).select().single();
+        if (error) { console.error(error); throw error; }
+        return data;
     }
 
     // Wellness circles
@@ -197,36 +217,17 @@ class Database {
         if (error) { console.error(error); return []; }
         return data.map(wc => ({ ...wc, maxParticipants: wc.max_participants }));
     }
-
-    async addWellnessCircle(circle) {
-        const insertC = { ...circle, max_participants: circle.maxParticipants, created_by: circle.createdBy };
-        delete insertC.maxParticipants;
-        delete insertC.createdBy;
-        delete insertC.id;
-
-        const { data, error } = await supabase.from('wellness_circles').insert([insertC]).select().single();
+    async addWellnessCircle(log) {
+        const { data, error } = await supabase.from('wellness_circles').insert([log]).select().single();
         if (error) { console.error(error); throw error; }
-        return { ...data, maxParticipants: data.max_participants };
+        return data;
+    }
+    async deleteWellnessCircle(id) {
+        const { error } = await supabase.from('wellness_circles').delete().eq('id', id);
+        if (error) { console.error(error); throw error; }
+        return { message: 'Deleted' };
     }
 
-    async joinWellnessCircle(id) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("Not logged in");
-
-        const { data, error } = await supabase.from('circle_participants').insert([{
-            circle_id: id,
-            user_id: user.id
-        }]);
-
-        if (error) { console.error(error); throw error; }
-        return { message: "Joined successfully" };
-    }
-
-    // Seeded flag
-    async isSeeded() { return true; }
-    async markSeeded() { }
-
-    // Clear all data
     async clearAll() { }
 
     // Campus Analytics
@@ -237,14 +238,39 @@ class Database {
     // College Leaderboard
     async getLeaderboard(college) {
         if (!college) return [];
+        console.log('🏆 DEBUG: Getting leaderboard for college:', `"${college}"`);
         try {
-            // Fetch all users from the same college
-            const { data: users, error } = await supabase
+            // First try exact match
+            let { data: users, error } = await supabase
                 .from('users')
                 .select('id, name, college, height, weight, age, gender')
                 .eq('college', college);
 
-            if (error || !users) {
+            // If no users found, try case-insensitive search
+            if (!users || users.length === 0) {
+                console.log('🏆 DEBUG: No exact match, trying case-insensitive search');
+                console.log('🏆 DEBUG: Original query error:', error);
+                const { data: allUsers, error: allUsersError } = await supabase
+                    .from('users')
+                    .select('id, name, college, height, weight, age, gender');
+                
+                console.log('🏆 DEBUG: All users query error:', allUsersError);
+                console.log('🏆 DEBUG: ALL users in database:', allUsers?.length || 0);
+                console.log('🏆 DEBUG: ALL college names in database:', allUsers?.map(u => `"${u.college}"`));
+                
+                if (allUsers) {
+                    users = allUsers.filter(u => 
+                        u.college && u.college.toLowerCase().trim() === college.toLowerCase().trim()
+                    );
+                    console.log('🏆 DEBUG: Filtered users from all users:', users?.length || 0);
+                    console.log('🏆 DEBUG: Matching users:', users?.map(u => ({ name: u.name, college: `"${u.college}"` })));
+                }
+            }
+
+            console.log('🏆 DEBUG: Final users found:', users?.length || 0);
+            console.log('🏆 DEBUG: User colleges:', users?.map(u => `"${u.college}"`));
+
+            if (error) {
                 console.error('Leaderboard fetch error:', error);
                 return [];
             }
@@ -303,13 +329,29 @@ class Database {
         }
     }
 
-    // Daily Wellness Logs (Local Storage)
+    // Daily Wellness Logs (Database)
     async getDailyWellnessLog(date) {
         try {
-            const logs = await AsyncStorage.getItem('@daily_wellness_logs');
-            if (!logs) return null;
-            const parsed = JSON.parse(logs);
-            return parsed.find(l => l.date === date);
+            // Get current user
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                console.log('🧠 [Wellness] No user found for daily wellness log');
+                return null;
+            }
+            
+            // Get wellness logs from database
+            const { data, error } = await supabase
+                .from('user_wellness_data')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('date', date);
+            
+            if (error) {
+                console.error('getDailyWellnessLog error:', error);
+                return null;
+            }
+            
+            return data.length > 0 ? data[0] : null;
         } catch (e) {
             console.error('getDailyWellnessLog error:', e);
             return null;
@@ -318,31 +360,123 @@ class Database {
 
     async saveDailyWellnessLog(log) {
         try {
-            const logsStr = await AsyncStorage.getItem('@daily_wellness_logs');
-            let logs = logsStr ? JSON.parse(logsStr) : [];
-            // Update existing or add new
-            const existingIndex = logs.findIndex(l => l.date === log.date);
-            if (existingIndex >= 0) {
-                logs[existingIndex] = { ...logs[existingIndex], ...log };
-            } else {
-                logs.push(log);
+            console.log('🧠 [DEBUG] saveDailyWellnessLog called with:', JSON.stringify(log, null, 2));
+            
+            // Get current user
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                throw new Error('User not authenticated');
             }
-            await AsyncStorage.setItem('@daily_wellness_logs', JSON.stringify(logs));
-            return log;
+            
+            // Validate log object exists
+            if (!log || typeof log !== 'object') {
+                console.error('🧠 [ERROR] Invalid log object:', log);
+                throw new Error('Invalid log object provided');
+            }
+            
+            // Save to database with proper date constraint (one entry per day)
+            const date = (log.date || new Date().toISOString().split('T')[0]); // YYYY-MM-DD format
+            console.log('🧠 [DEBUG] Wellness date:', date);
+            
+            // First check if entry exists for today
+            const { data: existingRecords, error: checkError } = await supabase
+                .from('user_wellness_data')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('date', date);
+                
+            if (checkError) {
+                console.error('🧠 [ERROR] Check existing records error:', checkError);
+                throw checkError;
+            }
+            
+            console.log('🧠 [DEBUG] Existing records:', existingRecords);
+            
+            const payload = {
+                user_id: user.id,
+                date,
+                sleep_hrs: typeof log.sleepHrs !== 'undefined' ? log.sleepHrs : log.sleep_hrs,
+                walked_km: typeof log.walkedKm !== 'undefined' ? log.walkedKm : log.walked_km,
+                stress_level: typeof log.stressLevel !== 'undefined' ? log.stressLevel : log.stress_level,
+                productivity: typeof log.productivity !== 'undefined' ? log.productivity : null,
+                created_at: new Date().toISOString(),
+            };
+            
+            console.log('🧠 [DEBUG] Wellness payload:', payload);
+            
+            let result;
+            if (existingRecords && existingRecords.length > 0) {
+                console.log('🧠 [DEBUG] Updating existing record:', existingRecords[0].id);
+                const { data: updateData, error: updateError } = await supabase
+                    .from('user_wellness_data')
+                    .update(payload)
+                    .eq('id', existingRecords[0].id)
+                    .eq('user_id', user.id)
+                    .select()
+                    .single();
+                if (updateError) {
+                    console.error('saveDailyWellnessLog update error:', updateError);
+                    throw updateError;
+                }
+                result = updateData;
+            } else {
+                console.log('🧠 [DEBUG] Inserting new record');
+                const { data: insertedData, error: insertError } = await supabase
+                    .from('user_wellness_data')
+                    .insert([payload])
+                    .select()
+                    .single();
+                if (insertError) {
+                    console.error('saveDailyWellnessLog insert error:', insertError);
+                    throw insertError;
+                }
+                result = insertedData;
+            }
+            
+            console.log(`🧠 [Wellness] Saved wellness log for user ${user.id}`);
+            return result;
         } catch (e) {
             console.error('saveDailyWellnessLog error:', e);
+            console.error('🧠 [ERROR] Stack trace:', e.stack);
             throw e;
         }
     }
 
-    async getWellnessHistory(days = 7) {
+    async getWellnessHistory(days = 7, userId = null) {
         try {
-            const logsStr = await AsyncStorage.getItem('@daily_wellness_logs');
-            if (!logsStr) return [];
-            const logs = JSON.parse(logsStr);
-            // Sort by date descending
-            logs.sort((a, b) => new Date(b.date) - new Date(a.date));
-            return logs.slice(0, days);
+            // Get current user if userId not provided
+            if (!userId) {
+                const { data: { user } } = await supabase.auth.getUser();
+                userId = user?.id;
+            }
+            
+            // Get wellness logs from database filtered by user with flexible column selection
+            const { data, error } = await supabase
+                .from('user_wellness_data')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+            
+            if (error) {
+                console.error('getWellnessHistory error:', error);
+                return [];
+            }
+            
+            // Normalize data for frontend consumption
+            const normalizedData = data.map(record => ({
+                ...record,
+                // Map possible column variations to standard names
+                date: record.date || record.created_at?.split('T')[0],
+                sleepHrs: record.sleepHrs || record.sleep_hrs,
+                walkedKm: record.walkedKm || record.walked_km,
+                stressLevel: record.stressLevel || record.stress_level,
+                productivity: record.productivity || 0 // Default to 0 if column doesn't exist
+            }));
+            
+            console.log(`🧠 [Wellness] Found ${normalizedData.length} wellness records for user ${userId}`);
+            
+            // Sort by date and limit
+            return normalizedData.slice(0, days);
         } catch (e) {
             console.error('getWellnessHistory error:', e);
             return [];
@@ -351,5 +485,4 @@ class Database {
 }
 
 export const db = new Database();
-export const KEYS = {};
 export default db;

@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node nutrition-server.js",
-    "dev": "nodemon server.js",
+    "start": "python3 nutrition-server.py",
+    "dev": "nodemon nutrition-server.py",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

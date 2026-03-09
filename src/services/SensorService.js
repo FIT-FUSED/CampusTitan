@@ -138,7 +138,7 @@ class SensorService {
   async persistSteps() {
     try {
       const today = new Date().toDateString();
-      await AsyncStorage.setItem(DAILY_STEPS_KEY, this.stepCount.toString());
+      await AsyncStorage.setItem(DAILY_STEPS_KEY, String(this.stepCount || 0));
       await AsyncStorage.setItem(LAST_STEP_DATE_KEY, today);
       this.lastStepDate = today;
     } catch (error) {
@@ -156,11 +156,11 @@ class SensorService {
   }
 
   getKm() {
-    return this.stepCount * STRIDE_KM_PER_STEP;
+    return (this.stepCount || 0) * STRIDE_KM_PER_STEP;
   }
 
   getCalories() {
-    return this.stepCount * CALORIES_PER_STEP;
+    return (this.stepCount || 0) * CALORIES_PER_STEP;
   }
 
   async incrementStep(callback) {

@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/services/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import sensorService from './src/services/SensorService';
+import SyncService from './src/services/SyncService';
 
 function AppRoot() {
   useEffect(() => {

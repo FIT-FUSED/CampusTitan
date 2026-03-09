@@ -2,8 +2,8 @@ import os
 import json
 import requests
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
+import google.generativeai as genai
+from google.generativeai import types
 
 # ==========================================
 # Phase 1: PostgreSQL Simulation
@@ -44,7 +44,7 @@ def calculate_moving_averages(history_data: list) -> dict:
 # ==========================================
 def compress_historical_context(history_data: list, api_key: str) -> str:
     """Uses a fast LLM to summarize 7 days of raw data into a 2-sentence trend."""
-    client = genai.Client(api_key=api_key)
+    genai.configure(api_key=api_key)
     raw_data_string = json.dumps(history_data, indent=2)
     
     prompt = f"""
@@ -57,10 +57,10 @@ def compress_historical_context(history_data: list, api_key: str) -> str:
     
     print("-> Pinging Gemini for Context Compression...")
     try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        response = model.generate_content(
             contents=prompt,
-            config=types.GenerateContentConfig(temperature=0.1)
+            generation_config=types.GenerateContentConfig(temperature=0.1)
         )
         return response.text.strip()
     except Exception as e:

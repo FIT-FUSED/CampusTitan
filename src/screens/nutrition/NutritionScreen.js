@@ -1,6 +1,6 @@
 // Nutrition Screen
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, Modal, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS, MEAL_TYPES } from '../../theme';
 import { GradientCard, SectionHeader, AnimatedButton, ProgressBar, Chip } from '../../components/common';
@@ -16,22 +16,31 @@ export default function NutritionScreen({ navigation }) {
     const [foodLogs, setFoodLogs] = useState([]);
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [refreshing, setRefreshing] = useState(false);
+    const [selectedFood, setSelectedFood] = useState(null);
+    const [modalVisible, setModalVisible] = useState(false);
 
     const loadData = useCallback(async () => {
         if (!user) return;
+        console.log('[NutritionScreen] Loading food logs for user:', user.id);
         const logs = await db.getFoodLogs(user.id);
+        console.log('[NutritionScreen] Loaded logs:', logs);
         setFoodLogs(logs);
     }, [user]);
 
     useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
     const dayLogs = foodLogs.filter(l => l.date === selectedDate);
+    console.log('[NutritionScreen] Selected date:', selectedDate);
+    console.log('[NutritionScreen] Day logs:', dayLogs);
+    
     const totals = dayLogs.reduce((acc, l) => ({
         calories: acc.calories + (l.calories || 0),
         protein: acc.protein + (l.protein || 0),
         carbs: acc.carbs + (l.carbs || 0),
         fat: acc.fat + (l.fat || 0),
     }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+    
+    console.log('[NutritionScreen] Totals:', totals);
 
     const calorieGoal = 2000;
     const proteinGoal = 60;
@@ -52,8 +61,15 @@ export default function NutritionScreen({ navigation }) {
     });
 
     function getMealsByType(type) {
-        return dayLogs.filter(l => l.mealType === type);
+        const meals = dayLogs.filter(l => l.mealType === type);
+        console.log(`[NutritionScreen] Meals for ${type}:`, meals);
+        return meals;
     }
+
+    const handleFoodClick = (food) => {
+        setSelectedFood(food);
+        setModalVisible(true);
+    };
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
@@ -155,11 +171,16 @@ export default function NutritionScreen({ navigation }) {
                                 <Text style={styles.mealEmpty}>No items logged</Text>
                             ) : (
                                 meals.map((item, i) => (
-                                    <View key={i} style={styles.foodItem}>
+                                    <TouchableOpacity 
+                                        key={i} 
+                                        style={styles.foodItem}
+                                        onPress={() => handleFoodClick(item)}
+                                        activeOpacity={0.7}
+                                    >
                                         <View style={[styles.vegDot, { backgroundColor: item.isVeg ? COLORS.success : COLORS.error }]} />
                                         <Text style={styles.foodName}>{item.foodName}</Text>
                                         <Text style={styles.foodCalories}>{item.calories} kcal</Text>
-                                    </View>
+                                    </TouchableOpacity>
                                 ))
                             )}
                         </View>
@@ -188,6 +209,59 @@ export default function NutritionScreen({ navigation }) {
 
                 <View style={{ height: 100 }} />
             </ScrollView>
+            
+            {/* Food Detail Modal */}
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={modalVisible}
+                onRequestClose={() => setModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>{selectedFood?.foodName}</Text>
+                            <TouchableOpacity
+                                style={styles.closeButton}
+                                onPress={() => setModalVisible(false)}
+                            >
+                                <Text style={styles.closeButtonText}>✕</Text>
+                            </TouchableOpacity>
+                        </View>
+                        
+                        <View style={styles.modalBody}>
+                            <View style={styles.nutritionGrid}>
+                                <View style={styles.nutritionItem}>
+                                    <Text style={styles.nutritionLabel}>Calories</Text>
+                                    <Text style={styles.nutritionValue}>{selectedFood?.calories || 0} kcal</Text>
+                                </View>
+                                <View style={styles.nutritionItem}>
+                                    <Text style={styles.nutritionLabel}>Protein</Text>
+                                    <Text style={styles.nutritionValue}>{selectedFood?.protein || 0}g</Text>
+                                </View>
+                                <View style={styles.nutritionItem}>
+                                    <Text style={styles.nutritionLabel}>Carbs</Text>
+                                    <Text style={styles.nutritionValue}>{selectedFood?.carbs || 0}g</Text>
+                                </View>
+                                <View style={styles.nutritionItem}>
+                                    <Text style={styles.nutritionLabel}>Fat</Text>
+                                    <Text style={styles.nutritionValue}>{selectedFood?.fat || 0}g</Text>
+                                </View>
+                            </View>
+                            
+                            <View style={styles.mealInfo}>
+                                <Text style={styles.mealInfoLabel}>Meal Type</Text>
+                                <Text style={styles.mealInfoValue}>{selectedFood?.mealType || 'Unknown'}</Text>
+                            </View>
+                            
+                            <View style={styles.mealInfo}>
+                                <Text style={styles.mealInfoLabel}>Date</Text>
+                                <Text style={styles.mealInfoValue}>{selectedFood?.date || 'Unknown'}</Text>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -267,4 +341,84 @@ const styles = StyleSheet.create({
     weekCalValue: { color: COLORS.textMuted, fontSize: 9, marginBottom: 4 },
     weekBarFill: { width: 28, borderRadius: BORDER_RADIUS.sm },
     weekDay: { color: COLORS.textMuted, fontSize: FONT_SIZES.xs, marginTop: SPACING.sm },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        backgroundColor: COLORS.surface,
+        borderRadius: BORDER_RADIUS.xl,
+        padding: SPACING.lg,
+        margin: SPACING.lg,
+        width: width * 0.9,
+        maxWidth: 400,
+        ...SHADOWS.large,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: SPACING.lg,
+    },
+    modalTitle: {
+        fontSize: FONT_SIZES.lg,
+        ...FONTS.bold,
+        color: COLORS.text,
+        flex: 1,
+    },
+    closeButton: {
+        padding: SPACING.sm,
+        borderRadius: BORDER_RADIUS.round,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    closeButtonText: {
+        fontSize: FONT_SIZES.lg,
+        color: COLORS.textSecondary,
+    },
+    modalBody: {
+        gap: SPACING.lg,
+    },
+    nutritionGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: SPACING.md,
+        marginBottom: SPACING.lg,
+    },
+    nutritionItem: {
+        width: '48%',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        padding: SPACING.md,
+        borderRadius: BORDER_RADIUS.md,
+        alignItems: 'center',
+    },
+    nutritionLabel: {
+        fontSize: FONT_SIZES.sm,
+        ...FONTS.medium,
+        color: COLORS.textSecondary,
+        marginBottom: SPACING.xs,
+    },
+    nutritionValue: {
+        fontSize: FONT_SIZES.md,
+        ...FONTS.bold,
+        color: COLORS.text,
+    },
+    mealInfo: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        padding: SPACING.md,
+        borderRadius: BORDER_RADIUS.md,
+    },
+    mealInfoLabel: {
+        fontSize: FONT_SIZES.sm,
+        ...FONTS.medium,
+        color: COLORS.textSecondary,
+    },
+    mealInfoValue: {
+        fontSize: FONT_SIZES.sm,
+        ...FONTS.semiBold,
+        color: COLORS.text,
+    },
 });
