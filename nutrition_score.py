@@ -67,9 +67,9 @@ def calculate_nrf93(nutrition_data: dict) -> float:
 
 # Models to try in order (separate free-tier quotas per model)
 GEMINI_MODELS = [
-    'models/gemini-2.0-flash',
-    'models/gemini-2.0-flash-lite',
-    'models/gemini-2.5-flash-lite',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
 ]
 
 def _call_gemini(model_name, contents, config, max_retries=3):
@@ -78,7 +78,7 @@ def _call_gemini(model_name, contents, config, max_retries=3):
     
     for attempt in range(max_retries):
         try:
-            print(f"  Trying {model_name} (attempt {attempt + 1}/{max_retries})...")
+            print(f"  [Gemini] Trying {model_name}...")
             model = genai.GenerativeModel(model_name)
             response = model.generate_content(
                 contents=contents,
@@ -105,6 +105,7 @@ def _call_gemini(model_name, contents, config, max_retries=3):
 
 def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_key: str, usda_key: str):
     # Configure the API key
+    print(f"  [Debug] Gemini key prefix: {gemini_key[:10]}..." if gemini_key else "  [Debug] No Gemini key!")
     genai.configure(api_key=gemini_key)
     try:
         image = Image.open(image_path)

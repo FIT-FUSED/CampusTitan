@@ -192,6 +192,24 @@ export default function FoodScannerScreen({ navigation }) {
         setScanning(true);
     };
 
+    // Auto-detect meal type based on time of day
+    const getMealTypeFromTime = () => {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 11) return 'breakfast';
+        if (hour >= 11 && hour < 15) return 'lunch';
+        if (hour >= 15 && hour < 18) return 'snack';
+        return 'dinner'; // 18:00 - 4:59
+    };
+
+    // Get local date string (not UTC)
+    const getLocalDateString = () => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     const logFood = async (foodData) => {
         if (!user) {
             Alert.alert('Error', 'Please log in to save food data.');
@@ -202,7 +220,10 @@ export default function FoodScannerScreen({ navigation }) {
             console.log('[FoodScanner] Attempting to save food data:', foodData);
             
             const normalized = normalizeNutritionResult(foodData);
-            const dateStr = new Date().toISOString().split('T')[0];
+            const dateStr = getLocalDateString();
+            const detectedMealType = getMealTypeFromTime();
+
+            console.log('[FoodScanner] Auto-detected meal type:', detectedMealType);
 
             await db.addFoodLog({
                 food_name: normalized.food_name,
@@ -210,14 +231,16 @@ export default function FoodScannerScreen({ navigation }) {
                 protein: Math.round(normalized.protein || 0),
                 carbs: Math.round(normalized.carbs || 0),
                 fat: Math.round(normalized.fat || 0),
-                meal_type: 'detected',
+                meal_type: detectedMealType,
                 date: dateStr,
                 portion: 1,
             });
 
+            // Show which meal type it was saved as
+            const mealNames = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
             Alert.alert(
                 'Success!',
-                `${normalized.food_name} has been logged to your nutrition tracker.`,
+                `${normalized.food_name} logged to ${mealNames[detectedMealType]}.`,
                 [{ text: 'OK', onPress: () => navigation.goBack() }]
             );
         } catch (error) {

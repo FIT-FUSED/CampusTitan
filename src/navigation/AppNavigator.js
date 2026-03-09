@@ -117,6 +117,7 @@ function StudentTabs() {
       screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="Home" component={HomeStack} />
+      <Tab.Screen name="Fitness" component={FitnessStack} />
       <Tab.Screen name="Nutrition" component={NutritionStack} />
       <Tab.Screen name="Wellness" component={WellnessStack} />
       <Tab.Screen name="Community" component={CommunityStack} />

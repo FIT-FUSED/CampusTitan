@@ -10,10 +10,14 @@ import tempfile
 # Add the parent directory to the path to import nutrition_score
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Load .env from the backend folder
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+load_dotenv(env_path)
+print(f"Loaded .env from: {env_path}")
+
 # Import nutrition_score
 try:
     import nutrition_score
-    load_dotenv()
     print("✓ nutrition_score.py loaded successfully")
 except ImportError as e:
     print(f"✗ Failed to load nutrition_score.py: {e}")
@@ -51,7 +55,13 @@ def analyze_nutrition():
         gemini_key = os.getenv('GEMINI_API_KEY')
         usda_key = os.getenv('USDA_API_KEY')
 
-        print(f"Gemini key available: {bool(gemini_key)}")
+        # Debug: Show what keys are loaded (first 10 chars)
+        print(f"=== API KEY DEBUG ===")
+        print(f"GEMINI_API_KEY env var: {'set' if gemini_key else 'NOT SET'}")
+        if gemini_key:
+            print(f"GEMINI key prefix: {gemini_key[:15]}...")
+        print(f"USDA_API_KEY env var: {'set' if usda_key else 'NOT SET'}")
+        print(f"======================")
         print(f"USDA key available: {bool(usda_key)}")
         print(f"Nutrition score available: {nutrition_score is not None}")
 

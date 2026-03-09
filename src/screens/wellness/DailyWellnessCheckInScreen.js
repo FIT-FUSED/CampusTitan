@@ -1,3 +1,4 @@
+// Daily Wellness Check-in - Premium Redesigned UI with Wow Factor
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   View,
@@ -11,6 +12,7 @@ import {
   ToastAndroid,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
 import {
@@ -50,39 +52,139 @@ function formatHours(n) {
   return Number.isFinite(v) ? v.toFixed(1) : "0.0";
 }
 
-function ValueTag({ label, tone }) {
-  const bg =
-    tone === "auto"
-      ? COLORS.accent + "22"
-      : tone === "warn"
-        ? COLORS.orange + "22"
-        : COLORS.primary + "22";
-  const fg =
-    tone === "auto"
-      ? COLORS.accentDark
-      : tone === "warn"
-        ? COLORS.orange
-        : COLORS.primary;
+// Premium Auto Tag Component
+function AutoTag({ label, isAuto }) {
+    return (
+        <View style={[styles.autoTag, { backgroundColor: isAuto ? COLORS.successSubtle : COLORS.surfaceElevated }]}>
+            <View style={[styles.autoDot, { backgroundColor: isAuto ? COLORS.success : COLORS.textMuted }]} />
+            <Text style={[styles.autoTagText, { color: isAuto ? COLORS.success : COLORS.textMuted }]}>
+                {isAuto ? 'Auto' : 'Manual'}
+            </Text>
+        </View>
+    );
+}
+
+// Premium Metric Card with stunning gradient border
+function MetricCard({ title, subtitle, isAuto, children, icon }) {
   return (
-    <View style={[styles.tag, { backgroundColor: bg, borderColor: fg + "33" }]}>
-      <Text style={[styles.tagText, { color: fg }]}>{label}</Text>
+    <View style={styles.metricCard}>
+        <View style={styles.metricHeader}>
+            <View style={styles.metricTitleRow}>
+                {icon && (
+                    <LinearGradient colors={COLORS.gradientPrimary} style={styles.metricIconGradient}>
+                        <Text style={styles.metricIcon}>{icon}</Text>
+                    </LinearGradient>
+                )}
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.metricTitle}>{title}</Text>
+                    {!!subtitle && <Text style={styles.metricSubtitle}>{subtitle}</Text>}
+                </View>
+            </View>
+            {isAuto !== undefined && <AutoTag label="" isAuto={isAuto} />}
+        </View>
+        <View style={styles.metricContent}>
+            {children}
+        </View>
     </View>
   );
 }
 
-function MetricCard({ title, subtitle, right, children }) {
-  return (
-    <View style={styles.metricCard}>
-      <View style={styles.metricHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.metricTitle}>{title}</Text>
-          {!!subtitle && <Text style={styles.metricSubtitle}>{subtitle}</Text>}
+// Premium Slider for productivity with gradient
+function PremiumSlider({ value, onValueChange, min = 0, max = 100, step = 5, color = COLORS.primary }) {
+    const percentage = ((value - min) / (max - min)) * 100;
+    
+    return (
+        <View style={styles.sliderContainer}>
+            <TouchableOpacity
+                style={styles.sliderBtn}
+                onPress={() => onValueChange(Math.max(min, value - step))}
+            >
+                <LinearGradient colors={COLORS.gradientPrimary} style={styles.sliderBtnGradient}>
+                    <Text style={styles.sliderBtnText}>−</Text>
+                </LinearGradient>
+            </TouchableOpacity>
+            
+            <View style={styles.sliderTrack}>
+                <LinearGradient
+                    colors={[color, color + '80']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[styles.sliderFill, { width: `${percentage}%` }]}
+                />
+                <View style={[styles.sliderThumb, { left: `${percentage}%`, backgroundColor: color }]} />
+            </View>
+            
+            <TouchableOpacity
+                style={styles.sliderBtn}
+                onPress={() => onValueChange(Math.min(max, value + step))}
+            >
+                <LinearGradient colors={COLORS.gradientPrimary} style={styles.sliderBtnGradient}>
+                    <Text style={styles.sliderBtnText}>+</Text>
+                </LinearGradient>
+            </TouchableOpacity>
         </View>
-        {right}
-      </View>
-      {children}
-    </View>
-  );
+    );
+}
+
+// Premium Emoji Selector for mood/quality
+function EmojiSelector({ value, onValueChange, options, color = COLORS.primary }) {
+    return (
+        <View style={styles.emojiSelector}>
+            {options.map((opt) => (
+                <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                        styles.emojiOption,
+                        value === opt.value && { 
+                            backgroundColor: color + '15',
+                            borderColor: color,
+                        }
+                    ]}
+                    onPress={() => onValueChange(opt.value)}
+                    activeOpacity={0.7}
+                >
+                    <Text style={styles.emojiText}>{opt.emoji}</Text>
+                    <Text style={[
+                        styles.emojiLabel,
+                        value === opt.value && { color }
+                    ]}>
+                        {opt.label}
+                    </Text>
+                </TouchableOpacity>
+            ))}
+        </View>
+    );
+}
+
+// Number Circle Selector for stress - Premium
+function NumberCircleSelector({ value, onValueChange, min = 1, max = 10, color = COLORS.accent }) {
+    const numbers = Array.from({ length: max - min + 1 }, (_, i) => min + i);
+    
+    return (
+        <View style={styles.numberCircleContainer}>
+            {numbers.map((num) => (
+                <TouchableOpacity
+                    key={num}
+                    style={[
+                        styles.numberCircle,
+                        value === num && {
+                            backgroundColor: color,
+                            transform: [{ scale: 1.15 }],
+                        },
+                    ]}
+                    onPress={() => onValueChange(num)}
+                    activeOpacity={0.7}
+                >
+                    <Text style={[
+                        styles.numberCircleText,
+                        value === num && { color: COLORS.textInverse },
+                    ]}>
+                        {num}
+                    </Text>
+                </TouchableOpacity>
+            ))}
+        </View>
+    );
 }
 
 export default function DailyWellnessCheckInScreen({ navigation }) {
@@ -95,7 +197,7 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
   const [permissions, setPermissions] = useState({
     healthConnect: false,
     usageStats: false,
-  }); // healthConnect always false — no HC bridge
+  });
   const [sources, setSources] = useState({
     steps: "manual",
     exerciseMins: "manual",
@@ -279,10 +381,7 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
           usageStats: permissions.usageStats,
         },
       };
-      // Delegate to SyncService so the same payload can be handled in an
-      // offline-first way: it always updates local history, and either
-      // talks to the backend immediately (online) or enqueues for later
-      // flush (offline) without blocking the UI.
+      
       await SyncService.submitWellnessCheckin(log);
       await AsyncStorage.setItem("@last_logged_date", today);
       await AsyncStorage.setItem("@last_checkin_date", today);
@@ -296,8 +395,10 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading check-in…</Text>
+        <LinearGradient colors={COLORS.gradientPrimary} style={styles.loadingGradient}>
+          <ActivityIndicator size="large" color={COLORS.textInverse} />
+        </LinearGradient>
+        <Text style={styles.loadingText}>Loading your wellness data...</Text>
       </View>
     );
   }
@@ -305,12 +406,12 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={COLORS.gradientDark}
+        colors={['#FAFBFC', '#F3F4F6', '#F9FAFB']}
         style={StyleSheet.absoluteFill}
       />
       <Header
-        title="Daily Wellness"
-        subtitle={format(new Date(), "EEEE, MMM d")}
+        title="Daily Check-in"
+        subtitle={format(new Date(), "EEEE, MMMM d")}
         onBack={() => navigation.goBack()}
         onLongPress={handleHeaderLongPress}
       />
@@ -322,32 +423,64 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
+          {/* PREMIUM HEADER CARD - Stunning Gradient! */}
           <GradientCard
-            gradient={COLORS.gradientCard}
-            style={styles.noticeCard}
+            gradient={COLORS.gradientHero}
+            style={styles.headerCard}
           >
-            <Text style={styles.noticeTitle}>Privacy-first, opt-in</Text>
-            <Text style={styles.noticeText}>
-              Automatic tracking is optional. If you don’t enable it, you can
-              still log manually.
-            </Text>
+            <View style={styles.headerCardContent}>
+              <View style={styles.headerCardLeft}>
+                <LinearGradient colors={['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.15)']} style={styles.headerEmojiGradient}>
+                  <Text style={styles.headerEmoji}>🧠</Text>
+                </LinearGradient>
+              </View>
+              <View style={styles.headerCardRight}>
+                <Text style={styles.headerTitle}>Train Your AI</Text>
+                <Text style={styles.headerSubtitle}>
+                    Log daily to help predict your wellness
+                </Text>
+              </View>
+            </View>
+            <View style={styles.headerStats}>
+                <View style={styles.headerStat}>
+                    <LinearGradient colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.1)']} style={styles.headerStatGradient}>
+                        <Text style={styles.headerStatValue}>+10</Text>
+                        <Text style={styles.headerStatLabel}>Points</Text>
+                    </LinearGradient>
+                </View>
+                <View style={styles.headerStatDivider} />
+                <View style={styles.headerStat}>
+                    <LinearGradient colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.1)']} style={styles.headerStatGradient}>
+                        <Text style={styles.headerStatValue}>100%</Text>
+                        <Text style={styles.headerStatLabel}>Private</Text>
+                    </LinearGradient>
+                </View>
+            </View>
           </GradientCard>
 
+          {/* Profile Tags */}
           {profile.occupation || profile.workMode ? (
             <View style={styles.profileRow}>
               {profile.occupation ? (
-                <ValueTag label={profile.occupation} />
+                <View style={styles.profileTag}>
+                    <LinearGradient colors={COLORS.gradientPrimary} style={styles.profileTagGradient}>
+                        <Text style={styles.profileTagText}>{profile.occupation}</Text>
+                    </LinearGradient>
+                </View>
               ) : null}
-              {profile.workMode ? <ValueTag label={profile.workMode} /> : null}
-              {!profile.occupation && !profile.workMode ? null : (
-                <View style={{ flex: 1 }} />
-              )}
+              {profile.workMode ? (
+                <View style={[styles.profileTag, styles.profileTagSecondary]}>
+                    <LinearGradient colors={COLORS.gradientViolet} style={styles.profileTagGradient}>
+                        <Text style={[styles.profileTagText, styles.profileTagTextSecondary]}>{profile.workMode}</Text>
+                    </LinearGradient>
+                </View>
+              ) : null}
               <TouchableOpacity
                 onPress={() =>
                   navigation.navigate("Community", { screen: "Settings" })
                 }
               >
-                <Text style={styles.profileEdit}>Edit</Text>
+                <Text style={styles.editLink}>Edit</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -357,41 +490,53 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
                 navigation.navigate("Community", { screen: "Settings" })
               }
             >
+              <LinearGradient colors={COLORS.gradientPrimary} style={styles.profilePromptIcon}>
+                <Ionicons name="person-circle-outline" size={20} color={COLORS.textInverse} />
+              </LinearGradient>
               <Text style={styles.profilePromptText}>
-                Set Occupation & Work Mode in Settings
+                Set your profile for personalized insights
               </Text>
             </TouchableOpacity>
           )}
 
+          {/* Already Submitted State - Premium */}
           {locked ? (
             <GradientCard
-              gradient={COLORS.gradientAccent}
+              gradient={COLORS.gradientSuccess}
               style={styles.lockedCard}
             >
-              <Text style={styles.lockedTitle}>
-                Today’s check-in is already submitted.
-              </Text>
-              <AnimatedButton
-                title="View Today’s Insights"
+              <View style={styles.lockedContent}>
+                <View style={styles.lockedEmojiWrap}>
+                    <Text style={styles.lockedEmoji}>✅</Text>
+                </View>
+                <View style={styles.lockedTextContainer}>
+                    <Text style={styles.lockedTitle}>
+                        You're all set for today!
+                    </Text>
+                    <Text style={styles.lockedSubtitle}>
+                        Come back tomorrow for your next check-in
+                    </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.lockedButton}
                 onPress={() => navigation.navigate("WellnessMain")}
-                style={{ marginTop: SPACING.md }}
-              />
+              >
+                <LinearGradient colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.15)']} style={styles.lockedButtonGradient}>
+                    <Text style={styles.lockedButtonText}>View Today's Insights</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </GradientCard>
           ) : null}
 
-          <SectionHeader title="Auto / Manual Inputs" />
+          {/* Activity Metrics Section - Premium Header */}
+          <SectionHeader title="📱 Activity & Movement" />
 
           <MetricCard
             title="Steps"
-            subtitle={
-              sources.steps === "sensor" ? "Auto from device sensor" : "Manual"
-            }
-            right={
-              <ValueTag
-                label={sources.steps === "manual" ? "Manual" : "Auto"}
-                tone={sources.steps === "manual" ? "manual" : "auto"}
-              />
-            }
+            subtitle={sources.steps === "sensor" ? "Tracked via sensor" : "Enter your steps"}
+            isAuto={sources.steps !== "manual"}
+            icon="👟"
           >
             {sources.steps === "manual" ? (
               <StyledInput
@@ -404,36 +549,31 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
                 }
                 placeholder="0"
                 keyboardType="number-pad"
-                style={{ marginTop: SPACING.sm }}
               />
             ) : (
-              <View style={styles.readOnlyRow}>
-                <Text style={styles.readOnlyValue}>
-                  {coerceNumber(form.steps, 0).toLocaleString()} steps
-                </Text>
+              <View style={styles.autoValueDisplay}>
+                  <LinearGradient colors={COLORS.gradientPrimary} style={styles.autoValueGradient}>
+                    <Text style={styles.autoValueText}>
+                        {coerceNumber(form.steps, 0).toLocaleString()} steps
+                    </Text>
+                  </LinearGradient>
               </View>
             )}
           </MetricCard>
 
           <MetricCard
-            title="Exercise (mins)"
-            subtitle={
-              sources.exerciseMins === "sensor"
-                ? "Auto from device sensor"
-                : "Manual"
-            }
-            right={
-              <ValueTag
-                label={sources.exerciseMins === "manual" ? "Manual" : "Auto"}
-                tone={sources.exerciseMins === "manual" ? "manual" : "auto"}
-              />
-            }
+            title="Exercise"
+            subtitle={sources.exerciseMins === "sensor" ? "From device" : "Manual entry"}
+            isAuto={sources.exerciseMins !== "manual"}
+            icon="💪"
           >
             {sources.exerciseMins !== "manual" ? (
-              <View style={styles.readOnlyRow}>
-                <Text style={styles.readOnlyValue}>
-                  {coerceNumber(form.exerciseMins, 0)} mins
-                </Text>
+              <View style={styles.autoValueDisplay}>
+                  <LinearGradient colors={COLORS.gradientSuccess} style={styles.autoValueGradient}>
+                    <Text style={styles.autoValueText}>
+                        {coerceNumber(form.exerciseMins, 0)} minutes
+                    </Text>
+                  </LinearGradient>
               </View>
             ) : (
               <StyledInput
@@ -446,30 +586,23 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
                 }
                 placeholder="0"
                 keyboardType="number-pad"
-                style={{ marginTop: SPACING.sm }}
               />
             )}
           </MetricCard>
 
           <MetricCard
-            title="Walked distance (km)"
-            subtitle={
-              sources.walkedKm === "sensor"
-                ? "Auto from device sensor"
-                : "Manual"
-            }
-            right={
-              <ValueTag
-                label={sources.walkedKm === "manual" ? "Manual" : "Auto"}
-                tone={sources.walkedKm === "manual" ? "manual" : "auto"}
-              />
-            }
+            title="Distance Walked"
+            subtitle={sources.walkedKm === "sensor" ? "Auto-tracked" : "Manual entry"}
+            isAuto={sources.walkedKm !== "manual"}
+            icon="📍"
           >
             {sources.walkedKm !== "manual" ? (
-              <View style={styles.readOnlyRow}>
-                <Text style={styles.readOnlyValue}>
-                  {coerceNumber(form.walkedKm, 0)} km
-                </Text>
+              <View style={styles.autoValueDisplay}>
+                  <LinearGradient colors={COLORS.gradientCalm} style={styles.autoValueGradient}>
+                    <Text style={styles.autoValueText}>
+                        {coerceNumber(form.walkedKm, 0)} km
+                    </Text>
+                  </LinearGradient>
               </View>
             ) : (
               <StyledInput
@@ -482,83 +615,90 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
                 }
                 placeholder="0.0"
                 keyboardType="decimal-pad"
-                style={{ marginTop: SPACING.sm }}
               />
             )}
           </MetricCard>
 
+          {/* Sleep Section */}
+          <SectionHeader title="😴 Sleep" />
+
           <MetricCard
-            title="Sleep (hrs)"
-            subtitle="Manual"
-            right={
-              <ValueTag
-                label={sources.sleepHrs === "manual" ? "Manual" : "Auto"}
-                tone={sources.sleepHrs === "manual" ? "manual" : "auto"}
-              />
-            }
+            title="Hours of Sleep"
+            subtitle="Total sleep duration"
+            icon="🌙"
           >
-            {sources.sleepHrs !== "manual" ? (
-              <View style={styles.readOnlyRow}>
-                <Text style={styles.readOnlyValue}>
-                  {coerceNumber(form.sleepHrs, 0)} hrs
-                </Text>
-              </View>
-            ) : (
-              <StyledInput
-                value={form.sleepHrs}
-                onChangeText={(t) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    sleepHrs: t.replace(/[^0-9.]/g, ""),
-                  }))
-                }
-                placeholder="0.0"
-                keyboardType="decimal-pad"
-                style={{ marginTop: SPACING.sm }}
-              />
-            )}
+            <StyledInput
+              value={form.sleepHrs}
+              onChangeText={(t) =>
+                setForm((prev) => ({
+                  ...prev,
+                  sleepHrs: t.replace(/[^0-9.]/g, ""),
+                }))
+              }
+              placeholder="0.0"
+              keyboardType="decimal-pad"
+            />
           </MetricCard>
 
           <MetricCard
-            title="Screen time"
+            title="Sleep Quality"
+            subtitle="How restful was your sleep?"
+            icon="⭐"
+          >
+            <EmojiSelector
+                value={form.sleepQuality}
+                onValueChange={(v) => setForm((prev) => ({ ...prev, sleepQuality: v }))}
+                options={[
+                    { value: 1, emoji: '😫', label: 'Terrible' },
+                    { value: 2, emoji: '😔', label: 'Poor' },
+                    { value: 3, emoji: '😐', label: 'Okay' },
+                    { value: 4, emoji: '🙂', label: 'Good' },
+                    { value: 5, emoji: '😄', label: 'Great' },
+                ]}
+                color={COLORS.primary}
+            />
+          </MetricCard>
+
+          {/* Screen Time Section */}
+          <SectionHeader title="📱 Screen Time" />
+
+          <MetricCard
+            title="Screen Time"
             subtitle={
               permissions.usageStats
-                ? `Auto: ${formatHours(form.screenTimeHrs)}h`
-                : `Manual: ${formatHours(computedScreenTime)}h`
+                ? `Total: ${formatHours(form.screenTimeHrs)}h`
+                : "Manual entry"
             }
-            right={
-              <ValueTag
-                label={permissions.usageStats ? "Auto" : "Manual"}
-                tone={permissions.usageStats ? "auto" : "manual"}
-              />
-            }
+            isAuto={permissions.usageStats}
+            icon="📱"
           >
             {permissions.usageStats ? (
-              <View style={styles.readOnlyGrid}>
-                <View style={styles.readOnlyCell}>
-                  <Text style={styles.readOnlyCellLabel}>Work</Text>
-                  <Text style={styles.readOnlyCellValue}>
-                    {formatHours(form.workScreenHrs)}h
-                  </Text>
+              <View style={styles.screenTimeGrid}>
+                <View style={styles.screenTimeItem}>
+                    <LinearGradient colors={COLORS.gradientPrimary} style={styles.screenTimeItemGradient}>
+                        <Text style={styles.screenTimeLabel}>Work</Text>
+                    </LinearGradient>
+                    <Text style={styles.screenTimeValue}>{formatHours(form.workScreenHrs)}h</Text>
                 </View>
-                <View style={styles.readOnlyCell}>
-                  <Text style={styles.readOnlyCellLabel}>Leisure</Text>
-                  <Text style={styles.readOnlyCellValue}>
-                    {formatHours(form.leisureScreenHrs)}h
-                  </Text>
+                <View style={styles.screenTimeItem}>
+                    <LinearGradient colors={COLORS.gradientViolet} style={styles.screenTimeItemGradient}>
+                        <Text style={styles.screenTimeLabel}>Leisure</Text>
+                    </LinearGradient>
+                    <Text style={styles.screenTimeValue}>{formatHours(form.leisureScreenHrs)}h</Text>
                 </View>
-                <View style={[styles.readOnlyCell, { width: "100%" }]}>
-                  <Text style={styles.readOnlyCellLabel}>Total</Text>
-                  <Text style={styles.readOnlyCellValue}>
-                    {formatHours(form.screenTimeHrs)}h
-                  </Text>
+                <View style={[styles.screenTimeItem, styles.screenTimeTotal]}>
+                    <LinearGradient colors={COLORS.gradientSuccess} style={styles.screenTimeItemGradient}>
+                        <Text style={styles.screenTimeLabel}>Total</Text>
+                    </LinearGradient>
+                    <Text style={[styles.screenTimeValue, { color: COLORS.primary }]}>
+                        {formatHours(form.screenTimeHrs)}h
+                    </Text>
                 </View>
               </View>
             ) : (
-              <>
-                <View style={styles.twoCol}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.splitLabel}>Work screen (hrs)</Text>
+              <View style={styles.screenTimeManual}>
+                <View style={styles.screenTimeInput}>
+                    <Text style={styles.screenTimeInputLabel}>Work (hrs)</Text>
                     <StyledInput
                       value={form.workScreenHrs}
                       onChangeText={(t) =>
@@ -569,12 +709,10 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
                       }
                       placeholder="0.0"
                       keyboardType="decimal-pad"
-                      style={{ marginTop: SPACING.xs }}
                     />
-                  </View>
-                  <View style={{ width: SPACING.md }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.splitLabel}>Leisure screen (hrs)</Text>
+                </View>
+                <View style={styles.screenTimeInput}>
+                    <Text style={styles.screenTimeInputLabel}>Leisure (hrs)</Text>
                     <StyledInput
                       value={form.leisureScreenHrs}
                       onChangeText={(t) =>
@@ -585,26 +723,19 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
                       }
                       placeholder="0.0"
                       keyboardType="decimal-pad"
-                      style={{ marginTop: SPACING.xs }}
                     />
-                  </View>
                 </View>
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>Total</Text>
-                  <Text style={styles.totalValue}>
-                    {formatHours(computedScreenTime)}h
-                  </Text>
-                </View>
-              </>
+              </View>
             )}
           </MetricCard>
 
-          <SectionHeader title="Daily Feelings" />
+          {/* Social Section */}
+          <SectionHeader title="👥 Social" />
 
           <MetricCard
-            title="Social (hrs)"
-            subtitle="Manual"
-            right={<ValueTag label="Daily" />}
+            title="Social Hours"
+            subtitle="Time spent with friends/family"
+            icon="🤝"
           >
             <StyledInput
               value={form.socialHrs}
@@ -616,106 +747,66 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
               }
               placeholder="0.0"
               keyboardType="decimal-pad"
-              style={{ marginTop: SPACING.sm }}
             />
           </MetricCard>
 
-          <MetricCard
-            title="Sleep quality"
-            subtitle="1 (bad) to 5 (great)"
-            right={<ValueTag label="Daily" />}
-          >
-            <View style={styles.chipRow}>
-              {[1, 2, 3, 4, 5].map((v) => (
-                <Chip
-                  key={v}
-                  label={String(v)}
-                  color={COLORS.primary}
-                  selected={form.sleepQuality === v}
-                  onPress={() =>
-                    setForm((prev) => ({ ...prev, sleepQuality: v }))
-                  }
-                />
-              ))}
-            </View>
-          </MetricCard>
+          {/* Feelings Section */}
+          <SectionHeader title="💭 How You Feel" />
 
           <MetricCard
-            title="Stress level"
-            subtitle="1 (low) to 10 (high)"
-            right={<ValueTag label="Daily" />}
+            title="Stress Level"
+            subtitle="How stressed did you feel?"
+            icon="🔥"
           >
-            <View style={styles.chipRow}>
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
-                <Chip
-                  key={v}
-                  label={String(v)}
-                  color={COLORS.orange}
-                  selected={form.stressLevel === v}
-                  onPress={() =>
-                    setForm((prev) => ({ ...prev, stressLevel: v }))
-                  }
-                />
-              ))}
+            <View style={styles.stressLabels}>
+                <Text style={styles.stressLabelLow}>Relaxed</Text>
+                <Text style={styles.stressLabelHigh}>Stressed</Text>
+            </View>
+            <NumberCircleSelector
+                value={form.stressLevel}
+                onValueChange={(v) => setForm((prev) => ({ ...prev, stressLevel: v }))}
+                min={1}
+                max={10}
+                color={form.stressLevel > 6 ? COLORS.error : form.stressLevel > 3 ? COLORS.warning : COLORS.success}
+            />
+            <View style={styles.stressValueDisplay}>
+                <Text style={styles.stressValueText}>Current: <Text style={styles.stressValue}>{form.stressLevel}/10</Text></Text>
             </View>
           </MetricCard>
 
           <MetricCard
             title="Productivity"
-            subtitle="0 to 100"
-            right={<ValueTag label="Daily" />}
+            subtitle="How productive was your day?"
+            icon="⚡"
           >
-            <View style={styles.productivityRow}>
-              <TouchableOpacity
-                style={styles.stepBtn}
-                onPress={() =>
-                  setForm((prev) => ({
-                    ...prev,
-                    productivity: clamp(
-                      coerceNumber(prev.productivity, 50) - 5,
-                      0,
-                      100,
-                    ),
-                  }))
-                }
-              >
-                <Text style={styles.stepText}>−</Text>
-              </TouchableOpacity>
-              <View style={styles.productivityValueWrap}>
-                <Text style={styles.productivityValue}>
-                  {form.productivity}
-                </Text>
-                <Text style={styles.productivityUnit}>/ 100</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.stepBtn}
-                onPress={() =>
-                  setForm((prev) => ({
-                    ...prev,
-                    productivity: clamp(
-                      coerceNumber(prev.productivity, 50) + 5,
-                      0,
-                      100,
-                    ),
-                  }))
-                }
-              >
-                <Text style={styles.stepText}>+</Text>
-              </TouchableOpacity>
+            <View style={styles.productivityDisplay}>
+                <Text style={styles.productivityValue}>{form.productivity}</Text>
+                <Text style={styles.productivityMax}>/ 100</Text>
             </View>
+            <PremiumSlider
+                value={form.productivity}
+                onValueChange={(v) => setForm((prev) => ({ ...prev, productivity: v }))}
+                min={0}
+                max={100}
+                step={5}
+                color={COLORS.primary}
+            />
           </MetricCard>
 
+          {/* Submit Button - Premium */}
           <AnimatedButton
             title={
               locked
-                ? "Submitted"
+                ? "✓ Already Submitted"
                 : submitting
-                  ? "Submitting…"
-                  : "Submit Check-in"
+                  ? "Submitting..."
+                  : "Complete Check-in"
             }
             onPress={submit}
             disabled={!canSubmit || submitting}
-            style={{ marginTop: SPACING.lg }}
+            style={styles.submitButton}
+            icon={locked ? "✓" : "✨"}
+            variant="primary"
           />
 
           <View style={{ height: 50 }} />
@@ -726,168 +817,464 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  content: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.xxxl },
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.background 
+  },
+  content: { 
+    paddingHorizontal: SPACING.lg, 
+    paddingBottom: SPACING.xxxl 
+  },
   loading: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: COLORS.background,
   },
+  loadingGradient: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.lg,
+  },
   loadingText: {
     marginTop: SPACING.md,
     color: COLORS.textSecondary,
     ...FONTS.medium,
   },
-  noticeCard: { marginHorizontal: SPACING.lg, marginTop: SPACING.md },
-  noticeTitle: { fontSize: FONT_SIZES.lg, ...FONTS.bold, color: COLORS.text },
-  noticeText: {
-    marginTop: SPACING.xs,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    lineHeight: 18,
+
+  // Header Card - STUNNING PREMIUM!
+  headerCard: {
+    marginTop: SPACING.md,
+    marginBottom: SPACING.lg,
   },
+  headerCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerCardLeft: {
+    marginRight: SPACING.md,
+  },
+  headerEmojiGradient: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerEmoji: {
+    fontSize: 32,
+  },
+  headerCardRight: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: FONT_SIZES.xxl,
+    ...FONTS.bold,
+    color: COLORS.textInverse,
+  },
+  headerSubtitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textInverse,
+    opacity: 0.85,
+    marginTop: 2,
+  },
+  headerStats: {
+    flexDirection: 'row',
+    marginTop: SPACING.xl,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.2)',
+  },
+  headerStat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerStatGradient: {
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center',
+  },
+  headerStatValue: {
+    fontSize: FONT_SIZES.xl,
+    ...FONTS.bold,
+    color: COLORS.textInverse,
+  },
+  headerStatLabel: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textInverse,
+    opacity: 0.8,
+    marginTop: 2,
+  },
+  headerStatDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+
+  // Profile Row
   profileRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING.sm,
-    marginTop: SPACING.md,
+    marginBottom: SPACING.lg,
   },
-  profileEdit: {
+  profileTag: {
+    borderRadius: BORDER_RADIUS.round,
+    overflow: 'hidden',
+  },
+  profileTagGradient: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+  },
+  profileTagSecondary: {
+    backgroundColor: COLORS.violet,
+  },
+  profileTagText: {
+    fontSize: FONT_SIZES.sm,
+    ...FONTS.medium,
+    color: COLORS.textInverse,
+  },
+  profileTagTextSecondary: {
+    color: COLORS.textInverse,
+  },
+  editLink: {
     color: COLORS.primary,
     ...FONTS.semiBold,
     fontSize: FONT_SIZES.sm,
+    marginLeft: 'auto',
   },
   profilePrompt: {
-    marginTop: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.lg,
     padding: SPACING.md,
     backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
-    borderColor: COLORS.glassBorder,
+    borderColor: COLORS.primary + '20',
+  },
+  profilePromptIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   profilePromptText: {
     color: COLORS.textSecondary,
     fontSize: FONT_SIZES.sm,
     ...FONTS.medium,
+    flex: 1,
   },
-  lockedCard: { marginTop: SPACING.md, marginHorizontal: SPACING.lg },
+
+  // Locked Card - Premium
+  lockedCard: {
+    marginBottom: SPACING.lg,
+  },
+  lockedContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  lockedEmojiWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
+  lockedEmoji: {
+    fontSize: 28,
+  },
+  lockedTextContainer: {
+    flex: 1,
+  },
   lockedTitle: {
+    fontSize: FONT_SIZES.lg,
+    ...FONTS.bold,
     color: COLORS.textInverse,
-    fontSize: FONT_SIZES.md,
-    ...FONTS.semiBold,
   },
+  lockedSubtitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textInverse,
+    opacity: 0.85,
+    marginTop: 2,
+  },
+  lockedButton: {
+    borderRadius: BORDER_RADIUS.lg,
+    overflow: 'hidden',
+  },
+  lockedButtonGradient: {
+    padding: SPACING.md,
+    alignItems: 'center',
+  },
+  lockedButtonText: {
+    color: COLORS.textInverse,
+    ...FONTS.bold,
+  },
+
+  // Metric Card - Premium
   metricCard: {
     backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: BORDER_RADIUS.xl,
     padding: SPACING.lg,
     borderWidth: 1,
-    borderColor: COLORS.glassBorder,
+    borderColor: COLORS.glassBorderLight,
     ...SHADOWS.small,
-    marginTop: SPACING.md,
+    marginBottom: SPACING.md,
   },
   metricHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
+    marginBottom: SPACING.md,
   },
-  metricTitle: { fontSize: FONT_SIZES.md, ...FONTS.bold, color: COLORS.text },
+  metricTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  metricIconGradient: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.sm,
+  },
+  metricIcon: {
+    fontSize: 20,
+  },
+  metricTitle: { 
+    fontSize: FONT_SIZES.lg, 
+    ...FONTS.bold, 
+    color: COLORS.text 
+  },
   metricSubtitle: {
     marginTop: 2,
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-    ...FONTS.medium,
-  },
-  readOnlyRow: {
-    marginTop: SPACING.sm,
-    backgroundColor: COLORS.surfaceElevated,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-  },
-  readOnlyValue: { fontSize: FONT_SIZES.lg, ...FONTS.bold, color: COLORS.text },
-  tag: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.round,
-    borderWidth: 1,
-  },
-  tagText: { fontSize: FONT_SIZES.xs, ...FONTS.semiBold },
-  twoCol: { flexDirection: "row", marginTop: SPACING.md },
-  splitLabel: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-    ...FONTS.medium,
-  },
-  totalRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: SPACING.sm,
-  },
-  totalLabel: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.textSecondary,
     ...FONTS.medium,
   },
-  totalValue: { fontSize: FONT_SIZES.md, color: COLORS.text, ...FONTS.bold },
-  readOnlyGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: SPACING.sm,
-    marginTop: SPACING.md,
+  metricContent: {
+    marginTop: SPACING.xs,
   },
-  readOnlyCell: {
-    width: "48%",
-    backgroundColor: COLORS.surfaceElevated,
+
+  // Auto Tag
+  autoTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.round,
+  },
+  autoDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 4,
+  },
+  autoTagText: {
+    fontSize: FONT_SIZES.xs - 1,
+    ...FONTS.semiBold,
+  },
+  autoValueDisplay: {
     borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.glassBorder,
+    overflow: 'hidden',
   },
-  readOnlyCellLabel: {
+  autoValueGradient: {
+    padding: SPACING.md,
+    alignItems: 'center',
+  },
+  autoValueText: {
+    fontSize: FONT_SIZES.lg,
+    ...FONTS.bold,
+    color: COLORS.textInverse,
+  },
+
+  // Screen Time Grid
+  screenTimeGrid: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  screenTimeItem: {
+    flex: 1,
+    borderRadius: BORDER_RADIUS.md,
+    overflow: 'hidden',
+  },
+  screenTimeItemGradient: {
+    padding: SPACING.xs,
+    alignItems: 'center',
+  },
+  screenTimeLabel: {
+    fontSize: FONT_SIZES.xs - 1,
+    color: COLORS.textInverse,
+    ...FONTS.semiBold,
+  },
+  screenTimeValue: {
+    fontSize: FONT_SIZES.md,
+    ...FONTS.bold,
+    color: COLORS.text,
+    textAlign: 'center',
+    marginTop: SPACING.xs,
+  },
+  screenTimeManual: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
+  screenTimeInput: {
+    flex: 1,
+  },
+  screenTimeInputLabel: {
     fontSize: FONT_SIZES.xs,
     color: COLORS.textSecondary,
     ...FONTS.medium,
+    marginBottom: 4,
   },
-  readOnlyCellValue: {
-    marginTop: 2,
-    fontSize: FONT_SIZES.lg,
-    color: COLORS.text,
-    ...FONTS.bold,
+
+  // Emoji Selector - Premium
+  emojiSelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  chipRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: SPACING.sm,
-    marginTop: SPACING.md,
-  },
-  productivityRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: SPACING.md,
-  },
-  stepBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: COLORS.surfaceElevated,
-    alignItems: "center",
-    justifyContent: "center",
+  emojiOption: {
+    flex: 1,
+    alignItems: 'center',
+    padding: SPACING.sm,
+    marginHorizontal: 2,
+    borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.glassBorder,
+    borderColor: COLORS.glassBorderLight,
+    backgroundColor: COLORS.surface,
   },
-  stepText: { fontSize: 22, color: COLORS.text, ...FONTS.bold },
-  productivityValueWrap: { alignItems: "center" },
+  emojiText: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  emojiLabel: {
+    fontSize: FONT_SIZES.xs - 2,
+    ...FONTS.medium,
+    color: COLORS.textMuted,
+  },
+
+  // Number Circle Selector - Premium
+  numberCircleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: SPACING.sm,
+  },
+  numberCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: COLORS.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.glassBorderLight,
+  },
+  numberCircleText: {
+    fontSize: FONT_SIZES.sm,
+    ...FONTS.bold,
+    color: COLORS.text,
+  },
+  stressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.sm,
+  },
+  stressLabelLow: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.success,
+    ...FONTS.medium,
+  },
+  stressLabelHigh: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.error,
+    ...FONTS.medium,
+  },
+  stressValueDisplay: {
+    alignItems: 'center',
+    marginTop: SPACING.md,
+  },
+  stressValueText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    ...FONTS.medium,
+  },
+  stressValue: {
+    ...FONTS.bold,
+    color: COLORS.text,
+  },
+
+  // Productivity Slider - Premium
+  productivityDisplay: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    marginBottom: SPACING.md,
+  },
   productivityValue: {
-    fontSize: 32,
+    fontSize: 40,
     ...FONTS.extraBold,
     color: COLORS.primary,
   },
-  productivityUnit: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
+  productivityMax: {
+    fontSize: FONT_SIZES.lg,
+    color: COLORS.textMuted,
     ...FONTS.medium,
-    marginTop: -2,
+    marginLeft: 4,
+  },
+  sliderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  sliderBtn: {
+    borderRadius: BORDER_RADIUS.lg,
+    overflow: 'hidden',
+  },
+  sliderBtnGradient: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sliderBtnText: {
+    fontSize: 20,
+    ...FONTS.bold,
+    color: COLORS.textInverse,
+  },
+  sliderTrack: {
+    flex: 1,
+    height: 10,
+    backgroundColor: COLORS.surfaceElevated,
+    borderRadius: 5,
+    overflow: 'visible',
+    position: 'relative',
+  },
+  sliderFill: {
+    height: '100%',
+    borderRadius: 5,
+  },
+  sliderThumb: {
+    position: 'absolute',
+    top: -5,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginLeft: -10,
+    ...SHADOWS.small,
+  },
+
+  // Submit Button
+  submitButton: {
+    marginTop: SPACING.xl,
   },
 });
+

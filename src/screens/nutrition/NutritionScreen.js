@@ -29,8 +29,19 @@ export default function NutritionScreen({ navigation }) {
 
     useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-    const dayLogs = foodLogs.filter(l => l.date === selectedDate);
+    // Helper to extract just the date part (YYYY-MM-DD) from any date format
+    const extractDate = (dateValue) => {
+        if (!dateValue) return '';
+        // If it's a full ISO string like "2026-03-09T19:02:18.260958+00:00", extract the date part
+        if (typeof dateValue === 'string' && dateValue.includes('T')) {
+            return dateValue.split('T')[0];
+        }
+        return dateValue;
+    };
+
+    const dayLogs = foodLogs.filter(l => extractDate(l.date) === selectedDate);
     console.log('[NutritionScreen] Selected date:', selectedDate);
+    console.log('[NutritionScreen] Day logs dates:', foodLogs.map(l => extractDate(l.date)));
     console.log('[NutritionScreen] Day logs:', dayLogs);
     
     const totals = dayLogs.reduce((acc, l) => ({
@@ -50,7 +61,7 @@ export default function NutritionScreen({ navigation }) {
     // Last 7 days calorie data
     const weekData = Array.from({ length: 7 }, (_, i) => {
         const date = format(subDays(new Date(), 6 - i), 'yyyy-MM-dd');
-        const dayTotal = foodLogs.filter(l => l.date === date).reduce((s, l) => s + (l.calories || 0), 0);
+        const dayTotal = foodLogs.filter(l => extractDate(l.date) === date).reduce((s, l) => s + (l.calories || 0), 0);
         return { date, day: format(subDays(new Date(), 6 - i), 'EEE'), calories: dayTotal };
     });
 

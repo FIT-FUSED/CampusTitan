@@ -1,14 +1,24 @@
-# CampusTitan Bug Fix Plan — Live Demo Critical Path
+# CampusTitan UI Redesign - TODO List
 
-## Order of Execution
+## Phase 1: Theme Foundation ✅ COMPLETED
+- [x] 1.1 Update color palette in src/theme/index.js - Complete new premium colors
+- [x] 1.2 Enhance shadows and border radius
+- [x] 1.3 Add new gradient definitions
 
-- [x] 1. SQL RPCs — Fix `steps` → `duration` in all RPC functions (`migration_analytics_rpc.sql`)
-- [x] 2. database.js — Fix `addActivity()` camelCase→snake_case mapping (`caloriesBurned` → `calories_burned`)
-- [x] 3. AuthContext.js — Already clean (seed imports were removed in prior pass) ✅
-- [x] 4. FoodLogScreen.js — Already fixed (save flow uses try/catch correctly) ✅; Fixed `COLORS.white`/`COLORS.border` → valid theme tokens
-- [x] 5. AnalyticsService.js — Removed `avgDailySteps`/`totalSteps`, renamed to `avgActivityMinutes`/`totalActiveMinutes`; Fixed calorie calc (food only, not food+activity)
-- [x] 6. AnalyticsScreen.js — Updated `avgDailySteps` → `avgActivityMinutes`, label "Avg Steps" → "Avg Min/Day"
-- [x] 7. CampusPulseLeaderboardScreen.js — Fixed RPC metric key `avg_steps` → `avg_active_mins` (with fallback); Added missing `gradeColor()` function
+## Phase 2: Core Screens ✅ COMPLETED
+- [x] 2.1 Redesign HomeScreen hero and branding
+- [x] 2.2 Improve daily wellness check-in card with stunning gradient
+- [x] 2.3 Enhance bento grid with better cards
+- [x] 2.4 Improve progress rings styling
+- [x] 2.5 Redesign DailyWellnessCheckInScreen with premium styling
+- [x] 2.6 Enhance WellnessScreen
 
-## SQL Migration Required
-Run `migration_analytics_rpc.sql` in Supabase SQL Editor to deploy the fixed RPCs.
+## Phase 3: Components ✅ COMPLETED
+- [x] 3.1 Update AIWellnessCoach with new avatar gradient
+- [x] 3.2 Improve common components (GradientCard, StatCard, AnimatedButton)
+
+## Phase 4: Testing & Polish ✅ COMPLETED
+- [x] 4.1 Review all changes
+- [x] 4.2 Ensure functionality works
+- [x] 4.3 Final polish
+

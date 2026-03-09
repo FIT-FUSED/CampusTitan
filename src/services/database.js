@@ -54,6 +54,34 @@ class Database {
         delete insertLog.isVeg;
         delete insertLog.id;
 
+        // Check if entry exists - if so, update instead of insert
+        const { data: existing } = await supabase
+            .from('food_logs')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('date', insertLog.date)
+            .eq('meal_type', insertLog.meal_type)
+            .eq('food_name', insertLog.food_name)
+            .single();
+
+        if (existing) {
+            // Update existing entry
+            const { data, error } = await supabase
+                .from('food_logs')
+                .update(insertLog)
+                .eq('id', existing.id)
+                .select('*')
+                .single();
+            if (error) { console.error(error); throw error; }
+            return {
+                ...data,
+                mealType: data.mealType ?? data.meal_type,
+                foodName: data.foodName ?? data.food_name,
+                isVeg: data.isVeg ?? data.is_veg,
+            };
+        }
+
+        // Insert new entry
         const { data, error } = await supabase
             .from('food_logs')
             .insert([insertLog])
@@ -442,7 +470,7 @@ class Database {
         }
     }
 
-    async getWellnessHistory(days = 7, userId = null) {
+async getWellnessHistory(days = 7, userId = null) {
         try {
             // Get current user if userId not provided
             if (!userId) {
@@ -462,18 +490,59 @@ class Database {
                 return [];
             }
             
-            // Normalize data for frontend consumption
-            const normalizedData = data.map(record => ({
-                ...record,
-                // Map possible column variations to standard names
-                date: record.date || record.created_at?.split('T')[0],
-                sleepHrs: record.sleepHrs || record.sleep_hrs,
-                walkedKm: record.walkedKm || record.walked_km,
-                stressLevel: record.stressLevel || record.stress_level,
-                productivity: record.productivity || 0 // Default to 0 if column doesn't exist
-            }));
+            // Get activities for the user to calculate steps
+            const { data: activities } = await supabase
+                .from('activities')
+                .select('*')
+                .eq('user_id', userId)
+                .order('date', { ascending: false });
+            
+            // Get mood logs for screen time estimates
+            const { data: moodLogs } = await supabase
+                .from('mood_logs')
+                .select('*')
+                .eq('user_id', userId)
+                .order('date', { ascending: false });
+            
+            // Create a map of activities by date
+            const activitiesByDate = {};
+            (activities || []).forEach(act => {
+                const dateKey = act.date || act.created_at?.split('T')[0];
+                if (!activitiesByDate[dateKey]) activitiesByDate[dateKey] = { steps: 0, duration: 0 };
+                activitiesByDate[dateKey].steps += act.steps || 0;
+                activitiesByDate[dateKey].duration += act.duration || 0;
+            });
+            
+            // Create a map of mood by date (for screen time estimates)
+            const moodByDate = {};
+            (moodLogs || []).forEach(mood => {
+                const dateKey = mood.date || mood.created_at?.split('T')[0];
+                moodByDate[dateKey] = mood;
+            });
+            
+            // Normalize data for frontend consumption and AI service
+            const normalizedData = data.map(record => {
+                const dateKey = record.date || record.created_at?.split('T')[0];
+                const dayActivities = activitiesByDate[dateKey] || {};
+                const dayMood = moodByDate[dateKey] || {};
+                
+                return {
+                    ...record,
+                    // Map possible column variations to standard names
+                    date: dateKey,
+                    sleepHrs: record.sleepHrs || record.sleep_hrs || 0,
+                    walkedKm: record.walkedKm || record.walked_km || 0,
+                    stressLevel: record.stressLevel || record.stress_level || 5,
+                    productivity: record.productivity || dayMood.productivity || 50,
+                    // Convert walked_km to approximate steps (1 km ≈ 1250 steps)
+                    steps: Math.round((dayActivities.steps || record.walked_km * 1250 || 0)),
+                    // Estimate screen time from mood if not available (using typical student values)
+                    screenTimeHrs: dayMood.screen_time || 6, // Default 6 hours for students
+                };
+            });
             
             console.log(`🧠 [Wellness] Found ${normalizedData.length} wellness records for user ${userId}`);
+            console.log(`🧠 [Wellness] Sample record:`, normalizedData[0]);
             
             // Sort by date and limit
             return normalizedData.slice(0, days);

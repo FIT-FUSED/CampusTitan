@@ -1,4 +1,4 @@
-// Wellness Screen
+// Wellness Screen - Premium Redesigned UI
 import React, { useState, useCallback } from "react";
 import {
   View,
@@ -161,6 +161,7 @@ export default function WellnessScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      {/* Premium Modal */}
       <Modal
         visible={!!selectedLog}
         transparent={true}
@@ -171,14 +172,19 @@ export default function WellnessScreen({ navigation }) {
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
               <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Daily Snapshot</Text>
-                <Text style={styles.modalDate}>
-                  {selectedLog &&
-                    format(new Date(selectedLog.date), "EEEE, MMMM do")}
-                </Text>
+                <LinearGradient
+                  colors={COLORS.gradientHero}
+                  style={styles.modalHeader}
+                >
+                  <Text style={styles.modalTitle}>Daily Snapshot</Text>
+                  <Text style={styles.modalDate}>
+                    {selectedLog &&
+                      format(new Date(selectedLog.date), "EEEE, MMMM do")}
+                  </Text>
+                </LinearGradient>
 
                 <ScrollView
-                  style={{ maxHeight: 420 }}
+                  style={{ maxHeight: 380 }}
                   showsVerticalScrollIndicator={false}
                 >
                   <View style={styles.modalGrid}>
@@ -255,7 +261,12 @@ export default function WellnessScreen({ navigation }) {
                   style={styles.closeBtn}
                   onPress={() => setSelectedLog(null)}
                 >
-                  <Text style={styles.closeBtnText}>Close</Text>
+                  <LinearGradient
+                    colors={COLORS.gradientPrimary}
+                    style={styles.closeBtnGradient}
+                  >
+                    <Text style={styles.closeBtnText}>Close</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
             </TouchableWithoutFeedback>
@@ -276,17 +287,19 @@ export default function WellnessScreen({ navigation }) {
       >
         <Text style={styles.headerTitle}>Mental Wellness</Text>
 
-        {/* Today's Mood */}
+        {/* Today's Mood - Premium Card */}
         <GradientCard
-          gradient={todayMood ? COLORS.gradientPrimary : COLORS.gradientCard}
+          gradient={todayMood ? COLORS.gradientHero : COLORS.gradientCard}
           style={styles.moodCard}
         >
           {todayMood ? (
             <View style={styles.todayMood}>
-              <Text style={styles.todayMoodEmoji}>
-                {MOOD_EMOJIS[5 - todayMood.mood]?.emoji}
-              </Text>
-              <View>
+              <View style={styles.todayMoodEmojiWrap}>
+                <Text style={styles.todayMoodEmoji}>
+                  {MOOD_EMOJIS[5 - todayMood.mood]?.emoji}
+                </Text>
+              </View>
+              <View style={styles.todayMoodContent}>
                 <Text style={styles.todayMoodLabel}>Today's Mood</Text>
                 <Text style={styles.todayMoodText}>
                   {MOOD_EMOJIS[5 - todayMood.mood]?.label}
@@ -301,9 +314,14 @@ export default function WellnessScreen({ navigation }) {
               style={styles.logMoodPrompt}
               onPress={() => navigation.navigate("MoodLog")}
             >
-              <Text style={styles.logMoodEmoji}>😊</Text>
-              <Text style={styles.logMoodText}>How are you feeling today?</Text>
-              <Text style={styles.logMoodCta}>Tap to log your mood →</Text>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
+                style={styles.logMoodGradient}
+              >
+                <Text style={styles.logMoodEmoji}>😊</Text>
+                <Text style={styles.logMoodText}>How are you feeling today?</Text>
+                <Text style={styles.logMoodCta}>Tap to log your mood →</Text>
+              </LinearGradient>
             </TouchableOpacity>
           )}
         </GradientCard>
@@ -326,7 +344,7 @@ export default function WellnessScreen({ navigation }) {
                 backgroundGradientFrom: COLORS.surface,
                 backgroundGradientTo: COLORS.surface,
                 decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(255, 111, 97, ${opacity})`, // COLORS.primary
+                color: (opacity = 1) => `rgba(99, 102, 241, ${opacity})`,
                 labelColor: (opacity = 1) => COLORS.textSecondary,
                 style: { borderRadius: 16 },
                 propsForDots: {
@@ -345,16 +363,26 @@ export default function WellnessScreen({ navigation }) {
           </View>
         ) : (
           <View style={styles.emptyChart}>
+            <LinearGradient colors={COLORS.gradientPrimary} style={styles.emptyIconGradient}>
+              <Text style={styles.emptyIcon}>📊</Text>
+            </LinearGradient>
             <Text style={styles.emptyText}>
               No wellness data yet. Complete a check-in!
             </Text>
+            <AnimatedButton 
+              title="Start Check-in" 
+              onPress={() => navigation.navigate("DailyWellnessCheckIn")}
+              variant="primary"
+              style={{ marginTop: SPACING.md }}
+            />
           </View>
         )}
 
         {/* Sleep Tracker */}
         <SleepTracker />
 
-        {/* Quick Actions */}
+        {/* Quick Actions - Premium Grid */}
+        <SectionHeader title="Quick Actions" />
         <View style={styles.actions}>
           <TouchableOpacity
             style={styles.actionBtn}
@@ -385,7 +413,7 @@ export default function WellnessScreen({ navigation }) {
             onPress={() => navigation.navigate("WellnessCircle")}
           >
             <LinearGradient
-              colors={COLORS.gradientAccent}
+              colors={COLORS.gradientViolet}
               style={styles.actionGradient}
             >
               <Text style={styles.actionEmoji}>🤝</Text>
@@ -397,7 +425,7 @@ export default function WellnessScreen({ navigation }) {
             onPress={() => navigation.navigate("DailyJournal")}
           >
             <LinearGradient
-              colors={COLORS.gradientSunset}
+              colors={COLORS.gradientEnergy}
               style={styles.actionGradient}
             >
               <Text style={styles.actionEmoji}>🧠</Text>
@@ -406,7 +434,7 @@ export default function WellnessScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Stats */}
+        {/* Stats - Premium Cards */}
         <View style={styles.statsGrid}>
           <StatCard
             title="Avg Mood"
@@ -420,7 +448,7 @@ export default function WellnessScreen({ navigation }) {
             value={moodStreak}
             unit="days"
             icon="🔥"
-            color={COLORS.coral}
+            color={COLORS.accent}
           />
         </View>
 
@@ -457,7 +485,12 @@ export default function WellnessScreen({ navigation }) {
           const moodInfo = MOOD_EMOJIS[5 - log.mood];
           return (
             <View key={i} style={styles.moodLogItem}>
-              <Text style={styles.moodLogEmoji}>{moodInfo?.emoji}</Text>
+              <LinearGradient
+                colors={[moodInfo?.color + '15', moodInfo?.color + '08']}
+                style={styles.moodLogEmojiWrap}
+              >
+                <Text style={styles.moodLogEmoji}>{moodInfo?.emoji}</Text>
+              </LinearGradient>
               <View style={styles.moodLogInfo}>
                 <Text style={styles.moodLogDate}>
                   {log.date} • {log.time}
@@ -467,7 +500,7 @@ export default function WellnessScreen({ navigation }) {
               <View
                 style={[
                   styles.moodBadge,
-                  { backgroundColor: moodInfo?.color + "22" },
+                  { backgroundColor: moodInfo?.color + '18' },
                 ]}
               >
                 <Text
@@ -492,8 +525,12 @@ export default function WellnessScreen({ navigation }) {
             style={styles.journalItem}
             onPress={() => navigation.navigate("JournalEntry", { journal: j })}
           >
-            <Text style={styles.journalTitle}>{j.title}</Text>
-            <Text style={styles.journalDate}>{j.date}</Text>
+            <View style={styles.journalHeader}>
+              <Text style={styles.journalTitle}>{j.title}</Text>
+              <View style={styles.journalDateBadge}>
+                <Text style={styles.journalDate}>{j.date}</Text>
+              </View>
+            </View>
             <Text style={styles.journalPreview} numberOfLines={2}>
               {j.body}
             </Text>
@@ -510,19 +547,33 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scrollContent: { paddingTop: Platform.OS === "ios" ? 60 : 40 },
   headerTitle: {
-    fontSize: FONT_SIZES.xxl,
-    ...FONTS.bold,
+    fontSize: FONT_SIZES.xxxl,
+    ...FONTS.extraBold,
     color: COLORS.text,
     paddingHorizontal: SPACING.lg,
     marginBottom: SPACING.lg,
   },
-  moodCard: { marginHorizontal: SPACING.lg },
+  
+  // Mood Card - Premium
+  moodCard: { 
+    marginHorizontal: SPACING.lg, 
+    marginBottom: SPACING.lg,
+  },
   todayMood: { flexDirection: "row", alignItems: "center" },
-  todayMoodEmoji: { fontSize: 48, marginRight: SPACING.lg },
+  todayMoodEmojiWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.lg,
+  },
+  todayMoodEmoji: { fontSize: 40 },
   todayMoodLabel: {
     color: COLORS.textInverse,
     fontSize: FONT_SIZES.sm,
-    opacity: 0.8,
+    opacity: 0.85,
   },
   todayMoodText: {
     color: COLORS.textInverse,
@@ -536,7 +587,14 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
   },
   logMoodPrompt: { alignItems: "center", paddingVertical: SPACING.md },
-  logMoodEmoji: { fontSize: 40, marginBottom: SPACING.md },
+  logMoodGradient: {
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  logMoodEmoji: { fontSize: 40, marginBottom: SPACING.sm },
   logMoodText: {
     color: COLORS.text,
     fontSize: FONT_SIZES.lg,
@@ -545,44 +603,59 @@ const styles = StyleSheet.create({
   logMoodCta: {
     color: COLORS.textSecondary,
     fontSize: FONT_SIZES.sm,
-    marginTop: SPACING.sm,
+    marginTop: SPACING.xs,
   },
+
+  // Actions - Premium Grid
   actions: {
     flexDirection: "row",
     paddingHorizontal: SPACING.lg,
-    gap: SPACING.md,
-    marginTop: SPACING.lg,
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.lg,
   },
   actionBtn: { flex: 1 },
   actionGradient: {
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.md,
     alignItems: "center",
+    minHeight: 90,
+    justifyContent: 'center',
+    ...SHADOWS.small,
   },
-  actionEmoji: { fontSize: 28, marginBottom: SPACING.sm },
+  actionEmoji: { fontSize: 28, marginBottom: SPACING.xs },
   actionLabel: {
     color: COLORS.textInverse,
-    fontSize: FONT_SIZES.sm,
+    fontSize: FONT_SIZES.xs,
     ...FONTS.semiBold,
   },
+
+  // Stats Grid
   statsGrid: {
     flexDirection: "row",
     paddingHorizontal: SPACING.lg,
     gap: SPACING.md,
-    marginTop: SPACING.lg,
+    marginBottom: SPACING.lg,
   },
+
+  // Mood Chart
   moodChart: {
     flexDirection: "row",
     justifyContent: "space-around",
     height: 150,
     alignItems: "flex-end",
     paddingBottom: SPACING.md,
+    marginHorizontal: SPACING.lg,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.xl,
+    paddingTop: SPACING.lg,
+    ...SHADOWS.small,
   },
   moodChartItem: { alignItems: "center", width: 30 },
   moodChartDot: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: SPACING.xs,
@@ -592,15 +665,25 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xs,
     ...FONTS.medium,
   },
+
+  // Mood Log Items - Premium
   moodLogItem: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.glassBorder,
+    borderBottomColor: COLORS.glassBorderLight,
   },
-  moodLogEmoji: { fontSize: 32, marginRight: SPACING.md },
+  moodLogEmojiWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: SPACING.md,
+  },
+  moodLogEmoji: { fontSize: 24 },
   moodLogInfo: { flex: 1 },
   moodLogDate: {
     color: COLORS.textSecondary,
@@ -609,29 +692,51 @@ const styles = StyleSheet.create({
   },
   moodLogNote: { color: COLORS.text, fontSize: FONT_SIZES.sm, marginTop: 2 },
   moodBadge: {
-    paddingHorizontal: SPACING.sm,
+    paddingHorizontal: SPACING.sm + 2,
     paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: BORDER_RADIUS.round,
   },
   moodBadgeText: { fontSize: 10, ...FONTS.bold },
+
+  // Journal Items - Premium
   journalItem: {
     marginHorizontal: SPACING.lg,
-    padding: SPACING.md,
+    padding: SPACING.lg,
     backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: BORDER_RADIUS.xl,
     marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorderLight,
     ...SHADOWS.small,
   },
-  journalTitle: { fontSize: FONT_SIZES.md, ...FONTS.bold, color: COLORS.text },
+  journalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  journalTitle: { 
+    fontSize: FONT_SIZES.md, 
+    ...FONTS.bold, 
+    color: COLORS.text,
+    flex: 1,
+  },
+  journalDateBadge: {
+    backgroundColor: COLORS.primarySubtle,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.round,
+  },
   journalDate: {
     fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-    marginTop: 2,
+    color: COLORS.primary,
+    ...FONTS.medium,
   },
   journalPreview: {
     fontSize: FONT_SIZES.sm,
-    color: COLORS.textMuted,
-    marginTop: SPACING.sm,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
+    lineHeight: 20,
   },
 
   // Chart & Modal
@@ -642,8 +747,30 @@ const styles = StyleSheet.create({
     marginTop: -SPACING.sm,
     marginBottom: SPACING.md,
   },
-  emptyChart: { padding: SPACING.xl, alignItems: "center" },
-  emptyText: { color: COLORS.textSecondary, fontSize: FONT_SIZES.md },
+  emptyChart: { 
+    padding: SPACING.xl, 
+    alignItems: "center",
+    marginHorizontal: SPACING.lg,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.xl,
+    ...SHADOWS.small,
+  },
+  emptyIconGradient: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.md,
+  },
+  emptyIcon: { fontSize: 28 },
+  emptyText: { 
+    color: COLORS.textSecondary, 
+    fontSize: FONT_SIZES.md,
+    textAlign: 'center',
+  },
+
+  // Modal - Premium
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -651,28 +778,34 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalContent: {
-    width: "85%",
+    width: "90%",
     backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: BORDER_RADIUS.xxl,
+    overflow: 'hidden',
+    ...SHADOWS.large,
+  },
+  modalHeader: {
     padding: SPACING.xl,
-    ...SHADOWS.medium,
+    alignItems: 'center',
   },
   modalTitle: {
     fontSize: FONT_SIZES.xl,
     ...FONTS.bold,
-    color: COLORS.text,
+    color: COLORS.textInverse,
     textAlign: "center",
   },
   modalDate: {
     fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
+    color: COLORS.textInverse,
+    opacity: 0.85,
     textAlign: "center",
-    marginBottom: SPACING.lg,
+    marginTop: SPACING.xs,
   },
   modalGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+    padding: SPACING.lg,
   },
   detailItem: {
     width: "45%",
@@ -680,16 +813,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: SPACING.sm,
     backgroundColor: COLORS.background,
-    borderRadius: BORDER_RADIUS.md,
-  },
-  detailValue: { fontSize: FONT_SIZES.lg, ...FONTS.bold, color: COLORS.text },
-  detailLabel: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary },
-  closeBtn: {
-    marginTop: SPACING.md,
-    backgroundColor: COLORS.primary,
-    padding: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
-    alignItems: "center",
   },
-  closeBtnText: { color: COLORS.textInverse, ...FONTS.bold },
+  detailValue: { 
+    fontSize: FONT_SIZES.lg, 
+    ...FONTS.bold, 
+    color: COLORS.text 
+  },
+  detailLabel: { 
+    fontSize: FONT_SIZES.xs, 
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  closeBtn: {
+    margin: SPACING.lg,
+    marginTop: 0,
+    borderRadius: BORDER_RADIUS.xl,
+    overflow: 'hidden',
+    ...SHADOWS.medium,
+  },
+  closeBtnGradient: {
+    padding: SPACING.md,
+    alignItems: 'center',
+  },
+  closeBtnText: { 
+    color: COLORS.textInverse, 
+    ...FONTS.bold,
+    fontSize: FONT_SIZES.md,
+  },
 });
+
