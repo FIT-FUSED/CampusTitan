@@ -136,5 +136,4 @@ __pycache__/
 test_health_summary.py
 test_image.png
 
-# User requested: don't push the "fit" app
-fit/
+.env

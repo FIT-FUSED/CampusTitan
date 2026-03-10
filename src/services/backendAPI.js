@@ -4,9 +4,11 @@ import { Platform } from 'react-native';
 
 // For physical device testing, use your laptop's local IP address
 // You can find this by running 'ipconfig getifaddr en0' on Mac
-const LOCAL_IP = '10.120.198.163';
+// Updated to use user's actual IP from earlier conversation
+const LOCAL_IP = '10.57.218.69';
 
 const BACKEND_URL =
+  process.env.EXPO_PUBLIC_BACKEND_URL ||
   process.env.EXPO_PUBLIC_NUTRITION_API_URL ||
   (Platform.OS === 'web' ? 'http://localhost:5001' : `http://${LOCAL_IP}:5001`);
 
@@ -65,6 +67,28 @@ class BackendAPI {
     } catch (error) {
       console.error('[BackendAPI] Connection test failed:', error);
       throw error;
+    }
+  }
+
+  async getHealthSummary(payload) {
+    try {
+      console.log('[BackendAPI] Requesting health insights...');
+      const response = await this.axios.post('/api/health/summary', payload, {
+        timeout: 180000,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('[BackendAPI] Error getting health summary:', error);
+      if (error.response) {
+        throw new Error(error.response.data?.error || 'Health insights server error');
+      }
+      if (error.request) {
+        throw new Error('No response from health insights server. Check if it is running.');
+      }
+      throw new Error('Request setup error: ' + error.message);
     }
   }
 }

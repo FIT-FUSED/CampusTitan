@@ -47,6 +47,7 @@ import SettingsScreen from "../screens/profile/SettingsScreen";
 import AdminDashboardScreen from "../screens/admin/AdminDashboardScreen";
 import LeaderboardScreen from "../screens/leaderboard/LeaderboardScreen";
 import CampusPulseLeaderboardScreen from "../screens/community/CampusPulseLeaderboardScreen";
+import HealthInsightsScreen from "../screens/community/HealthInsightsScreen";
 import WellnessQuizScreen from "../screens/wellness/WellnessQuizScreen";
 import DailyJournalScreen from "../screens/wellness/DailyJournalScreen";
 import DailyWellnessCheckInScreen from "../screens/wellness/DailyWellnessCheckInScreen";
@@ -183,6 +184,7 @@ function CommunityStack() {
         name="CampusPulse"
         component={CampusPulseLeaderboardScreen}
       />
+      <Stack.Screen name="HealthInsights" component={HealthInsightsScreen} />
     </Stack.Navigator>
   );
 }
@@ -190,6 +192,12 @@ function CommunityStack() {
 function MoreMenu({ navigation }) {
   const { isAdmin } = useAuth();
   const items = [
+    {
+      icon: "🧠",
+      label: "AI Health Insights",
+      screen: "HealthInsights",
+      color: COLORS.violet,
+    },
     {
       icon: "🔥",
       label: "Campus Pulse",
