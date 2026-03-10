@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { supabase } from "./supabase";
+import { calculateNutritionGoals, getActivityLevelFromFitness } from "../utils/nutritionCalculator";
 
 const isWeb = Platform.OS === "web";
 
@@ -22,6 +23,7 @@ class AuthService {
             height: userData.height,
             weight: userData.weight,
             gender: userData.gender,
+            role: userData.isAdmin ? "admin" : "student",
           },
         },
       });
@@ -38,6 +40,25 @@ class AuthService {
           yearValue = yearMatch ? parseInt(yearMatch[0]) : null;
         }
 
+        // Calculate nutrition goals based on body metrics
+        const height = userData.height ? parseFloat(userData.height) : null;
+        const weight = userData.weight ? parseFloat(userData.weight) : null;
+        const age = userData.age ? parseInt(userData.age) : null;
+        const gender = userData.gender;
+
+        // Get activity level from fitness level (default to moderate if not set)
+        const activityLevel = getActivityLevelFromFitness(userData.fitnessLevel || 'intermediate');
+
+        // Calculate personalized nutrition goals
+        const nutritionGoals = calculateNutritionGoals({
+          weight,
+          height,
+          age,
+          gender,
+          activityLevel,
+          fitnessGoal: 'maintain', // Default goal
+        });
+
         const { error: profileError } = await supabase.from("users").insert([
           {
             id: authData.user.id,
@@ -47,11 +68,18 @@ class AuthService {
             year: yearValue,
             branch: userData.branch || null,
             hostel: userData.hostel || null,
-            age: userData.age ? parseInt(userData.age) : null,
-            height: userData.height ? parseFloat(userData.height) : null,
-            weight: userData.weight ? parseFloat(userData.weight) : null,
-            gender: userData.gender,
-            role: "student",
+            age: age,
+            height: height,
+            weight: weight,
+            gender: gender,
+            role: userData.isAdmin ? "admin" : "student",
+            // Nutrition goals
+            calorie_goal: nutritionGoals.calories,
+            protein_goal: nutritionGoals.protein,
+            carbs_goal: nutritionGoals.carbs,
+            fat_goal: nutritionGoals.fat,
+            activity_level: activityLevel,
+            fitness_goal: 'maintain',
           },
         ]);
 
@@ -154,6 +182,34 @@ class AuthService {
 
   isAdmin(user) {
     return user?.role === "admin";
+  }
+
+  // Admin Persistence (Mock Session)
+  async setAdminSession(adminUser) {
+    if (isWeb) {
+      localStorage.setItem("fitfusion_admin_session", JSON.stringify(adminUser));
+    } else {
+      await SecureStore.setItemAsync("fitfusion_admin_session", JSON.stringify(adminUser));
+    }
+  }
+
+  async getAdminSession() {
+    try {
+      const session = isWeb
+        ? localStorage.getItem("fitfusion_admin_session")
+        : await SecureStore.getItemAsync("fitfusion_admin_session");
+      return session ? JSON.parse(session) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async clearAdminSession() {
+    if (isWeb) {
+      localStorage.removeItem("fitfusion_admin_session");
+    } else {
+      await SecureStore.deleteItemAsync("fitfusion_admin_session");
+    }
   }
 }
 

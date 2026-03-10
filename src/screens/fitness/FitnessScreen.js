@@ -270,7 +270,7 @@ export default function FitnessScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background },
-    scrollContent: { paddingTop: Platform.OS === 'ios' ? 60 : 40 },
+    scrollContent: { paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingBottom: 140 },
     header: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
         paddingHorizontal: SPACING.lg, marginBottom: SPACING.md,

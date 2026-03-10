@@ -49,6 +49,7 @@ export default function RegisterScreen({ navigation }) {
     height: 170,
     weight: 65,
     gender: "male",
+    isAdmin: false, // Admin registration option
   });
   const [loading, setLoading] = useState(false);
 
@@ -362,6 +363,20 @@ export default function RegisterScreen({ navigation }) {
           />
         </View>
 
+        {/* Admin Toggle */}
+        <View style={styles.adminRow}>
+          <TouchableOpacity
+            style={styles.adminToggle}
+            onPress={() => updateForm("isAdmin", !form.isAdmin)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.adminCheckbox, form.isAdmin && styles.adminCheckboxActive]}>
+              {form.isAdmin && <Text style={styles.adminCheck}>✓</Text>}
+            </View>
+            <Text style={styles.adminLabel}>Register as Admin</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={[styles.navButtons, { marginTop: SPACING.xl }]}>
           <TouchableOpacity onPress={() => setStep(2)} style={styles.backBtn}>
             <Text style={styles.backBtnText}>← Back</Text>
@@ -665,5 +680,39 @@ const styles = StyleSheet.create({
   loginTextBold: {
     color: COLORS.primary,
     ...FONTS.bold,
+  },
+
+  // Admin toggle
+  adminRow: {
+    marginTop: SPACING.lg,
+    paddingHorizontal: SPACING.xs,
+  },
+  adminToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  adminCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: COLORS.glassBorder,
+    marginRight: SPACING.sm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  adminCheckboxActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  adminCheck: {
+    color: COLORS.textInverse,
+    fontSize: 14,
+    ...FONTS.bold,
+  },
+  adminLabel: {
+    color: COLORS.text,
+    fontSize: FONT_SIZES.md,
+    ...FONTS.medium,
   },
 });

@@ -13,8 +13,8 @@ import aiService from "../services/aiService";
 
 export default function AICampusAlerts({ analytics }) {
   const [loading, setLoading] = useState(true);
-  const [alertText, setAlertText] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [alertText, setAlertText] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     let mounted = true;

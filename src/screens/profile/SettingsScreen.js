@@ -1,6 +1,6 @@
 // Settings Screen
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity, Alert, Switch, TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS } from '../../theme';
@@ -9,13 +9,14 @@ import { useAuth } from '../../services/AuthContext';
 import db from '../../services/database';
 
 export default function SettingsScreen({ navigation }) {
-    const { logout, user } = useAuth();
+    const { logout, user, updateProfile } = useAuth();
     const [notifications, setNotifications] = useState(true);
     const [mealReminders, setMealReminders] = useState(true);
     const [activityReminders, setActivityReminders] = useState(true);
     const [dataSharing, setDataSharing] = useState(true);
     const [occupation, setOccupation] = useState('Student');
     const [workMode, setWorkMode] = useState('Onsite');
+    const [weight, setWeight] = useState(user?.weight?.toString() || '');
     const [profileLoaded, setProfileLoaded] = useState(false);
 
     useEffect(() => {
@@ -28,6 +29,7 @@ export default function SettingsScreen({ navigation }) {
                     const p = JSON.parse(raw);
                     setOccupation(p?.occupation || 'Student');
                     setWorkMode(p?.workMode || 'Onsite');
+                    if (p?.weight) setWeight(p.weight);
                 }
             } finally {
                 if (mounted) setProfileLoaded(true);
@@ -37,8 +39,28 @@ export default function SettingsScreen({ navigation }) {
     }, []);
 
     async function saveWellnessProfile() {
-        await AsyncStorage.setItem('@wellness_profile', JSON.stringify({ occupation, workMode }));
-        Alert.alert('Saved', 'Wellness profile updated.');
+        const parsedWeight = parseFloat(weight);
+        if (isNaN(parsedWeight) && weight !== '') {
+            Alert.alert('Invalid Weight', 'Please enter a valid number for weight.');
+            return;
+        }
+
+        try {
+            setProfileLoaded(false);
+            // Save locally for mental wellness features
+            await AsyncStorage.setItem('@wellness_profile', JSON.stringify({ occupation, workMode, weight }));
+
+            // Sync with Supabase for persistent profile
+            if (user?.id) {
+                await updateProfile({ weight: parsedWeight || null });
+            }
+            Alert.alert('Saved', 'Wellness profile updated.');
+        } catch (e) {
+            console.error('Save profile error:', e);
+            Alert.alert('Error', 'Failed to save profile.');
+        } finally {
+            setProfileLoaded(true);
+        }
     }
 
     function handleLogout() {
@@ -141,6 +163,18 @@ export default function SettingsScreen({ navigation }) {
                             <Picker.Item label="Remote" value="Remote" />
                             <Picker.Item label="Hybrid" value="Hybrid" />
                         </Picker>
+                    </View>
+
+                    <Text style={[styles.pickerLabel, { marginTop: SPACING.md }]}>Weight (kg)</Text>
+                    <View style={styles.pickerWrap}>
+                        <TextInput
+                            style={styles.weightInput}
+                            value={weight}
+                            onChangeText={setWeight}
+                            placeholder="e.g. 70"
+                            placeholderTextColor={COLORS.textMuted}
+                            keyboardType="numeric"
+                        />
                     </View>
                     <AnimatedButton
                         title="Save Wellness Profile"
@@ -259,4 +293,11 @@ const styles = StyleSheet.create({
     dangerText: { color: COLORS.error, fontSize: FONT_SIZES.md, ...FONTS.medium },
     pickerLabel: { color: COLORS.textSecondary, fontSize: FONT_SIZES.sm, ...FONTS.semiBold, marginBottom: SPACING.xs },
     pickerWrap: { borderWidth: 1, borderColor: COLORS.glassBorder, borderRadius: BORDER_RADIUS.md, overflow: 'hidden', backgroundColor: COLORS.surfaceLight },
+    weightInput: {
+        paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.sm,
+        fontSize: FONT_SIZES.md,
+        color: COLORS.text,
+        ...FONTS.medium,
+    },
 });

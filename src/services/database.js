@@ -12,6 +12,20 @@ class Database {
         if (error) { console.error(error); return []; }
         return data;
     }
+
+    // Admin: list all non-admin users via SECURITY DEFINER RPC (bypasses RLS)
+    async getAdminUsers() {
+        const { data, error } = await supabase.rpc('admin_list_users');
+        if (error) {
+            console.error('admin_list_users RPC error:', error);
+            return [];
+        }
+        return (data || []).map(u => ({
+            ...u,
+            activityLevel: u.activity_level,
+            fitnessGoal: u.fitness_goal,
+        }));
+    }
     async addUser(user) { return null; } // Handled by auth.js register
     async getUserByEmail(email) {
         const { data, error } = await supabase.from('users').select('*').eq('email', email).single();
@@ -281,13 +295,13 @@ class Database {
                 const { data: allUsers, error: allUsersError } = await supabase
                     .from('users')
                     .select('id, name, college, height, weight, age, gender');
-                
+
                 console.log('🏆 DEBUG: All users query error:', allUsersError);
                 console.log('🏆 DEBUG: ALL users in database:', allUsers?.length || 0);
                 console.log('🏆 DEBUG: ALL college names in database:', allUsers?.map(u => `"${u.college}"`));
-                
+
                 if (allUsers) {
-                    users = allUsers.filter(u => 
+                    users = allUsers.filter(u =>
                         u.college && u.college.toLowerCase().trim() === college.toLowerCase().trim()
                     );
                     console.log('🏆 DEBUG: Filtered users from all users:', users?.length || 0);
@@ -366,19 +380,19 @@ class Database {
                 console.log('🧠 [Wellness] No user found for daily wellness log');
                 return null;
             }
-            
+
             // Get wellness logs from database
             const { data, error } = await supabase
                 .from('user_wellness_data')
                 .select('*')
                 .eq('user_id', user.id)
                 .eq('date', date);
-            
+
             if (error) {
                 console.error('getDailyWellnessLog error:', error);
                 return null;
             }
-            
+
             return data.length > 0 ? data[0] : null;
         } catch (e) {
             console.error('getDailyWellnessLog error:', e);
@@ -389,37 +403,37 @@ class Database {
     async saveDailyWellnessLog(log) {
         try {
             console.log('🧠 [DEBUG] saveDailyWellnessLog called with:', JSON.stringify(log, null, 2));
-            
+
             // Get current user
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
                 throw new Error('User not authenticated');
             }
-            
+
             // Validate log object exists
             if (!log || typeof log !== 'object') {
                 console.error('🧠 [ERROR] Invalid log object:', log);
                 throw new Error('Invalid log object provided');
             }
-            
+
             // Save to database with proper date constraint (one entry per day)
             const date = (log.date || new Date().toISOString().split('T')[0]); // YYYY-MM-DD format
             console.log('🧠 [DEBUG] Wellness date:', date);
-            
+
             // First check if entry exists for today
             const { data: existingRecords, error: checkError } = await supabase
                 .from('user_wellness_data')
                 .select('id')
                 .eq('user_id', user.id)
                 .eq('date', date);
-                
+
             if (checkError) {
                 console.error('🧠 [ERROR] Check existing records error:', checkError);
                 throw checkError;
             }
-            
+
             console.log('🧠 [DEBUG] Existing records:', existingRecords);
-            
+
             const payload = {
                 user_id: user.id,
                 date,
@@ -429,9 +443,9 @@ class Database {
                 productivity: typeof log.productivity !== 'undefined' ? log.productivity : null,
                 created_at: new Date().toISOString(),
             };
-            
+
             console.log('🧠 [DEBUG] Wellness payload:', payload);
-            
+
             let result;
             if (existingRecords && existingRecords.length > 0) {
                 console.log('🧠 [DEBUG] Updating existing record:', existingRecords[0].id);
@@ -460,7 +474,7 @@ class Database {
                 }
                 result = insertedData;
             }
-            
+
             console.log(`🧠 [Wellness] Saved wellness log for user ${user.id}`);
             return result;
         } catch (e) {
@@ -470,82 +484,94 @@ class Database {
         }
     }
 
-async getWellnessHistory(days = 7, userId = null) {
+    async getWellnessHistory(days = 7, userId = null) {
         try {
             // Get current user if userId not provided
             if (!userId) {
-                const { data: { user } } = await supabase.auth.getUser();
-                userId = user?.id;
+                const { data: authData } = await supabase.auth.getUser();
+                userId = authData?.user?.id;
             }
-            
+
+            // If still no userId (e.g. mock admin or background service without session)
+            if (!userId) {
+                console.warn('🧠 [Wellness] No userId available for getWellnessHistory');
+                return [];
+            }
+
             // Get wellness logs from database filtered by user with flexible column selection
             const { data, error } = await supabase
                 .from('user_wellness_data')
                 .select('*')
                 .eq('user_id', userId)
-                .order('created_at', { ascending: false });
-            
+                .order('date', { ascending: false })
+                .limit(days);
+
             if (error) {
                 console.error('getWellnessHistory error:', error);
                 return [];
             }
-            
+
+            if (!data || data.length === 0) return [];
+
             // Get activities for the user to calculate steps
             const { data: activities } = await supabase
                 .from('activities')
-                .select('*')
+                .select('steps, duration, date, created_at')
                 .eq('user_id', userId)
-                .order('date', { ascending: false });
-            
+                .order('date', { ascending: false })
+                .limit(50); // Small sanity limit
+
             // Get mood logs for screen time estimates
             const { data: moodLogs } = await supabase
                 .from('mood_logs')
-                .select('*')
+                .select('productivity, screen_time, date, created_at')
                 .eq('user_id', userId)
-                .order('date', { ascending: false });
-            
+                .order('date', { ascending: false })
+                .limit(50);
+
             // Create a map of activities by date
             const activitiesByDate = {};
             (activities || []).forEach(act => {
                 const dateKey = act.date || act.created_at?.split('T')[0];
-                if (!activitiesByDate[dateKey]) activitiesByDate[dateKey] = { steps: 0, duration: 0 };
-                activitiesByDate[dateKey].steps += act.steps || 0;
-                activitiesByDate[dateKey].duration += act.duration || 0;
+                if (dateKey) {
+                    if (!activitiesByDate[dateKey]) activitiesByDate[dateKey] = { steps: 0, duration: 0 };
+                    activitiesByDate[dateKey].steps += (act.steps || 0);
+                    activitiesByDate[dateKey].duration += (act.duration || 0);
+                }
             });
-            
+
             // Create a map of mood by date (for screen time estimates)
             const moodByDate = {};
             (moodLogs || []).forEach(mood => {
                 const dateKey = mood.date || mood.created_at?.split('T')[0];
-                moodByDate[dateKey] = mood;
+                if (dateKey) {
+                    moodByDate[dateKey] = mood;
+                }
             });
-            
+
             // Normalize data for frontend consumption and AI service
             const normalizedData = data.map(record => {
                 const dateKey = record.date || record.created_at?.split('T')[0];
                 const dayActivities = activitiesByDate[dateKey] || {};
                 const dayMood = moodByDate[dateKey] || {};
-                
+
                 return {
                     ...record,
                     // Map possible column variations to standard names
                     date: dateKey,
-                    sleepHrs: record.sleepHrs || record.sleep_hrs || 0,
-                    walkedKm: record.walkedKm || record.walked_km || 0,
-                    stressLevel: record.stressLevel || record.stress_level || 5,
-                    productivity: record.productivity || dayMood.productivity || 50,
+                    sleepHrs: record.sleepHrs ?? record.sleep_hrs ?? 0,
+                    walkedKm: record.walkedKm ?? record.walked_km ?? 0,
+                    stressLevel: record.stressLevel ?? record.stress_level ?? 5,
+                    productivity: record.productivity ?? dayMood.productivity ?? 50,
                     // Convert walked_km to approximate steps (1 km ≈ 1250 steps)
-                    steps: Math.round((dayActivities.steps || record.walked_km * 1250 || 0)),
-                    // Estimate screen time from mood if not available (using typical student values)
-                    screenTimeHrs: dayMood.screen_time || 6, // Default 6 hours for students
+                    steps: Math.round(dayActivities.steps || (record.walkedKm ?? record.walked_km ?? 0) * 1250 || 0),
+                    // Estimate screen time from mood if not available
+                    screenTimeHrs: record.screenTimeHrs ?? record.screen_time_hours ?? dayMood.screen_time ?? 6,
                 };
             });
-            
-            console.log(`🧠 [Wellness] Found ${normalizedData.length} wellness records for user ${userId}`);
-            console.log(`🧠 [Wellness] Sample record:`, normalizedData[0]);
-            
-            // Sort by date and limit
-            return normalizedData.slice(0, days);
+
+            console.log(`🧠 [Wellness] Found ${normalizedData.length} records for user ${userId}`);
+            return normalizedData;
         } catch (e) {
             console.error('getWellnessHistory error:', e);
             return [];

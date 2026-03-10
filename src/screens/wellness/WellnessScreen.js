@@ -65,11 +65,11 @@ export default function WellnessScreen({ navigation }) {
     if (!user) return;
     console.log('🧠 [WellnessScreen] Loading data for user:', user.id);
     console.log('🧠 [WellnessScreen] User email:', user.email);
-    
+
     const moods = await db.getMoodLogs(user.id);
     console.log('🧠 [WellnessScreen] Mood logs found:', moods.length);
     console.log('🧠 [WellnessScreen] Mood data:', moods.map(m => ({ date: m.date, mood: m.mood })));
-    
+
     setMoodLogs(moods.sort((a, b) => b.date.localeCompare(a.date)));
     const j = await db.getJournals(user.id);
     console.log('🧠 [WellnessScreen] Journals found:', j.length);
@@ -77,7 +77,7 @@ export default function WellnessScreen({ navigation }) {
 
     // Load Wellness History
     const history = await db.getWellnessHistory(7, user.id);
-    const historyWithScore = history.map((h) => {
+    const historyWithScore = (history || []).map((h) => {
       // Guard against undefined/null/NaN field values before computing scores
       const sleepHrs = Number.isFinite(Number(h.sleepHrs))
         ? Number(h.sleepHrs)
@@ -140,9 +140,9 @@ export default function WellnessScreen({ navigation }) {
   const avgMood =
     moodLogs.length > 0
       ? (
-          moodLogs.slice(0, 7).reduce((s, m) => s + m.mood, 0) /
-          Math.min(moodLogs.length, 7)
-        ).toFixed(1)
+        moodLogs.slice(0, 7).reduce((s, m) => s + m.mood, 0) /
+        Math.min(moodLogs.length, 7)
+      ).toFixed(1)
       : "—";
 
   // Mood streak
@@ -369,8 +369,8 @@ export default function WellnessScreen({ navigation }) {
             <Text style={styles.emptyText}>
               No wellness data yet. Complete a check-in!
             </Text>
-            <AnimatedButton 
-              title="Start Check-in" 
+            <AnimatedButton
+              title="Start Check-in"
               onPress={() => navigation.navigate("DailyWellnessCheckIn")}
               variant="primary"
               style={{ marginTop: SPACING.md }}
@@ -545,7 +545,7 @@ export default function WellnessScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scrollContent: { paddingTop: Platform.OS === "ios" ? 60 : 40 },
+  scrollContent: { paddingTop: Platform.OS === "ios" ? 60 : 40, paddingBottom: 140 },
   headerTitle: {
     fontSize: FONT_SIZES.xxxl,
     ...FONTS.extraBold,
@@ -553,10 +553,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     marginBottom: SPACING.lg,
   },
-  
+
   // Mood Card - Premium
-  moodCard: { 
-    marginHorizontal: SPACING.lg, 
+  moodCard: {
+    marginHorizontal: SPACING.lg,
     marginBottom: SPACING.lg,
   },
   todayMood: { flexDirection: "row", alignItems: "center" },
@@ -715,9 +715,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.sm,
   },
-  journalTitle: { 
-    fontSize: FONT_SIZES.md, 
-    ...FONTS.bold, 
+  journalTitle: {
+    fontSize: FONT_SIZES.md,
+    ...FONTS.bold,
     color: COLORS.text,
     flex: 1,
   },
@@ -747,8 +747,8 @@ const styles = StyleSheet.create({
     marginTop: -SPACING.sm,
     marginBottom: SPACING.md,
   },
-  emptyChart: { 
-    padding: SPACING.xl, 
+  emptyChart: {
+    padding: SPACING.xl,
     alignItems: "center",
     marginHorizontal: SPACING.lg,
     backgroundColor: COLORS.surface,
@@ -764,8 +764,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   emptyIcon: { fontSize: 28 },
-  emptyText: { 
-    color: COLORS.textSecondary, 
+  emptyText: {
+    color: COLORS.textSecondary,
     fontSize: FONT_SIZES.md,
     textAlign: 'center',
   },
@@ -815,13 +815,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderRadius: BORDER_RADIUS.lg,
   },
-  detailValue: { 
-    fontSize: FONT_SIZES.lg, 
-    ...FONTS.bold, 
-    color: COLORS.text 
+  detailValue: {
+    fontSize: FONT_SIZES.lg,
+    ...FONTS.bold,
+    color: COLORS.text
   },
-  detailLabel: { 
-    fontSize: FONT_SIZES.xs, 
+  detailLabel: {
+    fontSize: FONT_SIZES.xs,
     color: COLORS.textSecondary,
     marginTop: 2,
   },
@@ -836,8 +836,8 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     alignItems: 'center',
   },
-  closeBtnText: { 
-    color: COLORS.textInverse, 
+  closeBtnText: {
+    color: COLORS.textInverse,
     ...FONTS.bold,
     fontSize: FONT_SIZES.md,
   },
