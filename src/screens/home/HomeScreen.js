@@ -1,4 +1,4 @@
-// Home Dashboard — Premium Bento Layout
+// Home Dashboard — Premium Bento Layout with Wow Factor
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -25,6 +25,9 @@ import {
   SHADOWS,
 } from "../../theme";
 import { Avatar, SectionHeader } from "../../components/common";
+import EnvironmentWidget from "../../components/EnvironmentWidget";
+import AIWellnessCoach from "../../components/AIWellnessCoach";
+import CampusZoneRecommender from "../../components/CampusZoneRecommender";
 import { useAuth } from "../../services/AuthContext";
 import db from "../../services/database";
 import sensorService from "../../services/SensorService";
@@ -36,10 +39,10 @@ import {
 } from "../../services/screenTimeMapper";
 
 const { width: W } = Dimensions.get("window");
-const CARD_GAP = 10;
+const CARD_GAP = 12;
 const BENTO_W = (W - SPACING.lg * 2 - CARD_GAP) / 2;
 
-// Circular Progress Ring (pure View, no SVG needed)
+// Circular Progress Ring - Premium Style
 function ProgressRing({
   progress,
   size = 80,
@@ -57,7 +60,7 @@ function ProgressRing({
         justifyContent: "center",
       }}
     >
-      {/* Background ring */}
+      {/* Background ring with gradient effect */}
       <View
         style={{
           position: "absolute",
@@ -113,10 +116,16 @@ function BottomSheet({
         <View style={s.sheetOverlay}>
           <TouchableWithoutFeedback>
             <View style={s.sheet}>
+              <View style={s.sheetHandle} />
               <Text style={s.sheetTitle}>{title}</Text>
               <Text style={s.sheetDesc}>{description}</Text>
               <TouchableOpacity style={s.sheetPrimary} onPress={onPrimary}>
-                <Text style={s.sheetPrimaryText}>{primaryLabel}</Text>
+                <LinearGradient
+                  colors={COLORS.gradientPrimary}
+                  style={s.sheetPrimaryGradient}
+                >
+                  <Text style={s.sheetPrimaryText}>{primaryLabel}</Text>
+                </LinearGradient>
               </TouchableOpacity>
               <TouchableOpacity style={s.sheetSecondary} onPress={onClose}>
                 <Text style={s.sheetSecondaryText}>Not now</Text>
@@ -271,7 +280,6 @@ export default function HomeScreen({ navigation }) {
 
     if (type === "usage") {
       requestUsagePermissionSafely();
-      // Permission is set in Settings; update state next tick
       setTimeout(() => setUsagePermission(hasUsagePermissionSafely()), 500);
       return;
     }
@@ -286,7 +294,6 @@ export default function HomeScreen({ navigation }) {
         } else {
           Alert.alert("Activity access enabled");
         }
-        // Start background tracking now that we have permission
         sensorService.startTracking((newSteps) => {
           setSteps(newSteps);
           setKm(sensorService.getKm().toFixed(2));
@@ -338,7 +345,7 @@ export default function HomeScreen({ navigation }) {
           />
         }
       >
-        {/* ─── HERO GREETING ─── */}
+        {/* ─── PREMIUM HERO GREETING ─── */}
         <View style={s.hero}>
           <View style={s.heroTop}>
             <View style={{ flex: 1 }}>
@@ -351,36 +358,38 @@ export default function HomeScreen({ navigation }) {
                   style={s.logoWrap}
                 >
                   <Image
-                    source={require("../../../assets/icon.png")}
-                    style={s.logo}
+                    source={require("../../../CT.png")}
+                    style={s.logoImage}
                   />
                 </TouchableOpacity>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.brandName}>FITFUSION</Text>
+                  <Text style={s.brandName}>CAMPUS TITAN</Text>
                   <Text style={s.heroGreet}>
                     {greetText} {greetEmoji}
                   </Text>
                 </View>
               </View>
               <Text style={s.heroName}>
-                {user?.name?.split(" ")[0] || "User"}
+                {user?.name?.split(" ")[0] || "Champion"}
               </Text>
               {!!user?.college && (
                 <View style={s.heroBadge}>
-                  <Text style={s.heroBadgeText}>{user.college}</Text>
+                  <Text style={s.heroBadgeText}>🎓 {user.college}</Text>
                 </View>
               )}
             </View>
             <View style={s.heroRight}>
-              <Avatar name={user?.name} color={COLORS.primary} size={52} />
-              <Text style={s.heroDate}>{format(new Date(), "dd MMM")}</Text>
+              <Avatar name={user?.name} color={COLORS.primary} size={56} />
+              <View style={s.datePill}>
+                <Text style={s.heroDate}>{format(new Date(), "dd MMM")}</Text>
+              </View>
             </View>
           </View>
         </View>
 
-        {/* ─── DAILY WELLNESS CHECK-IN CTA ─── */}
+        {/* ─── PREMIUM DAILY WELLNESS CHECK-IN CTA ─── */}
         <TouchableOpacity
-          activeOpacity={0.8}
+          activeOpacity={0.85}
           onPress={() => {
             if (checkInCompleted) {
               navigation.navigate("Wellness");
@@ -390,20 +399,26 @@ export default function HomeScreen({ navigation }) {
               });
             }
           }}
-          style={[s.quizCard, checkInCompleted && { opacity: 0.9 }]}
+          style={[s.quizCard, checkInCompleted && { opacity: 0.95 }]}
         >
           <LinearGradient
             colors={
               checkInCompleted
-                ? [COLORS.success, COLORS.accentDark]
-                : [COLORS.primary, COLORS.accent]
+                ? COLORS.gradientSuccess
+                : COLORS.gradientHero
             }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.quizGradient}
           >
+            {/* Decorative elements */}
+            <View style={s.quizDecor1} />
+            <View style={s.quizDecor2} />
+            
             <View style={s.quizContent}>
-              <Text style={s.quizEmoji}>{checkInCompleted ? "✅" : "🧠"}</Text>
+              <View style={s.quizIconWrap}>
+                <Text style={s.quizEmoji}>{checkInCompleted ? "✅" : "🧠"}</Text>
+              </View>
               <View style={{ flex: 1, marginLeft: SPACING.md }}>
                 <Text style={s.quizTitle}>
                   {checkInCompleted
@@ -413,19 +428,27 @@ export default function HomeScreen({ navigation }) {
                 <Text style={s.quizSub}>
                   {checkInCompleted
                     ? "View Today's Insights"
-                    : "Earn points & train your AI predictor!"}
+                    : "Train your AI & earn points!"}
                 </Text>
               </View>
               {!checkInCompleted && (
                 <View style={s.quizBtn}>
-                  <Text style={s.quizBtnText}>Start</Text>
+                  <LinearGradient
+                    colors={['#FFFFFF', '#F3F4F6']}
+                    style={s.quizBtnGradient}
+                  >
+                    <Text style={s.quizBtnText}>Start</Text>
+                  </LinearGradient>
                 </View>
               )}
             </View>
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* ─── VALUE EXCHANGE CARDS (shown only when check-in is pending) ─── */}
+        {/* ─── AI WELLNESS COACH ─── */}
+        <AIWellnessCoach navigation={navigation} />
+
+        {/* ─── VALUE EXCHANGE CARDS ─── */}
         {!checkInCompleted && (
           <ScrollView
             horizontal
@@ -437,109 +460,121 @@ export default function HomeScreen({ navigation }) {
             <TouchableOpacity
               style={[
                 s.valueCard,
-                { marginRight: SPACING.md, backgroundColor: "#FFF3E0" },
+                { marginRight: SPACING.md },
               ]}
               onPress={() => openSheet("activity")}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
-              <Text style={{ fontSize: 28, marginBottom: SPACING.sm }}>👟</Text>
-              <Text
-                style={[
-                  s.bentoLabel,
-                  { color: COLORS.text, textAlign: "center" },
-                ]}
+              <LinearGradient
+                colors={COLORS.gradientCalm}
+                style={s.valueCardGradient}
               >
-                Auto Steps
-              </Text>
-              <Text
-                style={[
-                  s.bentoSub,
-                  { color: COLORS.textSecondary, textAlign: "center" },
-                ]}
-              >
-                {stepPermissionGranted ? "✓ Enabled" : "Enable Activity Access"}
-              </Text>
-              {!stepPermissionGranted && (
-                <View style={s.valueCardBadge}>
-                  <Text style={s.valueCardBadgeText}>Enable</Text>
-                </View>
-              )}
+                <Text style={{ fontSize: 32, marginBottom: SPACING.sm }}>👟</Text>
+                <Text style={s.valueCardTitle}>Auto Steps</Text>
+                <Text style={s.valueCardDesc}>
+                  {stepPermissionGranted ? "✓ Enabled" : "Enable Activity"}
+                </Text>
+                {!stepPermissionGranted && (
+                  <View style={s.valueCardBadge}>
+                    <Text style={s.valueCardBadgeText}>Enable</Text>
+                  </View>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
 
             {/* Card 2: Screen Time */}
             <TouchableOpacity
-              style={[s.valueCard, { backgroundColor: "#E3F2FD" }]}
+              style={[s.valueCard, { marginRight: SPACING.md }]}
               onPress={() => openSheet("usage")}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
-              <Text style={{ fontSize: 28, marginBottom: SPACING.sm }}>📱</Text>
-              <Text
-                style={[
-                  s.bentoLabel,
-                  { color: COLORS.text, textAlign: "center" },
-                ]}
+              <LinearGradient
+                colors={COLORS.gradientViolet}
+                style={s.valueCardGradient}
               >
-                Screen Time
-              </Text>
-              <Text
-                style={[
-                  s.bentoSub,
-                  { color: COLORS.textSecondary, textAlign: "center" },
-                ]}
+                <Text style={{ fontSize: 32, marginBottom: SPACING.sm }}>📱</Text>
+                <Text style={s.valueCardTitle}>Screen Time</Text>
+                <Text style={s.valueCardDesc}>
+                  {usagePermission ? "✓ Enabled" : "Enable Usage"}
+                </Text>
+                {!usagePermission && (
+                  <View style={s.valueCardBadge}>
+                    <Text style={s.valueCardBadgeText}>Enable</Text>
+                  </View>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* Card 3: Quick Log */}
+            <TouchableOpacity
+              style={[s.valueCard]}
+              onPress={() => navigation.navigate("Wellness", { screen: "MoodLog" })}
+              activeOpacity={0.85}
+            >
+              <LinearGradient
+                colors={COLORS.gradientEnergy}
+                style={s.valueCardGradient}
               >
-                {usagePermission ? "✓ Enabled" : "Enable Usage Access"}
-              </Text>
-              {!usagePermission && (
-                <View style={s.valueCardBadge}>
-                  <Text style={s.valueCardBadgeText}>Enable</Text>
-                </View>
-              )}
+                <Text style={{ fontSize: 32, marginBottom: SPACING.sm }}>😊</Text>
+                <Text style={s.valueCardTitle}>Log Mood</Text>
+                <Text style={s.valueCardDesc}>Track your feelings</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </ScrollView>
         )}
 
-        {/* ─── BENTO GRID ─── */}
+        {/* ─── PREMIUM BENTO GRID ─── */}
         <View style={s.bentoGrid}>
           {/* Row 1: Two progress rings side by side */}
           <View style={s.bentoRow}>
             {/* Calories Ring */}
             <View style={[s.bentoCard, s.bentoHalf]}>
-              <ProgressRing
-                progress={calProg}
-                size={76}
-                strokeWidth={5}
-                color={COLORS.coral}
+              <LinearGradient
+                colors={COLORS.gradientPeach}
+                style={s.ringCardGradient}
               >
-                <Text style={s.ringValue}>{todayStats.calories}</Text>
-                <Text style={s.ringUnit}>kcal</Text>
-              </ProgressRing>
-              <Text style={s.bentoLabel}>Calories</Text>
-              <Text style={s.bentoSub}>
-                {Math.round(calProg)}% of {calorieGoal}
-              </Text>
+                <ProgressRing
+                  progress={calProg}
+                  size={76}
+                  strokeWidth={5}
+                  color={COLORS.coral}
+                >
+                  <Text style={s.ringValue}>{todayStats.calories}</Text>
+                  <Text style={s.ringUnit}>kcal</Text>
+                </ProgressRing>
+                <Text style={s.bentoLabel}>Calories</Text>
+                <Text style={s.bentoSub}>
+                  {Math.round(calProg)}% of {calorieGoal}
+                </Text>
+              </LinearGradient>
             </View>
 
             {/* Activity Ring */}
             <View style={[s.bentoCard, s.bentoHalf]}>
-              <ProgressRing
-                progress={actProg}
-                size={76}
-                strokeWidth={5}
-                color={COLORS.accent}
+              <LinearGradient
+                colors={COLORS.gradientMint}
+                style={s.ringCardGradient}
               >
-                <Text style={s.ringValue}>{todayActivity.minutes}</Text>
-                <Text style={s.ringUnit}>min</Text>
-              </ProgressRing>
-              <Text style={s.bentoLabel}>Activity</Text>
-              <Text style={s.bentoSub}>
-                {Math.round(actProg)}% of {actGoal}m
-              </Text>
+                <ProgressRing
+                  progress={actProg}
+                  size={76}
+                  strokeWidth={5}
+                  color={COLORS.mint}
+                >
+                  <Text style={s.ringValue}>{todayActivity.minutes}</Text>
+                  <Text style={s.ringUnit}>min</Text>
+                </ProgressRing>
+                <Text style={s.bentoLabel}>Activity</Text>
+                <Text style={s.bentoSub}>
+                  {Math.round(actProg)}% of {actGoal}m
+                </Text>
+              </LinearGradient>
             </View>
           </View>
 
-          {/* Row 2: Macro strip */}
+          {/* Row 2: Macro strip - Premium Gradient */}
           <LinearGradient
-            colors={[COLORS.surface, COLORS.surfaceElevated]}
+            colors={['#EEF2FF', '#E0E7FF']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={s.macroStrip}
@@ -566,7 +601,7 @@ export default function HomeScreen({ navigation }) {
               {
                 label: "Meals",
                 val: todayStats.meals,
-                color: COLORS.orange,
+                color: COLORS.violet,
                 suffix: "/4",
               },
             ].map((m, i) => (
@@ -574,7 +609,7 @@ export default function HomeScreen({ navigation }) {
                 <View
                   style={[s.macroIndicator, { backgroundColor: m.color }]}
                 />
-                <Text style={s.macroVal}>
+                <Text style={[s.macroVal, { color: m.color }]}>
                   {Math.round(m.val)}
                   {m.suffix}
                 </Text>
@@ -593,7 +628,7 @@ export default function HomeScreen({ navigation }) {
                 s.bentoHalf,
                 { paddingHorizontal: SPACING.sm },
               ]}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
               onPress={async () => {
                 if (!stepPermissionGranted) {
                   const granted = await sensorService.requestPermissions();
@@ -617,8 +652,8 @@ export default function HomeScreen({ navigation }) {
               <LinearGradient
                 colors={
                   stepPermissionGranted
-                    ? COLORS.gradientPrimary
-                    : [COLORS.surface, COLORS.surfaceElevated]
+                    ? COLORS.gradientCalm
+                    : ['#F0F9FF', '#E0F2FE']
                 }
                 style={s.valueExchangeGradient}
               >
@@ -643,11 +678,13 @@ export default function HomeScreen({ navigation }) {
                   >
                     {stepPermissionGranted
                       ? "Tracking active"
-                      : "Enable Physical Activity access"}
+                      : "Enable Physical Activity"}
                   </Text>
                 </View>
                 {!stepPermissionGranted && (
-                  <Text style={s.valueExchangeButton}>Enable →</Text>
+                  <View style={s.enableBtn}>
+                    <Text style={s.enableBtnText}>Enable →</Text>
+                  </View>
                 )}
               </LinearGradient>
             </TouchableOpacity>
@@ -659,7 +696,7 @@ export default function HomeScreen({ navigation }) {
                 s.bentoHalf,
                 { paddingHorizontal: SPACING.sm },
               ]}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
               onPress={() => {
                 if (!usagePermission) {
                   openSheet("usage");
@@ -669,8 +706,8 @@ export default function HomeScreen({ navigation }) {
               <LinearGradient
                 colors={
                   usagePermission
-                    ? [COLORS.accent, COLORS.accentDark]
-                    : [COLORS.surface, COLORS.surfaceElevated]
+                    ? COLORS.gradientViolet
+                    : ['#F5F3FF', '#EDE9FE']
                 }
                 style={s.valueExchangeGradient}
               >
@@ -699,7 +736,9 @@ export default function HomeScreen({ navigation }) {
                   </Text>
                 </View>
                 {!usagePermission && (
-                  <Text style={s.valueExchangeButton}>Enable →</Text>
+                  <View style={s.enableBtn}>
+                    <Text style={s.enableBtnText}>Enable →</Text>
+                  </View>
                 )}
               </LinearGradient>
             </TouchableOpacity>
@@ -710,7 +749,7 @@ export default function HomeScreen({ navigation }) {
             {/* Steps — tall gradient card */}
             <TouchableOpacity
               style={[s.bentoCard, s.bentoHalf, s.bentoTall]}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
               onPress={async () => {
                 if (!stepPermissionGranted) {
                   const granted = await sensorService.requestPermissions();
@@ -733,13 +772,14 @@ export default function HomeScreen({ navigation }) {
                 end={{ x: 1, y: 1 }}
                 style={s.stepsGradient}
               >
+                <View style={s.stepsDecor} />
                 <Text style={s.stepsIcon}>👟</Text>
                 <Text style={s.stepsValue}>{steps.toLocaleString()}</Text>
                 <Text style={s.stepsLabel}>Steps Today</Text>
                 <View style={s.stepsMeta}>
-                  <Text style={s.stepsMetaItem}>{km} km</Text>
+                  <Text style={s.stepsMetaItem}>🏃 {km} km</Text>
                   <Text style={s.stepsMetaDot}>·</Text>
-                  <Text style={s.stepsMetaItem}>{calories} kcal</Text>
+                  <Text style={s.stepsMetaItem}>🔥 {calories} kcal</Text>
                 </View>
                 <Text style={s.stepsTap}>
                   {!stepPermissionGranted
@@ -766,22 +806,32 @@ export default function HomeScreen({ navigation }) {
             {/* Mood + Burn stack */}
             <View style={[s.bentoHalf, { gap: CARD_GAP }]}>
               <View style={s.bentoCard}>
-                <Text style={s.moodEmoji}>
-                  {todayMood
-                    ? ["😢", "😔", "😐", "🙂", "😄"][todayMood.mood - 1]
-                    : "🫥"}
-                </Text>
-                <Text style={s.bentoLabel}>
-                  {todayMood
-                    ? ["Bad", "Low", "Okay", "Good", "Great"][
-                        todayMood.mood - 1
-                      ]
-                    : "No mood"}
-                </Text>
+                <LinearGradient
+                  colors={COLORS.gradientSunset}
+                  style={s.moodCardGradient}
+                >
+                  <Text style={s.moodEmoji}>
+                    {todayMood
+                      ? ["😢", "😔", "😐", "🙂", "😄"][todayMood.mood - 1]
+                      : "🫥"}
+                  </Text>
+                  <Text style={s.bentoLabel}>
+                    {todayMood
+                      ? ["Bad", "Low", "Okay", "Good", "Great"][
+                          todayMood.mood - 1
+                        ]
+                      : "No mood"}
+                  </Text>
+                </LinearGradient>
               </View>
               <View style={s.bentoCard}>
-                <Text style={s.burnValue}>{todayActivity.burned}</Text>
-                <Text style={s.burnUnit}>kcal burned</Text>
+                <LinearGradient
+                  colors={COLORS.gradientRose}
+                  style={s.burnCardGradient}
+                >
+                  <Text style={s.burnValue}>{todayActivity.burned}</Text>
+                  <Text style={s.burnUnit}>kcal burned</Text>
+                </LinearGradient>
               </View>
             </View>
           </View>
@@ -827,13 +877,11 @@ export default function HomeScreen({ navigation }) {
             <Text style={s.sectionTitle}>Recent Activity</Text>
             {recentActivities.map((act, i) => (
               <View key={i} style={s.actRow}>
-                <View
-                  style={[
-                    s.actIcon,
-                    { backgroundColor: COLORS.chartColors[i % 7] + "20" },
-                  ]}
+                <LinearGradient
+                  colors={[COLORS.primary + '15', COLORS.primary + '08']}
+                  style={s.actIconGradient}
                 >
-                  <Text style={{ fontSize: 16 }}>
+                  <Text style={{ fontSize: 18 }}>
                     {act.type === "running"
                       ? "🏃"
                       : act.type === "gym"
@@ -844,7 +892,7 @@ export default function HomeScreen({ navigation }) {
                             ? "🧘"
                             : "⚡"}
                   </Text>
-                </View>
+                </LinearGradient>
                 <View style={s.actInfo}>
                   <Text style={s.actType}>
                     {act.type?.charAt(0).toUpperCase() + act.type?.slice(1)}
@@ -858,6 +906,15 @@ export default function HomeScreen({ navigation }) {
             ))}
           </View>
         )}
+
+        {/* ─── ENVIRONMENT & ZONE RECOMMENDER ─── */}
+        <SectionHeader title="Campus Environment" />
+        <CampusZoneRecommender />
+        <EnvironmentWidget
+          onPress={() =>
+            navigation.navigate("Community", { screen: "Environment" })
+          }
+        />
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -878,20 +935,35 @@ const s = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   logoWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     overflow: "hidden",
     marginRight: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.glassBorder,
-    backgroundColor: COLORS.surface,
+    ...SHADOWS.medium,
   },
-  logo: { width: "100%", height: "100%" },
+  logoImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  logoGradient: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logo: { width: "80%", height: "80%" },
+  logoText: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.textInverse,
+    letterSpacing: 1,
+  },
   brandName: {
-    fontSize: 12,
-    letterSpacing: 2,
-    color: COLORS.textSecondary,
+    fontSize: 11,
+    letterSpacing: 3,
+    color: COLORS.primary,
     ...FONTS.bold,
   },
   heroGreet: {
@@ -902,7 +974,7 @@ const s = StyleSheet.create({
     textTransform: "uppercase",
   },
   heroName: {
-    fontSize: 32,
+    fontSize: 34,
     ...FONTS.extraBold,
     color: COLORS.text,
     marginTop: 2,
@@ -911,12 +983,10 @@ const s = StyleSheet.create({
   heroBadge: {
     alignSelf: "flex-start",
     marginTop: SPACING.sm,
-    backgroundColor: COLORS.primary + "18",
+    backgroundColor: COLORS.primarySubtle,
     paddingHorizontal: SPACING.md,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: BORDER_RADIUS.round,
-    borderWidth: 1,
-    borderColor: COLORS.primary + "30",
   },
   heroBadgeText: {
     fontSize: FONT_SIZES.xs,
@@ -924,46 +994,81 @@ const s = StyleSheet.create({
     ...FONTS.semiBold,
   },
   heroRight: { alignItems: "center" },
+  datePill: {
+    marginTop: SPACING.sm,
+    backgroundColor: COLORS.surfaceElevated,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.round,
+  },
   heroDate: {
     fontSize: FONT_SIZES.xs,
-    color: COLORS.textMuted,
+    color: COLORS.textSecondary,
     ...FONTS.medium,
-    marginTop: 4,
   },
 
-  // ─── Daily Check-in CTA ───
+  // ─── Daily Check-in CTA — Premium ───
   quizCard: {
     marginHorizontal: SPACING.lg,
     marginBottom: SPACING.xl,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: BORDER_RADIUS.xxl,
     overflow: "hidden",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    ...SHADOWS.large,
   },
-  quizGradient: { padding: SPACING.lg },
-  quizContent: { flexDirection: "row", alignItems: "center" },
-  quizEmoji: { fontSize: 36 },
+  quizGradient: { 
+    padding: SPACING.xl,
+    minHeight: 100,
+    justifyContent: 'center',
+  },
+  quizDecor1: {
+    position: 'absolute',
+    top: -30,
+    right: -30,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  quizDecor2: {
+    position: 'absolute',
+    bottom: -20,
+    left: -20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  quizContent: { flexDirection: "row", alignItems: "center", position: 'relative', zIndex: 1 },
+  quizIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quizEmoji: { fontSize: 28 },
   quizTitle: {
-    fontSize: FONT_SIZES.md,
+    fontSize: FONT_SIZES.xl,
     ...FONTS.bold,
     color: COLORS.textInverse,
   },
   quizSub: {
-    fontSize: FONT_SIZES.xs,
+    fontSize: FONT_SIZES.sm,
     ...FONTS.medium,
     color: COLORS.textInverse,
-    opacity: 0.8,
+    opacity: 0.85,
     marginTop: 2,
   },
   quizBtn: {
-    backgroundColor: COLORS.textInverse,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.round,
+    overflow: 'hidden',
     marginLeft: SPACING.sm,
+    ...SHADOWS.small,
+  },
+  quizBtnGradient: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
   },
   quizBtnText: {
     color: COLORS.primary,
@@ -973,23 +1078,35 @@ const s = StyleSheet.create({
 
   // ─── Value Exchange horizontal cards ───
   valueCard: {
-    width: W * 0.45,
-    height: 150,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.md,
+    width: W * 0.42,
+    height: 160,
+    borderRadius: BORDER_RADIUS.xxl,
+    overflow: 'hidden',
+    ...SHADOWS.medium,
+  },
+  valueCardGradient: {
+    flex: 1,
+    padding: SPACING.lg,
     alignItems: "center",
     justifyContent: "center",
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+  },
+  valueCardTitle: {
+    fontSize: FONT_SIZES.lg,
+    ...FONTS.bold,
+    color: COLORS.textInverse,
+    marginBottom: 2,
+  },
+  valueCardDesc: {
+    fontSize: FONT_SIZES.xs,
+    ...FONTS.medium,
+    color: COLORS.textInverse,
+    opacity: 0.85,
   },
   valueCardBadge: {
     marginTop: SPACING.sm,
-    backgroundColor: COLORS.primary,
+    backgroundColor: 'rgba(255,255,255,0.25)',
     paddingHorizontal: SPACING.md,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: BORDER_RADIUS.round,
   },
   valueCardBadgeText: {
@@ -1001,47 +1118,56 @@ const s = StyleSheet.create({
   // ─── Permission Bottom Sheet ───
   sheetOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "flex-end",
   },
   sheet: {
     backgroundColor: COLORS.surface,
     padding: SPACING.xl,
-    borderTopLeftRadius: BORDER_RADIUS.xl,
-    borderTopRightRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    borderColor: COLORS.glassBorder,
-    ...SHADOWS.medium,
+    borderTopLeftRadius: BORDER_RADIUS.xxl,
+    borderTopRightRadius: BORDER_RADIUS.xxl,
+    ...SHADOWS.large,
   },
-  sheetTitle: { fontSize: FONT_SIZES.lg, ...FONTS.bold, color: COLORS.text },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: COLORS.surfaceElevated,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: SPACING.lg,
+  },
+  sheetTitle: { fontSize: FONT_SIZES.xl, ...FONTS.bold, color: COLORS.text },
   sheetDesc: {
     marginTop: SPACING.sm,
-    fontSize: FONT_SIZES.sm,
+    fontSize: FONT_SIZES.md,
     color: COLORS.textSecondary,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   sheetPrimary: {
-    marginTop: SPACING.lg,
-    backgroundColor: COLORS.primary,
+    marginTop: SPACING.xl,
+    borderRadius: BORDER_RADIUS.xl,
+    overflow: 'hidden',
+    ...SHADOWS.medium,
+  },
+  sheetPrimaryGradient: {
     paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-    alignItems: "center",
+    alignItems: 'center',
   },
   sheetPrimaryText: {
     color: COLORS.textInverse,
-    fontSize: FONT_SIZES.md,
+    fontSize: FONT_SIZES.lg,
     ...FONTS.bold,
   },
   sheetSecondary: {
     marginTop: SPACING.md,
     paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: BORDER_RADIUS.xl,
     alignItems: "center",
     backgroundColor: COLORS.surfaceElevated,
   },
   sheetSecondaryText: {
     color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.md,
+    fontSize: FONT_SIZES.lg,
     ...FONTS.semiBold,
   },
 
@@ -1050,12 +1176,11 @@ const s = StyleSheet.create({
   bentoRow: { flexDirection: "row", gap: CARD_GAP },
   bentoCard: {
     backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.lg,
-    alignItems: "center",
-    justifyContent: "center",
+    borderRadius: BORDER_RADIUS.xxl,
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: COLORS.glassBorder,
+    borderColor: COLORS.glassBorderLight,
+    ...SHADOWS.small,
   },
   bentoHalf: { width: BENTO_W },
   bentoTall: { paddingVertical: 0, overflow: "hidden" },
@@ -1068,8 +1193,13 @@ const s = StyleSheet.create({
   bentoSub: { color: COLORS.textMuted, fontSize: FONT_SIZES.xs, marginTop: 2 },
 
   // ─── Progress rings ───
+  ringCardGradient: {
+    padding: SPACING.lg,
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.xxl,
+  },
   ringValue: {
-    fontSize: FONT_SIZES.xl,
+    fontSize: FONT_SIZES.xxl,
     ...FONTS.extraBold,
     color: COLORS.text,
   },
@@ -1084,32 +1214,32 @@ const s = StyleSheet.create({
   macroStrip: {
     flexDirection: "row",
     borderRadius: BORDER_RADIUS.xl,
-    paddingVertical: SPACING.md,
+    paddingVertical: SPACING.lg,
     paddingHorizontal: SPACING.sm,
     borderWidth: 1,
-    borderColor: COLORS.glassBorder,
+    borderColor: COLORS.glassBorderLight,
   },
   macroCell: { flex: 1, alignItems: "center" },
-  macroIndicator: { width: 6, height: 6, borderRadius: 3, marginBottom: 4 },
-  macroVal: { fontSize: FONT_SIZES.md, ...FONTS.bold, color: COLORS.text },
+  macroIndicator: { width: 8, height: 8, borderRadius: 4, marginBottom: 6 },
+  macroVal: { fontSize: FONT_SIZES.lg, ...FONTS.bold },
   macroLbl: {
     fontSize: 9,
     color: COLORS.textMuted,
     ...FONTS.medium,
-    marginTop: 1,
+    marginTop: 2,
   },
 
-  // ─── Value Exchange bento cards (Automate Tracking section) ───
+  // ─── Value Exchange bento cards ───
   valueExchangeGradient: {
     flex: 1,
     width: "100%",
-    borderRadius: BORDER_RADIUS.xl - 1,
+    borderRadius: BORDER_RADIUS.xxl - 1,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: SPACING.lg,
     paddingHorizontal: SPACING.sm,
   },
-  valueExchangeIcon: { fontSize: 26, marginBottom: SPACING.xs },
+  valueExchangeIcon: { fontSize: 28, marginBottom: SPACING.xs },
   valueExchangeContent: { alignItems: "center", marginBottom: SPACING.xs },
   valueExchangeTitle: {
     fontSize: FONT_SIZES.sm,
@@ -1124,10 +1254,15 @@ const s = StyleSheet.create({
     marginTop: 2,
     lineHeight: 14,
   },
-  valueExchangeButton: {
-    marginTop: SPACING.xs,
+  enableBtn: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.round,
+  },
+  enableBtnText: {
     fontSize: FONT_SIZES.xs,
-    color: COLORS.primary,
+    color: COLORS.textInverse,
     ...FONTS.bold,
   },
 
@@ -1135,14 +1270,24 @@ const s = StyleSheet.create({
   stepsGradient: {
     flex: 1,
     width: "100%",
-    borderRadius: BORDER_RADIUS.xl - 1,
+    borderRadius: BORDER_RADIUS.xxl - 1,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: SPACING.lg,
+    overflow: 'hidden',
   },
-  stepsIcon: { fontSize: 28 },
+  stepsDecor: {
+    position: 'absolute',
+    top: -40,
+    right: -40,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  stepsIcon: { fontSize: 32 },
   stepsValue: {
-    fontSize: 28,
+    fontSize: 30,
     ...FONTS.extraBold,
     color: COLORS.textInverse,
     marginTop: 4,
@@ -1151,51 +1296,66 @@ const s = StyleSheet.create({
     fontSize: FONT_SIZES.xs,
     color: COLORS.textInverse,
     ...FONTS.semiBold,
-    opacity: 0.8,
+    opacity: 0.85,
   },
   stepsMeta: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 4,
-    gap: 4,
+    marginTop: 6,
+    gap: 6,
   },
   stepsMetaItem: {
-    fontSize: 10,
+    fontSize: 11,
     color: COLORS.textInverse,
-    opacity: 0.7,
+    opacity: 0.8,
     ...FONTS.medium,
   },
-  stepsMetaDot: { fontSize: 10, color: COLORS.textInverse, opacity: 0.4 },
+  stepsMetaDot: { fontSize: 11, color: COLORS.textInverse, opacity: 0.4 },
   stepsTap: {
     fontSize: 9,
     color: COLORS.textInverse,
     opacity: 0.5,
-    marginTop: 4,
+    marginTop: 6,
     ...FONTS.medium,
   },
   permissionBtn: {
-    backgroundColor: COLORS.textInverse,
+    backgroundColor: 'rgba(255,255,255,0.25)',
     paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: BORDER_RADIUS.round,
-    marginTop: 6,
+    marginTop: 8,
   },
   permissionBtnText: {
-    color: COLORS.primary,
+    color: COLORS.textInverse,
     fontSize: FONT_SIZES.xs,
     ...FONTS.bold,
   },
 
   // ─── Mood & Burn ───
-  moodEmoji: { fontSize: 32 },
+  moodCardGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xxl - 1,
+  },
+  moodEmoji: { fontSize: 36 },
+  burnCardGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xxl - 1,
+  },
   burnValue: {
-    fontSize: FONT_SIZES.xxl,
+    fontSize: FONT_SIZES.xxl + 4,
     ...FONTS.extraBold,
-    color: COLORS.coral,
+    color: COLORS.textInverse,
   },
   burnUnit: {
     fontSize: FONT_SIZES.xs,
-    color: COLORS.textMuted,
+    color: COLORS.textInverse,
+    opacity: 0.85,
     ...FONTS.medium,
   },
 
@@ -1204,14 +1364,14 @@ const s = StyleSheet.create({
     marginTop: SPACING.xl,
     marginHorizontal: SPACING.lg,
     backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: BORDER_RADIUS.xxl,
     padding: SPACING.lg,
     borderWidth: 1,
-    borderColor: COLORS.glassBorder,
+    borderColor: COLORS.glassBorderLight,
     ...SHADOWS.small,
   },
   sectionTitle: {
-    fontSize: FONT_SIZES.md,
+    fontSize: FONT_SIZES.lg,
     ...FONTS.bold,
     color: COLORS.text,
     marginBottom: SPACING.md,
@@ -1225,14 +1385,14 @@ const s = StyleSheet.create({
     height: 100,
   },
   barCol: { alignItems: "center", flex: 1 },
-  bar: { width: 22, borderRadius: 11, marginBottom: 6 },
-  barLabel: { fontSize: 10, color: COLORS.textMuted, ...FONTS.medium },
+  bar: { width: 24, borderRadius: 12, marginBottom: 6 },
+  barLabel: { fontSize: 11, color: COLORS.textMuted, ...FONTS.medium },
   barDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     backgroundColor: COLORS.primary,
-    marginTop: 3,
+    marginTop: 4,
   },
 
   // ─── Recent Activity rows ───
@@ -1241,12 +1401,12 @@ const s = StyleSheet.create({
     alignItems: "center",
     paddingVertical: SPACING.md,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.glassBorder,
+    borderBottomColor: COLORS.glassBorderLight,
   },
-  actIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  actIconGradient: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     marginRight: SPACING.md,
@@ -1260,3 +1420,4 @@ const s = StyleSheet.create({
     ...FONTS.medium,
   },
 });
+

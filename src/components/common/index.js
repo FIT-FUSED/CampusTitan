@@ -6,7 +6,7 @@ import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS } from '../.
 
 const { width } = Dimensions.get('window');
 
-// Gradient Card
+// Premium Gradient Card with stunning gradients
 export function GradientCard({ children, gradient, style, onPress }) {
     const content = (
         <View style={styles.cardContainer}>
@@ -23,7 +23,7 @@ export function GradientCard({ children, gradient, style, onPress }) {
     if (onPress) {
         return (
             <TouchableOpacity
-                activeOpacity={0.8}
+                activeOpacity={0.85}
                 onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     onPress();
@@ -36,8 +36,9 @@ export function GradientCard({ children, gradient, style, onPress }) {
     return content;
 }
 
-// Stat Card
+// Premium Stat Card with enhanced styling
 export function StatCard({ title, value, unit, icon, color, subtitle, onPress }) {
+    const cardColor = color || COLORS.primary;
     return (
         <TouchableOpacity
             activeOpacity={onPress ? 0.7 : 1}
@@ -47,27 +48,45 @@ export function StatCard({ title, value, unit, icon, color, subtitle, onPress })
                     onPress();
                 }
             }}
-            style={[styles.statCard, { borderLeftColor: color || COLORS.primary, borderLeftWidth: 3 }]}
+            style={[styles.statCard, { borderLeftWidth: 0 }]}
         >
-
-            <View style={styles.statCardHeader}>
-                <Text style={[styles.statCardTitle, { color: COLORS.textSecondary }]}>{title}</Text>
-                {!!icon && <Text style={{ fontSize: 18 }}>{icon}</Text>}
-            </View>
-            <View style={styles.statCardValueRow}>
-                <Text style={[styles.statCardValue, { color: color || COLORS.text }]}>{value}</Text>
-                {!!unit && <Text style={styles.statCardUnit}>{unit}</Text>}
-            </View>
-            {!!subtitle && <Text style={styles.statCardSubtitle}>{subtitle}</Text>}
+            <LinearGradient
+                colors={[cardColor + '08', cardColor + '02']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.statCardGradient}
+            >
+                <View style={[styles.statCardAccent, { backgroundColor: cardColor }]} />
+                <View style={styles.statCardHeader}>
+                    <Text style={[styles.statCardTitle, { color: COLORS.textSecondary }]}>{title}</Text>
+                    {!!icon && <Text style={{ fontSize: 20 }}>{icon}</Text>}
+                </View>
+                <View style={styles.statCardValueRow}>
+                    <Text style={[styles.statCardValue, { color: cardColor }]}>{value}</Text>
+                    {!!unit && <Text style={styles.statCardUnit}>{unit}</Text>}
+                </View>
+                {!!subtitle && <Text style={styles.statCardSubtitle}>{subtitle}</Text>}
+            </LinearGradient>
         </TouchableOpacity>
     );
 }
 
-// Animated Button
-export function AnimatedButton({ title, onPress, gradient, style, textStyle, disabled, icon }) {
+// Premium Animated Button with glow effect
+export function AnimatedButton({ title, onPress, gradient, style, textStyle, disabled, icon, variant = 'primary' }) {
+    const gradients = {
+        primary: COLORS.gradientPrimary,
+        accent: COLORS.gradientAccent,
+        success: COLORS.gradientSuccess,
+        violet: COLORS.gradientViolet,
+        sky: COLORS.gradientSky,
+        calm: COLORS.gradientCalm,
+    };
+    
+    const selectedGradient = gradient || gradients[variant] || COLORS.gradientPrimary;
+    
     return (
         <TouchableOpacity
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             onPress={() => {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 onPress && onPress();
@@ -76,7 +95,7 @@ export function AnimatedButton({ title, onPress, gradient, style, textStyle, dis
             style={{ opacity: disabled ? 0.5 : 1 }}
         >
             <LinearGradient
-                colors={gradient || COLORS.gradientPrimary}
+                colors={selectedGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={[styles.animatedButton, style]}
@@ -88,7 +107,7 @@ export function AnimatedButton({ title, onPress, gradient, style, textStyle, dis
     );
 }
 
-// Header
+// Premium Header
 export function Header({ title, subtitle, onBack, rightAction, onLongPress }) {
     return (
         <View style={styles.header}>
@@ -99,7 +118,12 @@ export function Header({ title, subtitle, onBack, rightAction, onLongPress }) {
                         onPress={onBack}
                         delayPressIn={0}
                     >
-                        <Text style={styles.backIcon}>←</Text>
+                        <LinearGradient
+                            colors={COLORS.gradientPrimary}
+                            style={styles.backButtonGradient}
+                        >
+                            <Text style={styles.backIcon}>←</Text>
+                        </LinearGradient>
                     </TouchableOpacity>
                 )}
             </View>
@@ -118,7 +142,7 @@ export function Header({ title, subtitle, onBack, rightAction, onLongPress }) {
     );
 }
 
-// Input Field
+// Premium Input Field
 export function InputField({ label, value, onChangeText, placeholder, secureTextEntry, keyboardType, multiline, style }) {
     return (
         <View style={[styles.inputContainer, style]}>
@@ -144,7 +168,7 @@ export function StyledInput({ label, value, onChangeText, placeholder, secureTex
     return (
         <View style={[styles.inputContainer, style]}>
             {label && <Text style={styles.inputLabel}>{label}</Text>}
-            <View style={styles.inputWrapper}>
+            <View style={[styles.inputWrapper, styles.styledInputWrapper]}>
                 {icon && <Text style={styles.inputIcon}>{icon}</Text>}
                 <TextInput
                     style={[styles.input, multiline && styles.inputMultiline, icon && { paddingLeft: 40 }]}
@@ -162,11 +186,16 @@ export function StyledInput({ label, value, onChangeText, placeholder, secureTex
     );
 }
 
-// Empty State
+// Premium Empty State
 export function EmptyState({ icon, title, message, action, actionLabel }) {
     return (
         <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>{icon || '📭'}</Text>
+            <LinearGradient
+                colors={COLORS.gradientPrimary}
+                style={styles.emptyIconGradient}
+            >
+                <Text style={styles.emptyIcon}>{icon || '📭'}</Text>
+            </LinearGradient>
             <Text style={styles.emptyTitle}>{title || 'Nothing here yet'}</Text>
             <Text style={styles.emptyMessage}>{message || 'Start by adding some data'}</Text>
             {action && (
@@ -176,11 +205,14 @@ export function EmptyState({ icon, title, message, action, actionLabel }) {
     );
 }
 
-// Section Header
+// Section Header with premium styling
 export function SectionHeader({ title, action, actionLabel }) {
     return (
         <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{title}</Text>
+            <View style={styles.sectionTitleContainer}>
+                <View style={styles.sectionTitleAccent} />
+                <Text style={styles.sectionTitle}>{title}</Text>
+            </View>
             {action && (
                 <TouchableOpacity onPress={action}>
                     <Text style={styles.sectionAction}>{actionLabel || 'See All'}</Text>
@@ -190,27 +222,32 @@ export function SectionHeader({ title, action, actionLabel }) {
     );
 }
 
-// Chip / Tag
+// Premium Chip / Tag
 export function Chip({ label, color, selected, onPress }) {
+    const chipColor = color || COLORS.primary;
     return (
         <TouchableOpacity
             onPress={onPress}
             style={[
                 styles.chip,
-                selected && { backgroundColor: color || COLORS.primary, borderColor: color || COLORS.primary },
+                selected && { 
+                    backgroundColor: chipColor, 
+                    borderColor: chipColor 
+                },
             ]}
         >
-            <Text style={[styles.chipText, selected && { color: COLORS.text }]}>{label}</Text>
+            <Text style={[styles.chipText, selected && { color: COLORS.textInverse }]}>{label}</Text>
         </TouchableOpacity>
     );
 }
 
-// Progress Bar
-export function ProgressBar({ progress, color, height = 6, style }) {
+// Premium Progress Bar
+export function ProgressBar({ progress, color, height = 8, style }) {
+    const barColor = color || COLORS.primary;
     return (
         <View style={[styles.progressBarBg, { height }, style]}>
             <LinearGradient
-                colors={[color || COLORS.primary, color ? color + '99' : COLORS.primaryLight]}
+                colors={[barColor, barColor + 'AA']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={[styles.progressBarFill, { width: `${Math.min(progress, 100)}%`, height }]}
@@ -219,34 +256,56 @@ export function ProgressBar({ progress, color, height = 6, style }) {
     );
 }
 
-// Avatar
-export function Avatar({ name, color, size = 40 }) {
+// Premium Avatar
+export function Avatar({ name, color, size = 50 }) {
     const initials = name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
+    const avatarColor = color || COLORS.primary;
     return (
-        <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: color || COLORS.primary }]}>
+        <LinearGradient
+            colors={COLORS.gradientPrimary}
+            style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}
+        >
             <Text style={[styles.avatarText, { fontSize: size * 0.38 }]}>{initials}</Text>
-        </View>
+        </LinearGradient>
     );
 }
 
 const styles = StyleSheet.create({
+    // Gradient Card
     gradientCard: {
-        borderRadius: BORDER_RADIUS.lg,
+        borderRadius: BORDER_RADIUS.xl,
         padding: SPACING.lg,
         borderWidth: 1,
-        borderColor: COLORS.glassBorder,
-        ...SHADOWS.small,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        ...SHADOWS.medium,
     },
+    cardContainer: {
+        borderRadius: BORDER_RADIUS.xl,
+        overflow: 'hidden',
+    },
+
+    // Stat Card - Premium
     statCard: {
         backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.md,
-        padding: SPACING.lg,
-        borderWidth: 1,
-        borderColor: COLORS.glassBorder,
-        minWidth: (width - SPACING.lg * 3) / 2,
-        flex: 1,
+        borderRadius: BORDER_RADIUS.xl,
         overflow: 'hidden',
         ...SHADOWS.small,
+        borderWidth: 0,
+    },
+    statCardGradient: {
+        padding: SPACING.lg,
+        borderRadius: BORDER_RADIUS.xl,
+        borderWidth: 1,
+        borderColor: COLORS.glassBorderLight,
+    },
+    statCardAccent: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 3,
+        borderTopLeftRadius: BORDER_RADIUS.xl,
+        borderTopRightRadius: BORDER_RADIUS.xl,
     },
     statCardHeader: {
         flexDirection: 'row',
@@ -257,16 +316,14 @@ const styles = StyleSheet.create({
     statCardTitle: {
         fontSize: FONT_SIZES.sm,
         ...FONTS.medium,
-        color: COLORS.textSecondary,
     },
     statCardValueRow: {
         flexDirection: 'row',
         alignItems: 'baseline',
     },
     statCardValue: {
-        fontSize: FONT_SIZES.xxl,
+        fontSize: FONT_SIZES.xxl + 4,
         ...FONTS.bold,
-        color: COLORS.text,
     },
     statCardUnit: {
         fontSize: FONT_SIZES.sm,
@@ -279,14 +336,17 @@ const styles = StyleSheet.create({
         color: COLORS.textMuted,
         marginTop: SPACING.xs,
     },
+
+    // Animated Button - Premium
     animatedButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: SPACING.md + 2,
+        paddingVertical: SPACING.md + 4,
         paddingHorizontal: SPACING.xxl,
         borderRadius: BORDER_RADIUS.xl,
         ...SHADOWS.medium,
+        borderWidth: 0,
     },
     buttonText: {
         color: COLORS.textInverse,
@@ -297,6 +357,8 @@ const styles = StyleSheet.create({
         fontSize: 18,
         marginRight: SPACING.sm,
     },
+
+    // Header - Premium
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -311,11 +373,17 @@ const styles = StyleSheet.create({
     },
     backButton: {
         marginRight: SPACING.md,
+        borderRadius: BORDER_RADIUS.lg,
+        overflow: 'hidden',
+    },
+    backButtonGradient: {
         padding: SPACING.sm,
+        paddingHorizontal: SPACING.sm,
     },
     backIcon: {
-        fontSize: 24,
-        color: COLORS.text,
+        fontSize: 22,
+        color: COLORS.textInverse,
+        ...FONTS.bold,
     },
     headerTitle: {
         fontSize: FONT_SIZES.xxl,
@@ -327,6 +395,8 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         marginTop: 2,
     },
+
+    // Input Fields
     inputContainer: {
         marginBottom: SPACING.lg,
     },
@@ -339,6 +409,12 @@ const styles = StyleSheet.create({
     inputWrapper: {
         position: 'relative',
     },
+    styledInputWrapper: {
+        backgroundColor: COLORS.surfaceLight,
+        borderRadius: BORDER_RADIUS.lg,
+        borderWidth: 1,
+        borderColor: COLORS.glassBorderLight,
+    },
     inputIcon: {
         position: 'absolute',
         left: SPACING.md,
@@ -348,26 +424,36 @@ const styles = StyleSheet.create({
     },
     input: {
         backgroundColor: COLORS.surfaceLight,
-        borderRadius: BORDER_RADIUS.md,
+        borderRadius: BORDER_RADIUS.lg,
         paddingHorizontal: SPACING.lg,
         paddingVertical: SPACING.md + 2,
         color: COLORS.text,
         fontSize: FONT_SIZES.md,
         borderWidth: 1,
-        borderColor: COLORS.glassBorder,
+        borderColor: COLORS.glassBorderLight,
     },
     inputMultiline: {
         minHeight: 100,
         textAlignVertical: 'top',
     },
+
+    // Empty State - Premium
     emptyState: {
         alignItems: 'center',
         justifyContent: 'center',
         padding: SPACING.huge,
     },
-    emptyIcon: {
-        fontSize: 48,
+    emptyIconGradient: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
         marginBottom: SPACING.lg,
+        ...SHADOWS.medium,
+    },
+    emptyIcon: {
+        fontSize: 36,
     },
     emptyTitle: {
         fontSize: FONT_SIZES.xl,
@@ -380,6 +466,8 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         textAlign: 'center',
     },
+
+    // Section Header - Premium
     sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -387,6 +475,17 @@ const styles = StyleSheet.create({
         paddingHorizontal: SPACING.lg,
         marginTop: SPACING.xl,
         marginBottom: SPACING.md,
+    },
+    sectionTitleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    sectionTitleAccent: {
+        width: 4,
+        height: 20,
+        backgroundColor: COLORS.primary,
+        borderRadius: 2,
+        marginRight: SPACING.sm,
     },
     sectionTitle: {
         fontSize: FONT_SIZES.lg,
@@ -398,12 +497,14 @@ const styles = StyleSheet.create({
         color: COLORS.primary,
         ...FONTS.semiBold,
     },
+
+    // Chip
     chip: {
         paddingHorizontal: SPACING.lg,
         paddingVertical: SPACING.sm,
         borderRadius: BORDER_RADIUS.round,
         borderWidth: 1,
-        borderColor: COLORS.glassBorder,
+        borderColor: COLORS.glassBorderLight,
         backgroundColor: COLORS.surface,
         marginRight: SPACING.sm,
     },
@@ -412,22 +513,29 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         ...FONTS.medium,
     },
+
+    // Progress Bar
     progressBarBg: {
-        backgroundColor: COLORS.surfaceLight,
+        backgroundColor: COLORS.surfaceElevated,
         borderRadius: BORDER_RADIUS.round,
         overflow: 'hidden',
     },
     progressBarFill: {
         borderRadius: BORDER_RADIUS.round,
     },
+
+    // Avatar - Premium
     avatar: {
         alignItems: 'center',
         justifyContent: 'center',
+        ...SHADOWS.small,
     },
     avatarText: {
-        color: COLORS.text,
+        color: COLORS.textInverse,
         ...FONTS.bold,
     },
+
+    // Scroll Picker
     scrollPickerContainer: {
         marginVertical: SPACING.md,
         width: '100%',
@@ -444,7 +552,7 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.surfaceLight,
         borderRadius: BORDER_RADIUS.lg,
         borderWidth: 1,
-        borderColor: COLORS.glassBorder,
+        borderColor: COLORS.glassBorderLight,
         overflow: 'hidden',
     },
     scrollPickerSelection: {
@@ -453,10 +561,10 @@ const styles = StyleSheet.create({
         marginTop: -20,
         height: 40,
         width: '100%',
-        backgroundColor: COLORS.primary + '15',
+        backgroundColor: COLORS.primary + '12',
         borderTopWidth: 1,
         borderBottomWidth: 1,
-        borderColor: COLORS.primary + '33',
+        borderColor: COLORS.primary + '25',
     },
     scrollPickerItem: {
         alignItems: 'center',
@@ -504,7 +612,7 @@ export function ScrollPicker({ data, value, onValueChange, label, height = 150 }
                 <FlatList
                     ref={flatListRef}
                     data={data}
-                    keyExtractor={(item) => item.toString()}
+                    keyExtractor={(item) => item + ""}
                     showsVerticalScrollIndicator={false}
                     snapToInterval={itemHeight}
                     decelerationRate="fast"
@@ -530,3 +638,4 @@ export function ScrollPicker({ data, value, onValueChange, label, height = 150 }
         </View>
     );
 }
+

@@ -72,6 +72,8 @@ export default function LeaderboardScreen({ navigation }) {
     const [refreshing, setRefreshing] = useState(false);
 
     const loadLeaderboard = useCallback(async () => {
+        console.log('🏆 DEBUG: Current user college:', user?.college);
+        console.log('🏆 DEBUG: User object:', user);
         if (!user?.college) {
             setLeaderboard([]);
             setLoading(false);
@@ -79,6 +81,7 @@ export default function LeaderboardScreen({ navigation }) {
         }
         try {
             const data = await db.getLeaderboard(user.college);
+            console.log('🏆 DEBUG: Leaderboard data received:', data?.length || 0, 'users');
             setLeaderboard(data);
         } catch (e) {
             console.error('Leaderboard error:', e);

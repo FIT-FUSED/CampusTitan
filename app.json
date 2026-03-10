@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F0F7FF"
     },
     "ios": {
       "supportsTablet": true,
@@ -38,9 +38,7 @@
     },
     "plugins": ["expo-secure-store", "expo-camera", "expo-sensors"],
     "extra": {
-      "eas": {
-        "projectId": "2910a738-ed93-4759-838f-16b603e416fc"
-      }
+      "eas": {}
     }
   }
 }
