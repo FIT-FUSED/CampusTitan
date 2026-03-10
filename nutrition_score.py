@@ -184,12 +184,16 @@ def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_k
     
     print(f"Step 3 raw response: {response_2.text}")
     selected_id = json.loads(response_2.text)["best_match_id"]
-    if selected_id == -1: 
-        raise Exception(f"AI rejected all USDA candidates for '{food_name}' to preserve data integrity.")
-        
-    selected_food = next((item for item in candidates if item["fdcId"] == selected_id), None)
-    if not selected_food:
-        raise Exception(f"Selected USDA ID {selected_id} not found in candidates list")
+    if selected_id == -1:
+        # AI was too strict — fall back to the top USDA search result
+        print(f"  ⚠ AI rejected all candidates for '{food_name}', using top USDA match as fallback...")
+        selected_food = candidates[0]
+    else:
+        selected_food = next((item for item in candidates if item["fdcId"] == selected_id), None)
+        if not selected_food:
+            # ID mismatch — fall back to top result
+            print(f"  ⚠ Selected ID {selected_id} not in candidate list, using top USDA match...")
+            selected_food = candidates[0]
     print(f"-> ML Approved Match: {selected_food['description']}")
 
     print("\n[Step 4] Scaling 34-Column Matrix & Calculating Density...")

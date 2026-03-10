@@ -63,7 +63,9 @@ jspm_packages/
 .yarn-integrity
 
 # dotenv environment variables file
-
+# User requested to push .env, but let's ignore variants
+.env*
+!.env
 .env.local
 .env.development.local
 .env.test.local
@@ -109,9 +111,11 @@ web-build/
 # Android
 *.apk
 *.aab
+android/
 
 # iOS
 *.ipa
+ios/
 
 # Metro
 .metro-health-check*
@@ -119,13 +123,18 @@ web-build/
 # EAS
 eas-build-metadata.json
 
-echo "*.gguf" >> .gitignore
-echo "*.pth" >> .gitignore
-echo "*.pkl" >> .gitignore
-echo ".env" >> .gitignore
-echo "__pycache__/" >> .gitignore
+# Model/Binary files
 *.gguf
 *.pth
 *.pkl
 
+# Python
 __pycache__/
+*.pyc
+
+# Local Test Files
+test_health_summary.py
+test_image.png
+
+# User requested: don't push the "fit" app
+fit/
