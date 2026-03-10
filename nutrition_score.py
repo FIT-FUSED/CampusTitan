@@ -4,8 +4,7 @@ import time
 import requests
 from PIL import Image
 from pydantic import BaseModel, Field
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 # ==========================================
@@ -68,45 +67,46 @@ def calculate_nrf93(nutrition_data: dict) -> float:
 
 # Models to try in order (separate free-tier quotas per model)
 GEMINI_MODELS = [
-    'models/gemini-2.0-flash',
-    'models/gemini-2.0-flash-lite',
-    'models/gemini-2.5-flash-lite',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
 ]
 
-def _call_gemini(client, contents, config, max_retries=3):
+def _call_gemini(model_name, contents, config, max_retries=3):
     """Call Gemini with automatic retry on 429 and model fallback."""
     last_error = None
     
-    for model_name in GEMINI_MODELS:
-        for attempt in range(max_retries):
-            try:
-                print(f"  Trying {model_name} (attempt {attempt + 1}/{max_retries})...")
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=contents,
-                    config=config
-                )
-                print(f"  ✓ Success with {model_name}")
-                return response
-            except Exception as e:
-                error_str = str(e)
-                last_error = e
-                if '429' in error_str or 'RESOURCE_EXHAUSTED' in error_str:
-                    # Rate limited - check if it's per-minute or per-day
-                    if 'PerDay' in error_str or 'limit: 0' in error_str:
-                        print(f"  ✗ {model_name} daily quota exhausted, trying next model...")
-                        break  # Skip retries, try next model
-                    else:
-                        wait_time = min(15 * (attempt + 1), 30)
-                        print(f"  ⏳ Rate limited, waiting {wait_time}s before retry...")
-                        time.sleep(wait_time)
+    for attempt in range(max_retries):
+        try:
+            print(f"  [Gemini] Trying {model_name}...")
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(
+                contents=contents,
+                generation_config=config
+            )
+            print(f"  ✓ Success with {model_name}")
+            return response
+        except Exception as e:
+            error_str = str(e)
+            last_error = e
+            if '429' in error_str or 'RESOURCE_EXHAUSTED' in error_str:
+                # Rate limited - check if it's per-minute or per-day
+                if 'PerDay' in error_str or 'limit: 0' in error_str:
+                    print(f"  ✗ {model_name} daily quota exhausted, trying next model...")
+                    break  # Skip retries, try next model
                 else:
-                    raise  # Non-rate-limit error, propagate immediately
+                    wait_time = min(15 * (attempt + 1), 30)
+                    print(f"  ⏳ Rate limited, waiting {wait_time}s before retry...")
+                    time.sleep(wait_time)
+            else:
+                raise  # Non-rate-limit error, propagate immediately
     
     raise Exception(f"All Gemini models exhausted after retries. Last error: {last_error}")
 
 def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_key: str, usda_key: str):
-    client = genai.Client(api_key=gemini_key)
+    # Configure the API key
+    print(f"  [Debug] Gemini key prefix: {gemini_key[:10]}..." if gemini_key else "  [Debug] No Gemini key!")
+    genai.configure(api_key=gemini_key)
     try:
         image = Image.open(image_path)
         print(f"Image loaded: {image.size}, mode={image.mode}")
@@ -127,14 +127,17 @@ def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_k
     """
     
     try:
+        # NOTE: Some google-generativeai versions do not expose types.GenerateContentConfig.
+        # Using a plain dict keeps compatibility across versions.
         response_1 = _call_gemini(
-            client,
+            GEMINI_MODELS[0],
             contents=[image, prompt_1],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=InitialIdentification,
-                temperature=0.0 
-            )
+            config={
+                "temperature": 0.0,
+                # These keys are ignored by older SDKs; newer SDKs may accept them.
+                "response_mime_type": "application/json",
+                "response_schema": InitialIdentification,
+            },
         )
         print(f"Step 1 raw response: {response_1.text}")
         initial_data = json.loads(response_1.text)
@@ -170,13 +173,13 @@ def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_k
     prompt_2 = f"Review the options and return the exact ID matching '{food_name}'. Return -1 if no safe match.\n{options_text}"
     
     response_2 = _call_gemini(
-        client,
+        GEMINI_MODELS[0],
         contents=[prompt_2],
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=USDASelection,
-            temperature=0.0
-        )
+        config={
+            "temperature": 0.0,
+            "response_mime_type": "application/json",
+            "response_schema": USDASelection,
+        },
     )
     
     print(f"Step 3 raw response: {response_2.text}")
@@ -195,34 +198,49 @@ def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_k
 
     print("\n[Step 4] Scaling 34-Column Matrix & Calculating Density...")
     
-    # CORRECTED UNIT MAPPINGS
     nutrient_mapping = {
         1008: "Caloric Value", 1004: "Fat( in g)", 1258: "Saturated Fats( in g)",
         1292: "Monounsaturated Fats( in g)", 1293: "Polyunsaturated Fats( in g)",
         1005: "Carbohydrates( in g)", 2000: "Sugars( in g)", 1003: "Protein( in g)",
         1079: "Dietary Fiber( in g)", 1253: "Cholesterol( in mg)", 1093: "Sodium( in mg)", 
-        1055: "Water( in g)", 1106: "Vitamin A( in µg)", 1165: "Vitamin B1 (Thiamine)( in mg)",
-        1177: "Vitamin B11 (Folic Acid)( in µg)", 1178: "Vitamin B12( in mg)",
-        1166: "Vitamin B2 (Riboflavin)( in mg)", 1167: "Vitamin B3 (Niacin)( in mg)",
-        1170: "Vitamin B5 (Pantothenic Acid)( in mg)", 1175: "Vitamin B6( in mg)",
-        1162: "Vitamin C( in mg)", 1110: "Vitamin D( in mg)", 1109: "Vitamin E( in mg)",
-        1185: "Vitamin K( in µg)", 1087: "Calcium( in mg)", 1098: "Copper( in mg)",
-        1089: "Iron( in mg)", 1090: "Magnesium( in mg)", 1097: "Manganese( in mg)",
-        1091: "Phosphorus( in mg)", 1092: "Potassium( in mg)", 1103: "Selenium( in µg)", 
-        1095: "Zinc( in mg)"
+        1087: "Calcium( in mg)", 1089: "Iron( in mg)", 1090: "Magnesium( in mg)", 1097: "Manganese( in mg)",
+        1092: "Potassium( in mg)", 1103: "Selenium( in µg)", 1095: "Zinc( in mg)", 1106: "Vitamin A( in µg)", 1165: "Vitamin B1 (Thiamine)( in mg)",
+        1177: "Vitamin B11 (Folic Acid)( in µg)", 1178: "Vitamin B12( in mg)", 1166: "Vitamin B2 (Riboflavin)( in mg)", 1167: "Vitamin B3 (Niacin)( in mg)",
+        1170: "Vitamin B5 (Pantothenic Acid)( in mg)", 1175: "Vitamin B6( in mg)", 1162: "Vitamin C( in mg)", 1110: "Vitamin D( in mg)", 1109: "Vitamin E( in mg)",
+        1185: "Vitamin K( in µg)", 1055: "Water( in g)"
     }
     
-    final_nutrition = {name: 0.0 for name in nutrient_mapping.values()}
+    final_nutrition = {"food_name": food_name, "portion_g": portion_g}
+    for nutrient_id, name in nutrient_mapping.items():
+        final_nutrition[name] = 0.0
     
     for nutrient in selected_food.get("foodNutrients", []):
-        n_id = nutrient.get("nutrientId")
-        if n_id in nutrient_mapping:
-            final_nutrition[nutrient_mapping[n_id]] = nutrient.get("value", 0.0)
+        nid = nutrient.get("nutrientId")
+        if nid in nutrient_mapping:
+            name = nutrient_mapping[nid]
+            amount = nutrient.get("value", 0)
+            unit = nutrient.get("unitName", "")
             
-    multiplier = portion_g / 100.0
-    for key in final_nutrition:
-        final_nutrition[key] = round(final_nutrition[key] * multiplier, 2)
-        
+            if unit == "g":
+                final_nutrition[name] = amount
+            elif unit == "mg":
+                final_nutrition[name] = amount
+            elif unit == "µg" or unit == "mcg":
+                final_nutrition[name] = amount / 1000
+            elif unit == "IU":
+                if name == "Vitamin A( in µg)":
+                    final_nutrition[name] = amount * 0.3
+                elif name == "Vitamin D( in mg)":
+                    final_nutrition[name] = amount * 0.025
+            else:
+                final_nutrition[name] = amount
+    
+    # Scale by portion size
+    scale_factor = portion_g / 100.0
+    for key, value in final_nutrition.items():
+        if key not in ["food_name", "portion_g"] and isinstance(value, (int, float)):
+            final_nutrition[key] = value * scale_factor
+    
     final_nutrition["Nutrition Density"] = calculate_nrf93(final_nutrition)
     final_nutrition["food_name"] = selected_food["description"]
     final_nutrition["portion_g"] = portion_g
@@ -233,7 +251,6 @@ def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_k
 # Execution Block
 # ==========================================
 if __name__ == "__main__":
-
     load_dotenv() 
 
     GEMINI_KEY = os.environ.get("GEMINI_API_KEY")

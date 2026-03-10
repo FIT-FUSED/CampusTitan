@@ -8,14 +8,19 @@ import requests as http_requests
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 import tempfile
+import time
 
 # Add the parent directory to the path to import nutrition_score
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Load .env from the backend folder
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+load_dotenv(env_path)
+print(f"Loaded .env from: {env_path}")
+
 # Import nutrition_score
 try:
     import nutrition_score
-    load_dotenv()
     print("✓ nutrition_score.py loaded successfully")
 except ImportError as e:
     print(f"✗ Failed to load nutrition_score.py: {e}")
@@ -53,7 +58,13 @@ def analyze_nutrition():
         gemini_key = os.getenv('GEMINI_API_KEY')
         usda_key = os.getenv('USDA_API_KEY')
 
-        print(f"Gemini key available: {bool(gemini_key)}")
+        # Debug: Show what keys are loaded (first 10 chars)
+        print(f"=== API KEY DEBUG ===")
+        print(f"GEMINI_API_KEY env var: {'set' if gemini_key else 'NOT SET'}")
+        if gemini_key:
+            print(f"GEMINI key prefix: {gemini_key[:15]}...")
+        print(f"USDA_API_KEY env var: {'set' if usda_key else 'NOT SET'}")
+        print(f"======================")
         print(f"USDA key available: {bool(usda_key)}")
         print(f"Nutrition score available: {nutrition_score is not None}")
 
@@ -163,7 +174,7 @@ def get_fallback_data(context):
 
 # ─── Ollama LLaMA Health Summary (using context_engine.py pipeline) ───
 OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://localhost:11434')
-OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'my-llama:latest')
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'myllama:latest')
 
 # Import the existing context engine and EMA tracker
 try:
@@ -222,23 +233,47 @@ def _call_ollama(prompt, timeout=180):
     """Send structured prompt to the local Ollama LLaMA model."""
     try:
         print(f"  → Calling Ollama at {OLLAMA_URL}/api/generate with model={OLLAMA_MODEL}")
-        resp = http_requests.post(
-            f'{OLLAMA_URL}/api/generate',
-            json={
-                'model': OLLAMA_MODEL,
-                'prompt': prompt,
-                'stream': False,
-                'options': {
-                    'num_predict': 256,   # Limit output tokens for faster response
-                    'temperature': 0.5,
-                    'num_ctx': 1024,      # Smaller context window for speed
-                },
+        
+        # Ultra conservative settings for 8GB RAM with 4.6GB model
+        # Truncate prompt to prevent OOM
+        max_prompt_len = 400  # Extremely conservative for 8GB RAM
+        if len(prompt) > max_prompt_len:
+            prompt = prompt[-max_prompt_len:]
+            print(f"  → Prompt truncated to {max_prompt_len} chars for memory safety")
+        
+        # Minimal payload to reduce memory pressure
+        payload = {
+            'model': OLLAMA_MODEL,
+            'prompt': prompt,
+            'stream': False,
+            'options': {
+                'num_predict': 80,       # Ultra conservative output
+                'temperature': 0.5,
+                'num_ctx': 256,          # Tiny context window
+                'num_batch': 8,          # Small batch size
+                'repeat_penalty': 1.1,
             },
-            timeout=timeout
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data.get('response', '')
+        }
+        
+        for attempt in range(2):  # Max 2 attempts
+            try:
+                resp = http_requests.post(
+                    f'{OLLAMA_URL}/api/generate',
+                    json=payload,
+                    timeout=timeout
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                return data.get('response', '')
+            except http_requests.exceptions.HTTPError as e:
+                if e.response.status_code == 500 and 'model runner has unexpectedly stopped' in str(e):
+                    if attempt == 0:
+                        print(f"  → Model runner crashed, retrying in 3s...")
+                        time.sleep(3)
+                        continue
+                    else:
+                        raise Exception('Ollama model runner crashed twice. Try reducing model size or freeing RAM.')
+                raise
     except http_requests.exceptions.ConnectionError:
         raise Exception(f'Cannot connect to Ollama at {OLLAMA_URL}. Is it running?')
     except http_requests.exceptions.Timeout:
@@ -388,6 +423,40 @@ def health_summary_start():
     print(f"  → Started health summary job {job_id[:8]}...")
     return jsonify({'jobId': job_id, 'status': 'processing'})
 
+@app.route('/api/health/summary', methods=['POST'])
+def health_summary_sync():
+    data = request.get_json() or {}
+    gemini_key = os.getenv('GEMINI_API_KEY')
+    job_id = str(uuid.uuid4())
+    _health_jobs[job_id] = {'status': 'processing'}
+
+    t = threading.Thread(target=_run_health_pipeline, args=(job_id, data, gemini_key))
+    t.daemon = True
+    t.start()
+
+    timeout_s = int(os.getenv('HEALTH_SUMMARY_TIMEOUT_S', '180'))
+    waited = 0
+    while waited < timeout_s:
+        job = _health_jobs.get(job_id)
+        if not job:
+            break
+        if job.get('status') == 'done':
+            result = job['result']
+            del _health_jobs[job_id]
+            return jsonify(result)
+        if job.get('status') == 'error':
+            err = job.get('error', 'Health summary failed')
+            del _health_jobs[job_id]
+            return jsonify({'error': err}), 500
+        time.sleep(1)
+        waited += 1
+
+    return jsonify({'error': 'Health summary timed out. Try again.'}), 504
+
+@app.route('/api/health/summary/job', methods=['POST'])
+def health_summary_job_alias():
+    return health_summary_start()
+
 @app.route('/api/health-summary/<job_id>', methods=['GET'])
 def health_summary_poll(job_id):
     """Poll for health summary result."""
@@ -410,8 +479,6 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'nutrition_score_available': nutrition_score is not None,
-        'gemini_key': bool(os.getenv('GEMINI_API_KEY')),
-        'usda_key': bool(os.getenv('USDA_API_KEY'))
     })
 
 if __name__ == '__main__':

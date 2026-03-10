@@ -1,48 +1,9 @@
 import { supabase } from './supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 class Database {
-    // Ensure user profile exists in public users table (prevents FK violations)
-    async _ensureUserExists(userId) {
-        console.log('[_ensureUserExists] Checking user:', userId);
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (!authUser || authUser.id !== userId) {
-            console.log('[_ensureUserExists] Auth user mismatch or missing, skipping');
-            return;
-        }
-
-        const { data: existingUser, error: selectErr } = await supabase
-            .from('users')
-            .select('id')
-            .eq('id', userId)
-            .maybeSingle();
-
-        console.log('[_ensureUserExists] SELECT result:', { existingUser, selectErr });
-
-        if (!existingUser) {
-            const meta = authUser.user_metadata || {};
-            // Include all user profile columns
-            const userRow = {
-                id: userId,
-                email: authUser.email,
-                name: meta.name || authUser.email?.split('@')[0] || 'User',
-                college: meta.college || 'Not set',
-                age: meta.age || null,
-                height: meta.height || null,
-                weight: meta.weight || null,
-                gender: meta.gender || null,
-                role: meta.role || 'student',
-            };
-            console.log('[_ensureUserExists] User missing, inserting:', userRow);
-            const { data: insertData, error: insertErr } = await supabase.from('users').insert([userRow]).select();
-            console.log('[_ensureUserExists] INSERT result:', { insertData, insertErr });
-            if (insertErr) {
-                console.error('[_ensureUserExists] User profile creation FAILED:', insertErr);
-                throw new Error('User profile could not be created: ' + insertErr.message);
-            }
-            console.log('[_ensureUserExists] User profile created successfully');
-        } else {
-            console.log('[_ensureUserExists] User already exists, OK');
-        }
+    get supabase() {
+        return supabase;
     }
 
     // User-specific
@@ -60,62 +21,80 @@ class Database {
 
     // Food logs
     async getFoodLogs(userId) {
-        // userId parameter might not be strictly needed if using RLS, but passing it for the query
-        const { data, error } = await supabase.from('food_logs').select('*').eq('user_id', userId).order('date', { ascending: false });
+        // userId parameter might not be strictly needed if using RLS, but passing it for query
+        const { data, error } = await supabase
+            .from('food_logs')
+            .select('*')
+            .eq('user_id', userId)
+            .order('date', { ascending: false });
         if (error) { console.error(error); return []; }
-        // Supabase returns dates as strings, let's format if needed, but for now just return
-        return data.map(log => ({ ...log, mealType: log.meal_type, foodName: log.food_name, isVeg: log.is_veg }));
+        return (data || []).map((row) => ({
+            ...row,
+            mealType: row.mealType ?? row.meal_type,
+            foodName: row.foodName ?? row.food_name,
+            isVeg: row.isVeg ?? row.is_veg,
+        }));
     }
 
     async addFoodLog(log) {
-        try {
-            console.log('Adding food log:', log);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
 
-            // Insert with basic fields only - avoid nutrition fields for now
-            const basicLog = {
-                user_id: log.userId,
-                meal_type: log.mealType,
-                food_name: log.foodName,
-                calories: log.calories,
-                protein: log.protein,
-                carbs: log.carbs,
-                fat: log.fat,
-                is_veg: log.isVeg,
-                date: log.date,
-            };
+        const insertLog = { ...log };
+        if (insertLog.userId && !insertLog.user_id) insertLog.user_id = insertLog.userId;
+        if (insertLog.mealType && !insertLog.meal_type) insertLog.meal_type = insertLog.mealType;
+        if (insertLog.foodName && !insertLog.food_name) insertLog.food_name = insertLog.foodName;
+        if (typeof insertLog.isVeg !== 'undefined' && typeof insertLog.is_veg === 'undefined') insertLog.is_veg = insertLog.isVeg;
 
-            console.log('Inserting basic log:', basicLog);
+        insertLog.user_id = user.id;
 
-            // FIX FK EXCEPTION: Ensure user exists in the 'users' table before inserting the log
-            await this._ensureUserExists(log.userId);
+        delete insertLog.userId;
+        delete insertLog.mealType;
+        delete insertLog.foodName;
+        delete insertLog.isVeg;
+        delete insertLog.id;
 
+        // Check if entry exists - if so, update instead of insert
+        const { data: existing } = await supabase
+            .from('food_logs')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('date', insertLog.date)
+            .eq('meal_type', insertLog.meal_type)
+            .eq('food_name', insertLog.food_name)
+            .single();
+
+        if (existing) {
+            // Update existing entry
             const { data, error } = await supabase
                 .from('food_logs')
-                .insert([basicLog])
-                .select()
+                .update(insertLog)
+                .eq('id', existing.id)
+                .select('*')
                 .single();
-
-            if (error) {
-                console.error('Database insert error:', error);
-                throw error;
-            }
-
-            console.log('Successfully inserted food log:', data);
-
-            // Return formatted data
+            if (error) { console.error(error); throw error; }
             return {
                 ...data,
-                mealType: data.meal_type,
-                foodName: data.food_name,
-                isVeg: data.is_veg
+                mealType: data.mealType ?? data.meal_type,
+                foodName: data.foodName ?? data.food_name,
+                isVeg: data.isVeg ?? data.is_veg,
             };
-
-        } catch (error) {
-            console.error('Database operation error:', error);
-            throw error;
         }
-    }
 
+        // Insert new entry
+        const { data, error } = await supabase
+            .from('food_logs')
+            .insert([insertLog])
+            .select('*')
+            .single();
+        if (error) { console.error(error); throw error; }
+        return {
+            ...data,
+            mealType: data.mealType ?? data.meal_type,
+            foodName: data.foodName ?? data.food_name,
+            isVeg: data.isVeg ?? data.is_veg,
+        };
+    }
     async deleteFoodLog(id) {
         const { error } = await supabase.from('food_logs').delete().eq('id', id);
         if (error) { console.error(error); throw error; }
@@ -126,36 +105,65 @@ class Database {
         return this.getFoodLogs(user?.id);
     }
 
+    async getAllFoodLogsAdmin() {
+        const { data, error } = await supabase
+            .from('food_logs')
+            .select('*')
+            .order('date', { ascending: false });
+        if (error) { console.error(error); return []; }
+        return (data || []).map((row) => ({
+            ...row,
+            mealType: row.mealType ?? row.meal_type,
+            foodName: row.foodName ?? row.food_name,
+            isVeg: row.isVeg ?? row.is_veg,
+        }));
+    }
+
+    async getAllActivitiesAdmin() {
+        const { data, error } = await supabase
+            .from('activities')
+            .select('*')
+            .order('date', { ascending: false });
+        if (error) { console.error(error); return []; }
+        return (data || []).map(act => ({ ...act, caloriesBurned: act.calories_burned }));
+    }
+
+    async getAllMoodLogsAdmin() {
+        const { data, error } = await supabase
+            .from('mood_logs')
+            .select('*')
+            .order('date', { ascending: false });
+        if (error) { console.error(error); return []; }
+        return data || [];
+    }
+
     // Activities
     async getActivities(userId) {
         const { data, error } = await supabase.from('activities').select('*').eq('user_id', userId).order('date', { ascending: false });
         if (error) { console.error(error); return []; }
         return data.map(act => ({ ...act, caloriesBurned: act.calories_burned }));
     }
+    async addActivity(log) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
 
-    async addActivity(activity) {
-        const insertAct = {
-            ...activity,
-            user_id: activity.userId,
-            calories_burned: activity.caloriesBurned
-        };
-        delete insertAct.userId;
-        delete insertAct.caloriesBurned;
-        delete insertAct.id;
-
-        await this._ensureUserExists(insertAct.user_id);
-
-        const { data, error } = await supabase.from('activities').insert([insertAct]).select().single();
+        const insertLog = { ...log, user_id: user.id };
+        // Map camelCase to snake_case for DB columns
+        if (insertLog.caloriesBurned !== undefined && insertLog.calories_burned === undefined) {
+            insertLog.calories_burned = insertLog.caloriesBurned;
+        }
+        delete insertLog.userId;
+        delete insertLog.caloriesBurned;
+        delete insertLog.id;
+        const { data, error } = await supabase.from('activities').insert([insertLog]).select().single();
         if (error) { console.error(error); throw error; }
         return { ...data, caloriesBurned: data.calories_burned };
     }
-
     async deleteActivity(id) {
         const { error } = await supabase.from('activities').delete().eq('id', id);
         if (error) { console.error(error); throw error; }
         return { message: 'Deleted' };
     }
-
     async getAllActivities() {
         const { data: { user } } = await supabase.auth.getUser();
         return this.getActivities(user?.id);
@@ -167,25 +175,22 @@ class Database {
         if (error) { console.error(error); return []; }
         return data;
     }
-
     async addMoodLog(log) {
-        const insertLog = { ...log, user_id: log.userId };
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const insertLog = { ...log, user_id: user.id };
         delete insertLog.userId;
         delete insertLog.id;
-
-        await this._ensureUserExists(insertLog.user_id);
-
         const { data, error } = await supabase.from('mood_logs').insert([insertLog]).select().single();
         if (error) { console.error(error); throw error; }
         return data;
     }
-
     async deleteMoodLog(id) {
         const { error } = await supabase.from('mood_logs').delete().eq('id', id);
         if (error) { console.error(error); throw error; }
         return { message: 'Deleted' };
     }
-
     async getAllMoodLogs() {
         const { data: { user } } = await supabase.auth.getUser();
         return this.getMoodLogs(user?.id);
@@ -197,39 +202,41 @@ class Database {
         if (error) { console.error(error); return []; }
         return data;
     }
+    async addJournal(log) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
 
-    async addJournal(journal) {
-        const insertJ = { ...journal, user_id: journal.userId };
-        delete insertJ.userId;
-        delete insertJ.id;
-
-        await this._ensureUserExists(insertJ.user_id);
-
-        const { data, error } = await supabase.from('journals').insert([insertJ]).select().single();
+        const insertLog = { ...log, user_id: user.id };
+        delete insertLog.userId;
+        delete insertLog.id;
+        const { data, error } = await supabase.from('journals').insert([insertLog]).select().single();
         if (error) { console.error(error); throw error; }
         return data;
     }
-
-    async updateJournal(id, updates) {
-        const { data, error } = await supabase.from('journals').update(updates).eq('id', id).select().single();
-        if (error) { console.error(error); throw error; }
-        return data;
-    }
-
     async deleteJournal(id) {
         const { error } = await supabase.from('journals').delete().eq('id', id);
         if (error) { console.error(error); throw error; }
         return { message: 'Deleted' };
     }
+    async getAllJournals() {
+        const { data: { user } } = await supabase.auth.getUser();
+        return this.getJournals(user?.id);
+    }
 
     // Environmental data
     async getEnvData() {
-        // Will rely on the old seeded logic as Supabase mapping for env might be overkill
+        // Will rely on old seeded logic as Supabase mapping for env might be overkill
         // If needed in the future, can create table
         return [];
     }
-    async addEnvData(data) {
-        return null;
+
+    async addEnvData(log) {
+        const insertLog = { ...log };
+        delete insertLog.userId;
+        delete insertLog.id;
+        const { data, error } = await supabase.from('environmental_data').insert([insertLog]).select().single();
+        if (error) { console.error(error); throw error; }
+        return data;
     }
 
     // Wellness circles
@@ -238,36 +245,17 @@ class Database {
         if (error) { console.error(error); return []; }
         return data.map(wc => ({ ...wc, maxParticipants: wc.max_participants }));
     }
-
-    async addWellnessCircle(circle) {
-        const insertC = { ...circle, max_participants: circle.maxParticipants, created_by: circle.createdBy };
-        delete insertC.maxParticipants;
-        delete insertC.createdBy;
-        delete insertC.id;
-
-        const { data, error } = await supabase.from('wellness_circles').insert([insertC]).select().single();
+    async addWellnessCircle(log) {
+        const { data, error } = await supabase.from('wellness_circles').insert([log]).select().single();
         if (error) { console.error(error); throw error; }
-        return { ...data, maxParticipants: data.max_participants };
+        return data;
+    }
+    async deleteWellnessCircle(id) {
+        const { error } = await supabase.from('wellness_circles').delete().eq('id', id);
+        if (error) { console.error(error); throw error; }
+        return { message: 'Deleted' };
     }
 
-    async joinWellnessCircle(id) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("Not logged in");
-
-        const { data, error } = await supabase.from('circle_participants').insert([{
-            circle_id: id,
-            user_id: user.id
-        }]);
-
-        if (error) { console.error(error); throw error; }
-        return { message: "Joined successfully" };
-    }
-
-    // Seeded flag
-    async isSeeded() { return true; }
-    async markSeeded() { }
-
-    // Clear all data
     async clearAll() { }
 
     // Campus Analytics
@@ -278,14 +266,39 @@ class Database {
     // College Leaderboard
     async getLeaderboard(college) {
         if (!college) return [];
+        console.log('🏆 DEBUG: Getting leaderboard for college:', `"${college}"`);
         try {
-            // Fetch all users from the same college
-            const { data: users, error } = await supabase
+            // First try exact match
+            let { data: users, error } = await supabase
                 .from('users')
                 .select('id, name, college, height, weight, age, gender')
                 .eq('college', college);
 
-            if (error || !users) {
+            // If no users found, try case-insensitive search
+            if (!users || users.length === 0) {
+                console.log('🏆 DEBUG: No exact match, trying case-insensitive search');
+                console.log('🏆 DEBUG: Original query error:', error);
+                const { data: allUsers, error: allUsersError } = await supabase
+                    .from('users')
+                    .select('id, name, college, height, weight, age, gender');
+
+                console.log('🏆 DEBUG: All users query error:', allUsersError);
+                console.log('🏆 DEBUG: ALL users in database:', allUsers?.length || 0);
+                console.log('🏆 DEBUG: ALL college names in database:', allUsers?.map(u => `"${u.college}"`));
+
+                if (allUsers) {
+                    users = allUsers.filter(u =>
+                        u.college && u.college.toLowerCase().trim() === college.toLowerCase().trim()
+                    );
+                    console.log('🏆 DEBUG: Filtered users from all users:', users?.length || 0);
+                    console.log('🏆 DEBUG: Matching users:', users?.map(u => ({ name: u.name, college: `"${u.college}"` })));
+                }
+            }
+
+            console.log('🏆 DEBUG: Final users found:', users?.length || 0);
+            console.log('🏆 DEBUG: User colleges:', users?.map(u => `"${u.college}"`));
+
+            if (error) {
                 console.error('Leaderboard fetch error:', error);
                 return [];
             }
@@ -343,8 +356,202 @@ class Database {
             return [];
         }
     }
+
+    // Daily Wellness Logs (Database)
+    async getDailyWellnessLog(date) {
+        try {
+            // Get current user
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                console.log('🧠 [Wellness] No user found for daily wellness log');
+                return null;
+            }
+
+            // Get wellness logs from database
+            const { data, error } = await supabase
+                .from('user_wellness_data')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('date', date);
+
+            if (error) {
+                console.error('getDailyWellnessLog error:', error);
+                return null;
+            }
+
+            return data.length > 0 ? data[0] : null;
+        } catch (e) {
+            console.error('getDailyWellnessLog error:', e);
+            return null;
+        }
+    }
+
+    async saveDailyWellnessLog(log) {
+        try {
+            console.log('🧠 [DEBUG] saveDailyWellnessLog called with:', JSON.stringify(log, null, 2));
+
+            // Get current user
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                throw new Error('User not authenticated');
+            }
+
+            // Validate log object exists
+            if (!log || typeof log !== 'object') {
+                console.error('🧠 [ERROR] Invalid log object:', log);
+                throw new Error('Invalid log object provided');
+            }
+
+            // Save to database with proper date constraint (one entry per day)
+            const date = (log.date || new Date().toISOString().split('T')[0]); // YYYY-MM-DD format
+            console.log('🧠 [DEBUG] Wellness date:', date);
+
+            // First check if entry exists for today
+            const { data: existingRecords, error: checkError } = await supabase
+                .from('user_wellness_data')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('date', date);
+
+            if (checkError) {
+                console.error('🧠 [ERROR] Check existing records error:', checkError);
+                throw checkError;
+            }
+
+            console.log('🧠 [DEBUG] Existing records:', existingRecords);
+
+            const payload = {
+                user_id: user.id,
+                date,
+                sleep_hrs: typeof log.sleepHrs !== 'undefined' ? log.sleepHrs : log.sleep_hrs,
+                walked_km: typeof log.walkedKm !== 'undefined' ? log.walkedKm : log.walked_km,
+                stress_level: typeof log.stressLevel !== 'undefined' ? log.stressLevel : log.stress_level,
+                productivity: typeof log.productivity !== 'undefined' ? log.productivity : null,
+                created_at: new Date().toISOString(),
+            };
+
+            console.log('🧠 [DEBUG] Wellness payload:', payload);
+
+            let result;
+            if (existingRecords && existingRecords.length > 0) {
+                console.log('🧠 [DEBUG] Updating existing record:', existingRecords[0].id);
+                const { data: updateData, error: updateError } = await supabase
+                    .from('user_wellness_data')
+                    .update(payload)
+                    .eq('id', existingRecords[0].id)
+                    .eq('user_id', user.id)
+                    .select()
+                    .single();
+                if (updateError) {
+                    console.error('saveDailyWellnessLog update error:', updateError);
+                    throw updateError;
+                }
+                result = updateData;
+            } else {
+                console.log('🧠 [DEBUG] Inserting new record');
+                const { data: insertedData, error: insertError } = await supabase
+                    .from('user_wellness_data')
+                    .insert([payload])
+                    .select()
+                    .single();
+                if (insertError) {
+                    console.error('saveDailyWellnessLog insert error:', insertError);
+                    throw insertError;
+                }
+                result = insertedData;
+            }
+
+            console.log(`🧠 [Wellness] Saved wellness log for user ${user.id}`);
+            return result;
+        } catch (e) {
+            console.error('saveDailyWellnessLog error:', e);
+            console.error('🧠 [ERROR] Stack trace:', e.stack);
+            throw e;
+        }
+    }
+
+    async getWellnessHistory(days = 7, userId = null) {
+        try {
+            // Get current user if userId not provided
+            if (!userId) {
+                const { data: { user } } = await supabase.auth.getUser();
+                userId = user?.id;
+            }
+
+            // Get wellness logs from database filtered by user with flexible column selection
+            const { data, error } = await supabase
+                .from('user_wellness_data')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('getWellnessHistory error:', error);
+                return [];
+            }
+
+            // Get activities for the user to calculate steps
+            const { data: activities } = await supabase
+                .from('activities')
+                .select('*')
+                .eq('user_id', userId)
+                .order('date', { ascending: false });
+
+            // Get mood logs for screen time estimates
+            const { data: moodLogs } = await supabase
+                .from('mood_logs')
+                .select('*')
+                .eq('user_id', userId)
+                .order('date', { ascending: false });
+
+            // Create a map of activities by date
+            const activitiesByDate = {};
+            (activities || []).forEach(act => {
+                const dateKey = act.date || act.created_at?.split('T')[0];
+                if (!activitiesByDate[dateKey]) activitiesByDate[dateKey] = { steps: 0, duration: 0 };
+                activitiesByDate[dateKey].steps += act.steps || 0;
+                activitiesByDate[dateKey].duration += act.duration || 0;
+            });
+
+            // Create a map of mood by date (for screen time estimates)
+            const moodByDate = {};
+            (moodLogs || []).forEach(mood => {
+                const dateKey = mood.date || mood.created_at?.split('T')[0];
+                moodByDate[dateKey] = mood;
+            });
+
+            // Normalize data for frontend consumption and AI service
+            const normalizedData = data.map(record => {
+                const dateKey = record.date || record.created_at?.split('T')[0];
+                const dayActivities = activitiesByDate[dateKey] || {};
+                const dayMood = moodByDate[dateKey] || {};
+
+                return {
+                    ...record,
+                    // Map possible column variations to standard names
+                    date: dateKey,
+                    sleepHrs: record.sleepHrs || record.sleep_hrs || 0,
+                    walkedKm: record.walkedKm || record.walked_km || 0,
+                    stressLevel: record.stressLevel || record.stress_level || 5,
+                    productivity: record.productivity || dayMood.productivity || 50,
+                    // Convert walked_km to approximate steps (1 km ≈ 1250 steps)
+                    steps: Math.round((dayActivities.steps || record.walked_km * 1250 || 0)),
+                    // Estimate screen time from mood if not available (using typical student values)
+                    screenTimeHrs: dayMood.screen_time || 6, // Default 6 hours for students
+                };
+            });
+
+            console.log(`🧠 [Wellness] Found ${normalizedData.length} wellness records for user ${userId}`);
+            console.log(`🧠 [Wellness] Sample record:`, normalizedData[0]);
+
+            // Sort by date and limit
+            return normalizedData.slice(0, days);
+        } catch (e) {
+            console.error('getWellnessHistory error:', e);
+            return [];
+        }
+    }
 }
 
 export const db = new Database();
-export const KEYS = {};
 export default db;

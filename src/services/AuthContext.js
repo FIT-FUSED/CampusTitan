@@ -1,11 +1,6 @@
 // Auth Context for state management
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import authService from '../services/auth';
-import db from '../services/database';
-import {
-    SAMPLE_USERS, generateFoodLogs, generateActivities,
-    generateMoodLogs, generateJournals, generateEnvData, WELLNESS_CIRCLES,
-} from '../data/seedData';
 
 const AuthContext = createContext(null);
 
@@ -13,6 +8,7 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isOnboarded, setIsOnboarded] = useState(false);
+    const [roleOverride, setRoleOverride] = useState(null);
 
     useEffect(() => {
         checkAuth();
@@ -63,11 +59,29 @@ export function AuthProvider({ children }) {
         return updated;
     }
 
+    const userRole = roleOverride || (user?.role === 'admin' ? 'admin' : 'student');
+
+    function setUserRoleOverride(nextRole) {
+        // This does not mutate the persisted Supabase role – it only affects
+        // in-app navigation for demo “God Mode” switches.
+        if (nextRole === 'admin' || nextRole === 'student' || nextRole === null) {
+            setRoleOverride(nextRole);
+        }
+    }
+
     return (
         <AuthContext.Provider value={{
-            user, loading, isOnboarded, setIsOnboarded,
-            login, register, logout, updateProfile,
-            isAdmin: authService.isAdmin(user),
+            user,
+            loading,
+            isOnboarded,
+            setIsOnboarded,
+            login,
+            register,
+            logout,
+            updateProfile,
+            userRole,
+            setUserRoleOverride,
+            isAdmin: userRole === 'admin',
         }}>
             {children}
         </AuthContext.Provider>
