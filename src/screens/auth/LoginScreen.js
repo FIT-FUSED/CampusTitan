@@ -11,11 +11,16 @@ import { useAuth } from '../../services/AuthContext';
 
 const { height: H, width: W } = Dimensions.get('window');
 
+// Fixed admin credentials
+const ADMIN_EMAIL = 'admin@campus.edu';
+const ADMIN_PASSWORD = 'campusadmin123';
+
 export default function LoginScreen({ navigation }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const { login } = useAuth();
+    const [isAdminLogin, setIsAdminLogin] = useState(false);
+    const { login, adminLogin } = useAuth();
 
     function showAlert(title, message) {
         console.log(`Alert: ${title} - ${message}`);
@@ -24,14 +29,27 @@ export default function LoginScreen({ navigation }) {
     }
 
     async function handleLogin() {
-        console.log('Login pressed, email:', email, 'password length:', password.length);
+        console.log('Login pressed, email:', email, 'isAdminLogin:', isAdminLogin);
+        
         if (!email || !password) {
             showAlert('Error', 'Please enter email and password');
             return;
         }
+
         setLoading(true);
         try {
-            await login(email.trim().toLowerCase(), password);
+            if (isAdminLogin) {
+                // Check fixed admin credentials
+                if (email.trim().toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+                    await adminLogin();
+                } else {
+                    showAlert('Access Denied', 'Invalid admin credentials');
+                    setLoading(false);
+                    return;
+                }
+            } else {
+                await login(email.trim().toLowerCase(), password);
+            }
         } catch (e) {
             console.error('Login error:', e);
             showAlert('Login Failed', e.message);
@@ -44,9 +62,16 @@ export default function LoginScreen({ navigation }) {
         const demoPass = 'demo123';
         setEmail(demoEmail);
         setPassword(demoPass);
+        if (type === 'admin') {
+            setIsAdminLogin(true);
+        }
         setLoading(true);
         try {
-            await login(demoEmail, demoPass);
+            if (type === 'admin') {
+                await adminLogin();
+            } else {
+                await login(demoEmail, demoPass);
+            }
         } catch (e) {
             showAlert('Login Failed', e.message);
         }
@@ -83,33 +108,53 @@ export default function LoginScreen({ navigation }) {
                 <Text style={s.formTitle}>Welcome back</Text>
                 <Text style={s.formSub}>Sign in to continue</Text>
 
+                {/* Admin Login Checkbox */}
+                <TouchableOpacity 
+                    style={s.adminToggle} 
+                    onPress={() => setIsAdminLogin(!isAdminLogin)}
+                    activeOpacity={0.7}
+                >
+                    <View style={[s.adminCheckbox, isAdminLogin && s.adminCheckboxActive]}>
+                        {isAdminLogin && <Text style={s.adminCheck}>✓</Text>}
+                    </View>
+                    <Text style={s.adminLabel}>Admin Login (Campus Analytics)</Text>
+                </TouchableOpacity>
+
                 <StyledInput
                     label="Email"
                     value={email}
                     onChangeText={setEmail}
-                    placeholder="your.email@campus.edu"
+                    placeholder={isAdminLogin ? "admin@campus.edu" : "your.email@campus.edu"}
                     keyboardType="email-address"
                 />
                 <StyledInput
                     label="Password"
                     value={password}
                     onChangeText={setPassword}
-                    placeholder="Enter your password"
+                    placeholder={isAdminLogin ? "campusadmin123" : "Enter your password"}
                     secureTextEntry
                 />
 
+                {isAdminLogin && (
+                    <View style={s.adminInfo}>
+                        <Text style={s.adminInfoText}>🔐 Admin access: View campus-wide analytics</Text>
+                    </View>
+                )}
+
                 <AnimatedButton
-                    title={loading ? "Signing in..." : "Sign In"}
+                    title={loading ? (isAdminLogin ? "Accessing Admin..." : "Signing in...") : (isAdminLogin ? "Access Admin Dashboard" : "Sign In")}
                     onPress={handleLogin}
                     disabled={loading}
                     style={{ marginTop: SPACING.sm }}
                 />
 
-                <TouchableOpacity style={s.registerLink} onPress={() => navigation.navigate('Register')}>
-                    <Text style={s.registerText}>
-                        Don't have an account? <Text style={s.registerBold}>Sign Up</Text>
-                    </Text>
-                </TouchableOpacity>
+                {!isAdminLogin && (
+                    <TouchableOpacity style={s.registerLink} onPress={() => navigation.navigate('Register')}>
+                        <Text style={s.registerText}>
+                            Don't have an account? <Text style={s.registerBold}>Sign Up</Text>
+                        </Text>
+                    </TouchableOpacity>
+                )}
             </View>
 
             {/* Demo Bar */}
@@ -207,6 +252,54 @@ const s = StyleSheet.create({
         marginBottom: SPACING.xl,
     },
 
+    // Admin toggle
+    adminToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: SPACING.lg,
+        paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.md,
+        backgroundColor: COLORS.surfaceLight,
+        borderRadius: BORDER_RADIUS.md,
+        borderWidth: 1,
+        borderColor: COLORS.glassBorder,
+    },
+    adminCheckbox: {
+        width: 22,
+        height: 22,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: COLORS.glassBorder,
+        marginRight: SPACING.sm,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    adminCheckboxActive: {
+        backgroundColor: COLORS.primary,
+        borderColor: COLORS.primary,
+    },
+    adminCheck: {
+        color: COLORS.textInverse,
+        fontSize: 14,
+        ...FONTS.bold,
+    },
+    adminLabel: {
+        color: COLORS.text,
+        fontSize: FONT_SIZES.md,
+        ...FONTS.medium,
+    },
+    adminInfo: {
+        backgroundColor: COLORS.primary + '15',
+        padding: SPACING.md,
+        borderRadius: BORDER_RADIUS.md,
+        marginBottom: SPACING.md,
+    },
+    adminInfoText: {
+        color: COLORS.primary,
+        fontSize: FONT_SIZES.sm,
+        ...FONTS.medium,
+    },
+
     registerLink: { alignItems: 'center', marginTop: SPACING.xl },
     registerText: { color: COLORS.textSecondary, fontSize: FONT_SIZES.md },
     registerBold: { color: COLORS.primary, ...FONTS.bold },
@@ -234,3 +327,4 @@ const s = StyleSheet.create({
     },
     demoPillText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, ...FONTS.medium },
 });
+

@@ -23,7 +23,12 @@ pids
 *.pid
 *.seed
 *.pid.lock
-
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+**/.env*.local
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov
@@ -59,17 +64,27 @@ jspm_packages/
 # Output of 'npm pack'
 *.tgz
 
+# Migration files
+MIGRATION_INSTRUCTIONS.md
+migration_admin_users_rpc.sql
+migration_analytics_rpc.sql
+migration_fix_unique.sql
+migration_nutrition_goals.sql
+migration_rls_policies.sql
+migration_admin_service_role.sql
+
+
+
 # Yarn Integrity file
 .yarn-integrity
 
 # dotenv environment variables file
-# User requested to push .env, but let's ignore variants
-.env*
-!.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+**/.env*.local
 
 # parcel-bundler cache
 .cache
@@ -136,4 +151,3 @@ __pycache__/
 test_health_summary.py
 test_image.png
 
-.env

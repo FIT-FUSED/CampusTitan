@@ -24,7 +24,7 @@ import {
   BORDER_RADIUS,
   SHADOWS,
 } from "../../theme";
-import { Avatar, SectionHeader } from "../../components/common";
+import { SectionHeader } from "../../components/common";
 import EnvironmentWidget from "../../components/EnvironmentWidget";
 import AIWellnessCoach from "../../components/AIWellnessCoach";
 import CampusZoneRecommender from "../../components/CampusZoneRecommender";
@@ -379,7 +379,7 @@ export default function HomeScreen({ navigation }) {
               )}
             </View>
             <View style={s.heroRight}>
-              <Avatar name={user?.name} color={COLORS.primary} size={56} />
+
               <View style={s.datePill}>
                 <Text style={s.heroDate}>{format(new Date(), "dd MMM")}</Text>
               </View>
@@ -414,7 +414,7 @@ export default function HomeScreen({ navigation }) {
             {/* Decorative elements */}
             <View style={s.quizDecor1} />
             <View style={s.quizDecor2} />
-            
+
             <View style={s.quizContent}>
               <View style={s.quizIconWrap}>
                 <Text style={s.quizEmoji}>{checkInCompleted ? "✅" : "🧠"}</Text>
@@ -818,8 +818,8 @@ export default function HomeScreen({ navigation }) {
                   <Text style={s.bentoLabel}>
                     {todayMood
                       ? ["Bad", "Low", "Okay", "Good", "Great"][
-                          todayMood.mood - 1
-                        ]
+                      todayMood.mood - 1
+                      ]
                       : "No mood"}
                   </Text>
                 </LinearGradient>
@@ -924,7 +924,7 @@ export default function HomeScreen({ navigation }) {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scroll: { paddingTop: Platform.OS === "ios" ? 60 : 40 },
+  scroll: { paddingTop: Platform.OS === "ios" ? 60 : 40, paddingBottom: 140 },
 
   // ─── Hero ───
   hero: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.xl },
@@ -1015,7 +1015,7 @@ const s = StyleSheet.create({
     overflow: "hidden",
     ...SHADOWS.large,
   },
-  quizGradient: { 
+  quizGradient: {
     padding: SPACING.xl,
     minHeight: 100,
     justifyContent: 'center',

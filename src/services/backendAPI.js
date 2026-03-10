@@ -5,12 +5,31 @@ import { Platform } from 'react-native';
 // For physical device testing, use your laptop's local IP address
 // You can find this by running 'ipconfig getifaddr en0' on Mac
 // Updated to use user's actual IP from earlier conversation
-const LOCAL_IP = '10.57.218.69';
+// For physical device testing, use your laptop's local IP address
+// You can find this by running 'ipconfig getifaddr en0' on Mac
+const LOCAL_IP = '10.149.124.163';
 
-const BACKEND_URL =
-  process.env.EXPO_PUBLIC_BACKEND_URL ||
-  process.env.EXPO_PUBLIC_NUTRITION_API_URL ||
-  (Platform.OS === 'web' ? 'http://localhost:5001' : `http://${LOCAL_IP}:5001`);
+// For Android emulator: use 10.0.2.2 to access host localhost
+// For iOS simulator: use localhost
+// For physical device: use actual IP address
+const getBackendUrl = () => {
+  if (process.env.EXPO_PUBLIC_BACKEND_URL) return process.env.EXPO_PUBLIC_BACKEND_URL;
+  if (process.env.EXPO_PUBLIC_NUTRITION_API_URL) return process.env.EXPO_PUBLIC_NUTRITION_API_URL;
+  
+  if (Platform.OS === 'web') return 'http://localhost:5001';
+  
+  // Android emulator accesses host via 10.0.2.2
+  // Physical Android device uses the computer's IP
+  if (Platform.OS === 'android') {
+    console.log('[BackendAPI] Using Android IP:', LOCAL_IP);
+    return `http://${LOCAL_IP}:5001`;
+  }
+  
+  return `http://${LOCAL_IP}:5001`;
+};
+
+const BACKEND_URL = getBackendUrl();
+console.log('[BackendAPI] Backend URL:', BACKEND_URL);
 
 class BackendAPI {
   constructor() {
@@ -87,6 +106,70 @@ class BackendAPI {
       }
       if (error.request) {
         throw new Error('No response from health insights server. Check if it is running.');
+      }
+      throw new Error('Request setup error: ' + error.message);
+    }
+  }
+
+  // Analyze food from text (food name + serving info)
+  async analyzeFoodText(foodName, servingInfo = '') {
+    try {
+      console.log('[BackendAPI] Analyzing food text:', foodName, servingInfo);
+      console.log('[BackendAPI] Full URL:', this.baseURL + '/api/nutrition/analyze-text');
+      
+      const response = await this.axios.post('/api/nutrition/analyze-text', {
+        food_name: foodName,
+        serving_info: servingInfo,
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout: 60000, // 60 second timeout for AI calls
+      });
+
+      console.log('[BackendAPI] Text analysis result:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[BackendAPI] Error analyzing food text:', error.message);
+      console.error('[BackendAPI] Error code:', error.code);
+      console.error('[BackendAPI] Error response:', error.response?.data);
+      if (error.response) {
+        throw new Error(error.response.data?.error || 'Text analysis server error');
+      }
+      if (error.request) {
+        throw new Error('No response from server. Check if backend is running at ' + this.baseURL);
+      }
+      throw new Error('Request setup error: ' + error.message);
+    }
+  }
+
+  // Analyze mess menu image
+  async analyzeMessMenu(imageUri) {
+    try {
+      console.log('[BackendAPI] Analyzing mess menu image...');
+      
+      const formData = new FormData();
+      formData.append('image', {
+        uri: imageUri,
+        type: 'image/jpeg',
+        name: 'mess_menu.jpg',
+      });
+
+      const response = await this.axios.post('/api/nutrition/analyze-mess-menu', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      console.log('[BackendAPI] Mess menu analysis result:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[BackendAPI] Error analyzing mess menu:', error);
+      if (error.response) {
+        throw new Error(error.response.data?.error || 'Mess menu analysis server error');
+      }
+      if (error.request) {
+        throw new Error('No response from server. Check if backend is running.');
       }
       throw new Error('Request setup error: ' + error.message);
     }

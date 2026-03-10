@@ -58,7 +58,7 @@ export default function EnvironmentScreen({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <Header title="Environment" subtitle="Campus conditions" onBack={() => navigation.goBack()} />
+            <Header title="Environment" subtitle="Campus conditions" onBack={navigation.canGoBack() ? () => navigation.goBack() : null} />
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.content}
