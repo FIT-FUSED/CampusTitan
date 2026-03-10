@@ -210,9 +210,9 @@ const s = StyleSheet.create({
         position: 'absolute', bottom: -4, right: -4,
         width: 22, height: 22, borderRadius: 11,
         alignItems: 'center', justifyContent: 'center',
-        borderWidth: 2, borderColor: COLORS.surface,
+        borderWidth: 2, borderColor: COLORS.background,
     },
-    podiumBadgeText: { color: COLORS.textInverse, fontSize: 10, ...FONTS.extraBold },
+    podiumBadgeText: { color: COLORS.background, fontSize: 10, ...FONTS.extraBold },
     podiumName: { color: COLORS.text, fontSize: FONT_SIZES.sm, ...FONTS.bold, marginBottom: 2 },
     podiumScore: { color: COLORS.textMuted, fontSize: 10, ...FONTS.semiBold, marginBottom: SPACING.sm },
     podiumBar: {
@@ -233,9 +233,8 @@ const s = StyleSheet.create({
         backgroundColor: COLORS.surface, marginHorizontal: SPACING.lg, marginBottom: SPACING.sm,
         borderRadius: BORDER_RADIUS.lg, padding: SPACING.md,
         borderWidth: 1, borderColor: COLORS.glassBorder,
-        ...SHADOWS.small,
     },
-    rowCardMe: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '08' },
+    rowCardMe: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '10' },
     rowRank: {
         width: 30, color: COLORS.textMuted, fontSize: FONT_SIZES.md, ...FONTS.bold, textAlign: 'center',
     },

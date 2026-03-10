@@ -1,9 +1,50 @@
 import { supabase } from './supabase';
-import axios from 'axios';
-import config from './config';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 class Database {
+    // Ensure user profile exists in public users table (prevents FK violations)
+    async _ensureUserExists(userId) {
+        console.log('[_ensureUserExists] Checking user:', userId);
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser || authUser.id !== userId) {
+            console.log('[_ensureUserExists] Auth user mismatch or missing, skipping');
+            return;
+        }
+
+        const { data: existingUser, error: selectErr } = await supabase
+            .from('users')
+            .select('id')
+            .eq('id', userId)
+            .maybeSingle();
+
+        console.log('[_ensureUserExists] SELECT result:', { existingUser, selectErr });
+
+        if (!existingUser) {
+            const meta = authUser.user_metadata || {};
+            // Include all user profile columns
+            const userRow = {
+                id: userId,
+                email: authUser.email,
+                name: meta.name || authUser.email?.split('@')[0] || 'User',
+                college: meta.college || 'Not set',
+                age: meta.age || null,
+                height: meta.height || null,
+                weight: meta.weight || null,
+                gender: meta.gender || null,
+                role: meta.role || 'student',
+            };
+            console.log('[_ensureUserExists] User missing, inserting:', userRow);
+            const { data: insertData, error: insertErr } = await supabase.from('users').insert([userRow]).select();
+            console.log('[_ensureUserExists] INSERT result:', { insertData, insertErr });
+            if (insertErr) {
+                console.error('[_ensureUserExists] User profile creation FAILED:', insertErr);
+                throw new Error('User profile could not be created: ' + insertErr.message);
+            }
+            console.log('[_ensureUserExists] User profile created successfully');
+        } else {
+            console.log('[_ensureUserExists] User already exists, OK');
+        }
+    }
+
     // User-specific
     async getUsers() {
         const { data, error } = await supabase.from('users').select('*');
@@ -17,42 +58,6 @@ class Database {
         return data;
     }
 
-    // Wellness Model Data
-    async saveWellnessData(userId, dataDict) {
-        const insertObj = {
-            user_id: userId,
-            ...dataDict
-        };
-        const { data, error } = await supabase.from('user_wellness_data').insert([insertObj]).select().single();
-        if (error) {
-            console.error('saveWellnessData error:', error);
-            throw error;
-        }
-        return data;
-    }
-
-    async predictWellness(metrics) {
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const url = `${config.BASE_URL}/wellness/predict`;
-            console.log('>>> predictWellness URL:', url);
-            console.log('>>> Session exists:', !!session);
-            console.log('>>> Token preview:', session?.access_token ? session.access_token.slice(0, 30) + '...' : 'none');
-            console.log('>>> Metrics keys:', Object.keys(metrics));
-            const response = await axios.post(url, metrics, {
-                headers: {
-                    Authorization: `Bearer ${session?.access_token}`
-                }
-            });
-            console.log('>>> predictWellness response status:', response.status);
-            return response.data;
-        } catch (error) {
-            console.error('>>> predictWellness error:', error.response?.data || error.message);
-            console.error('>>> Full axios error:', error);
-            throw error;
-        }
-    }
-
     // Food logs
     async getFoodLogs(userId) {
         // userId parameter might not be strictly needed if using RLS, but passing it for the query
@@ -63,22 +68,52 @@ class Database {
     }
 
     async addFoodLog(log) {
-        const insertLog = {
-            ...log,
-            user_id: log.userId,
-            meal_type: log.mealType,
-            food_name: log.foodName,
-            is_veg: log.isVeg
-        };
-        delete insertLog.userId;
-        delete insertLog.mealType;
-        delete insertLog.foodName;
-        delete insertLog.isVeg;
-        delete insertLog.id; // Supabase generates ID
+        try {
+            console.log('Adding food log:', log);
 
-        const { data, error } = await supabase.from('food_logs').insert([insertLog]).select().single();
-        if (error) { console.error(error); throw error; }
-        return { ...data, mealType: data.meal_type, foodName: data.food_name, isVeg: data.is_veg };
+            // Insert with basic fields only - avoid nutrition fields for now
+            const basicLog = {
+                user_id: log.userId,
+                meal_type: log.mealType,
+                food_name: log.foodName,
+                calories: log.calories,
+                protein: log.protein,
+                carbs: log.carbs,
+                fat: log.fat,
+                is_veg: log.isVeg,
+                date: log.date,
+            };
+
+            console.log('Inserting basic log:', basicLog);
+
+            // FIX FK EXCEPTION: Ensure user exists in the 'users' table before inserting the log
+            await this._ensureUserExists(log.userId);
+
+            const { data, error } = await supabase
+                .from('food_logs')
+                .insert([basicLog])
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Database insert error:', error);
+                throw error;
+            }
+
+            console.log('Successfully inserted food log:', data);
+
+            // Return formatted data
+            return {
+                ...data,
+                mealType: data.meal_type,
+                foodName: data.food_name,
+                isVeg: data.is_veg
+            };
+
+        } catch (error) {
+            console.error('Database operation error:', error);
+            throw error;
+        }
     }
 
     async deleteFoodLog(id) {
@@ -108,6 +143,8 @@ class Database {
         delete insertAct.caloriesBurned;
         delete insertAct.id;
 
+        await this._ensureUserExists(insertAct.user_id);
+
         const { data, error } = await supabase.from('activities').insert([insertAct]).select().single();
         if (error) { console.error(error); throw error; }
         return { ...data, caloriesBurned: data.calories_burned };
@@ -136,6 +173,8 @@ class Database {
         delete insertLog.userId;
         delete insertLog.id;
 
+        await this._ensureUserExists(insertLog.user_id);
+
         const { data, error } = await supabase.from('mood_logs').insert([insertLog]).select().single();
         if (error) { console.error(error); throw error; }
         return data;
@@ -163,6 +202,8 @@ class Database {
         const insertJ = { ...journal, user_id: journal.userId };
         delete insertJ.userId;
         delete insertJ.id;
+
+        await this._ensureUserExists(insertJ.user_id);
 
         const { data, error } = await supabase.from('journals').insert([insertJ]).select().single();
         if (error) { console.error(error); throw error; }
@@ -299,52 +340,6 @@ class Database {
             return scored;
         } catch (e) {
             console.error('Leaderboard error:', e);
-            return [];
-        }
-    }
-
-    // Daily Wellness Logs (Local Storage)
-    async getDailyWellnessLog(date) {
-        try {
-            const logs = await AsyncStorage.getItem('@daily_wellness_logs');
-            if (!logs) return null;
-            const parsed = JSON.parse(logs);
-            return parsed.find(l => l.date === date);
-        } catch (e) {
-            console.error('getDailyWellnessLog error:', e);
-            return null;
-        }
-    }
-
-    async saveDailyWellnessLog(log) {
-        try {
-            const logsStr = await AsyncStorage.getItem('@daily_wellness_logs');
-            let logs = logsStr ? JSON.parse(logsStr) : [];
-            // Update existing or add new
-            const existingIndex = logs.findIndex(l => l.date === log.date);
-            if (existingIndex >= 0) {
-                logs[existingIndex] = { ...logs[existingIndex], ...log };
-            } else {
-                logs.push(log);
-            }
-            await AsyncStorage.setItem('@daily_wellness_logs', JSON.stringify(logs));
-            return log;
-        } catch (e) {
-            console.error('saveDailyWellnessLog error:', e);
-            throw e;
-        }
-    }
-
-    async getWellnessHistory(days = 7) {
-        try {
-            const logsStr = await AsyncStorage.getItem('@daily_wellness_logs');
-            if (!logsStr) return [];
-            const logs = JSON.parse(logsStr);
-            // Sort by date descending
-            logs.sort((a, b) => new Date(b.date) - new Date(a.date));
-            return logs.slice(0, days);
-        } catch (e) {
-            console.error('getWellnessHistory error:', e);
             return [];
         }
     }

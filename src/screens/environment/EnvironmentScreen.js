@@ -2,7 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, RefreshControl, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS } from '../../theme';
+import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS } from '../../theme';
 import { Header, GradientCard, SectionHeader, ProgressBar } from '../../components/common';
 import { useFocusEffect } from '@react-navigation/native';
 import db from '../../services/database';
@@ -171,13 +171,12 @@ const styles = StyleSheet.create({
     content: { paddingBottom: SPACING.huge },
     recoCard: { marginHorizontal: SPACING.lg, alignItems: 'center', paddingVertical: SPACING.xxl },
     recoEmoji: { fontSize: 48, marginBottom: SPACING.md },
-    recoTitle: { color: COLORS.textInverse, fontSize: FONT_SIZES.lg, ...FONTS.bold, marginBottom: SPACING.sm },
-    recoText: { color: COLORS.textInverse, fontSize: FONT_SIZES.md, textAlign: 'center', opacity: 0.9, lineHeight: 22 },
+    recoTitle: { color: COLORS.text, fontSize: FONT_SIZES.lg, ...FONTS.bold, marginBottom: SPACING.sm },
+    recoText: { color: COLORS.text, fontSize: FONT_SIZES.md, textAlign: 'center', opacity: 0.9, lineHeight: 22 },
     aqiCard: {
         marginHorizontal: SPACING.lg, backgroundColor: COLORS.surface,
         borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg,
         borderWidth: 1, borderColor: COLORS.glassBorder,
-        ...SHADOWS.small,
     },
     aqiGauge: { alignItems: 'center', marginBottom: SPACING.lg },
     aqiValue: { fontSize: FONT_SIZES.mega, ...FONTS.extraBold },
@@ -194,7 +193,6 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.md,
         padding: SPACING.md, alignItems: 'center',
         borderWidth: 1, borderColor: COLORS.glassBorder,
-        ...SHADOWS.small,
     },
     weatherEmoji: { fontSize: 24, marginBottom: SPACING.sm },
     weatherValue: { fontSize: FONT_SIZES.lg, ...FONTS.bold },
@@ -203,7 +201,6 @@ const styles = StyleSheet.create({
         marginHorizontal: SPACING.lg, backgroundColor: COLORS.surface,
         borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg,
         borderWidth: 1, borderColor: COLORS.glassBorder,
-        ...SHADOWS.small,
     },
     crowdOverall: { alignItems: 'center', marginBottom: SPACING.lg, paddingBottom: SPACING.lg, borderBottomWidth: 1, borderBottomColor: COLORS.glassBorder },
     crowdEmoji: { fontSize: 32, marginBottom: SPACING.sm },
@@ -218,7 +215,6 @@ const styles = StyleSheet.create({
         marginHorizontal: SPACING.lg, backgroundColor: COLORS.surface,
         padding: SPACING.lg, paddingBottom: SPACING.sm,
         borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.glassBorder, height: 130,
-        ...SHADOWS.small,
     },
     trendBar: { alignItems: 'center' },
     trendValue: { fontSize: 9, marginBottom: 4, ...FONTS.bold },

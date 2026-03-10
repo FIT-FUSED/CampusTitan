@@ -17,6 +17,7 @@ import OnboardingScreen from '../screens/auth/OnboardingScreen';
 
 // Main screens
 import HomeScreen from '../screens/home/HomeScreen';
+import HealthSummaryScreen from '../screens/home/HealthSummaryScreen';
 import NutritionScreen from '../screens/nutrition/NutritionScreen';
 import FoodLogScreen from '../screens/nutrition/FoodLogScreen';
 import FoodScannerScreen from '../screens/nutrition/FoodScannerScreen';
@@ -33,9 +34,6 @@ import ProfileScreen from '../screens/profile/ProfileScreen';
 import SettingsScreen from '../screens/profile/SettingsScreen';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import LeaderboardScreen from '../screens/leaderboard/LeaderboardScreen';
-import WellnessQuizScreen from '../screens/wellness/WellnessQuizScreen';
-import DailyJournalScreen from '../screens/wellness/DailyJournalScreen';
-import DailyWellnessCheckInScreen from '../screens/wellness/DailyWellnessCheckInScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -102,6 +100,7 @@ function HomeStack() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="HomeMain" component={HomeScreen} />
+            <Stack.Screen name="HealthSummary" component={HealthSummaryScreen} />
         </Stack.Navigator>
     );
 }
@@ -133,8 +132,6 @@ function WellnessStack() {
             <Stack.Screen name="Journal" component={JournalScreen} />
             <Stack.Screen name="JournalEntry" component={JournalEntryScreen} />
             <Stack.Screen name="WellnessCircle" component={WellnessCircleScreen} />
-            <Stack.Screen name="DailyJournal" component={DailyJournalScreen} />
-            <Stack.Screen name="DailyWellnessCheckIn" component={DailyWellnessCheckInScreen} />
         </Stack.Navigator>
     );
 }
@@ -219,10 +216,7 @@ export default function AppNavigator() {
                         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
                     )
                 ) : (
-                    <>
-                        <Stack.Screen name="MainApp" component={HomeTabs} />
-                        <Stack.Screen name="WellnessQuiz" component={WellnessQuizScreen} />
-                    </>
+                    <Stack.Screen name="MainApp" component={HomeTabs} />
                 )}
             </Stack.Navigator>
         </NavigationContainer>

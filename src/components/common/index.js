@@ -89,31 +89,21 @@ export function AnimatedButton({ title, onPress, gradient, style, textStyle, dis
 }
 
 // Header
-export function Header({ title, subtitle, onBack, rightAction, onLongPress }) {
+export function Header({ title, subtitle, onBack, rightAction }) {
     return (
         <View style={styles.header}>
             <View style={styles.headerLeft}>
                 {onBack && (
-                    <TouchableOpacity 
-                        style={styles.backButton} 
-                        onPress={onBack}
-                        delayPressIn={0}
-                    >
+                    <TouchableOpacity onPress={onBack} style={styles.backButton}>
                         <Text style={styles.backIcon}>←</Text>
                     </TouchableOpacity>
                 )}
+                <View>
+                    <Text style={styles.headerTitle}>{title}</Text>
+                    {subtitle && <Text style={styles.headerSubtitle}>{subtitle}</Text>}
+                </View>
             </View>
-            <TouchableOpacity 
-                style={styles.headerCenter} 
-                onLongPress={onLongPress}
-                delayLongPress={2000}
-            >
-                <Text style={styles.headerTitle}>{title}</Text>
-                {subtitle && <Text style={styles.headerSubtitle}>{subtitle}</Text>}
-            </TouchableOpacity>
-            <View style={styles.headerRight}>
-                {rightAction}
-            </View>
+            {rightAction && rightAction}
         </View>
     );
 }
@@ -238,7 +228,7 @@ const styles = StyleSheet.create({
         ...SHADOWS.small,
     },
     statCard: {
-        backgroundColor: COLORS.surface,
+        backgroundColor: 'rgba(26, 26, 26, 0.6)',
         borderRadius: BORDER_RADIUS.md,
         padding: SPACING.lg,
         borderWidth: 1,
@@ -246,7 +236,6 @@ const styles = StyleSheet.create({
         minWidth: (width - SPACING.lg * 3) / 2,
         flex: 1,
         overflow: 'hidden',
-        ...SHADOWS.small,
     },
     statCardHeader: {
         flexDirection: 'row',
@@ -289,9 +278,9 @@ const styles = StyleSheet.create({
         ...SHADOWS.medium,
     },
     buttonText: {
-        color: COLORS.textInverse,
+        color: COLORS.text,
         fontSize: FONT_SIZES.lg,
-        ...FONTS.bold,
+        ...FONTS.semiBold,
     },
     buttonIcon: {
         fontSize: 18,

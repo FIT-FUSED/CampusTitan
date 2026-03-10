@@ -2,11 +2,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS, MEAL_TYPES } from '../../theme';
+import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, MEAL_TYPES } from '../../theme';
 import { GradientCard, SectionHeader, AnimatedButton, ProgressBar, Chip } from '../../components/common';
 import { useAuth } from '../../services/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import db from '../../services/database';
+import nutritionAnalysis from '../../services/nutritionAnalysis';
 import { format, subDays } from 'date-fns';
 
 const { width } = Dimensions.get('window');
@@ -157,7 +158,19 @@ export default function NutritionScreen({ navigation }) {
                                 meals.map((item, i) => (
                                     <View key={i} style={styles.foodItem}>
                                         <View style={[styles.vegDot, { backgroundColor: item.isVeg ? COLORS.success : COLORS.error }]} />
-                                        <Text style={styles.foodName}>{item.foodName}</Text>
+                                        <View style={styles.foodInfo}>
+                                            <Text style={styles.foodName}>{item.foodName}</Text>
+                                            {item.nutrition_score && (
+                                                <View style={styles.nutritionScore}>
+                                                    <Text style={[styles.gradeText, { color: nutritionAnalysis.getGradeColor(item.nutrition_grade) }]}>
+                                                        Grade: {item.nutrition_grade}
+                                                    </Text>
+                                                    <Text style={styles.scoreText}>
+                                                        Score: {Math.round(item.nutrition_score)}
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
                                         <Text style={styles.foodCalories}>{item.calories} kcal</Text>
                                     </View>
                                 ))
@@ -230,7 +243,6 @@ const styles = StyleSheet.create({
     macroCard: {
         flex: 1, backgroundColor: COLORS.surface, padding: SPACING.md,
         borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: COLORS.glassBorder,
-        ...SHADOWS.small,
     },
     macroLabel: { color: COLORS.textSecondary, fontSize: FONT_SIZES.xs, ...FONTS.medium },
     macroValue: { fontSize: FONT_SIZES.xl, ...FONTS.bold, marginTop: SPACING.xs },
@@ -239,7 +251,6 @@ const styles = StyleSheet.create({
         marginHorizontal: SPACING.lg, marginTop: SPACING.lg,
         backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg,
         borderWidth: 1, borderColor: COLORS.glassBorder, padding: SPACING.lg,
-        ...SHADOWS.small,
     },
     mealHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
     mealHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
@@ -253,7 +264,23 @@ const styles = StyleSheet.create({
         paddingVertical: SPACING.sm, borderTopWidth: 1, borderTopColor: COLORS.glassBorder,
     },
     vegDot: { width: 8, height: 8, borderRadius: 4, marginRight: SPACING.md },
-    foodName: { flex: 1, color: COLORS.text, fontSize: FONT_SIZES.md },
+    foodInfo: { flex: 1 },
+    foodName: { color: COLORS.text, fontSize: FONT_SIZES.md },
+    nutritionScore: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: SPACING.xs,
+        gap: SPACING.sm,
+    },
+    gradeText: {
+        fontSize: FONT_SIZES.xs,
+        ...FONTS.semiBold,
+    },
+    scoreText: {
+        fontSize: FONT_SIZES.xs,
+        ...FONTS.medium,
+        color: COLORS.textSecondary,
+    },
     foodCalories: { color: COLORS.textSecondary, fontSize: FONT_SIZES.sm },
     weekChart: {
         flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end',
@@ -261,7 +288,6 @@ const styles = StyleSheet.create({
         padding: SPACING.lg, paddingBottom: SPACING.sm,
         borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.glassBorder,
         height: 140,
-        ...SHADOWS.small,
     },
     weekBar: { alignItems: 'center' },
     weekCalValue: { color: COLORS.textMuted, fontSize: 9, marginBottom: 4 },

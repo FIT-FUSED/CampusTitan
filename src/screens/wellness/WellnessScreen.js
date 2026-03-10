@@ -1,34 +1,19 @@
 // Wellness Screen
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity, RefreshControl, Modal, Dimensions, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS, MOOD_EMOJIS } from '../../theme';
+import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, MOOD_EMOJIS } from '../../theme';
 import { GradientCard, StatCard, SectionHeader, AnimatedButton } from '../../components/common';
 import { useAuth } from '../../services/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import db from '../../services/database';
 import { format, subDays } from 'date-fns';
-import SleepTracker from './SleepTracker';
-import { LineChart } from 'react-native-chart-kit';
-
-const { width } = Dimensions.get('window');
-
-const DetailItem = ({ label, value, color, big }) => (
-    <View style={styles.detailItem}>
-        <Text style={[styles.detailValue, big && { fontSize: 24, color: color || COLORS.text }]}>{value}</Text>
-        <Text style={styles.detailLabel}>{label}</Text>
-    </View>
-);
 
 export default function WellnessScreen({ navigation }) {
     const { user } = useAuth();
     const [moodLogs, setMoodLogs] = useState([]);
     const [journals, setJournals] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
-    
-    // New State for Wellness History
-    const [wellnessHistory, setWellnessHistory] = useState([]);
-    const [selectedLog, setSelectedLog] = useState(null);
 
     const loadData = useCallback(async () => {
         if (!user) return;
@@ -36,27 +21,6 @@ export default function WellnessScreen({ navigation }) {
         setMoodLogs(moods.sort((a, b) => b.date.localeCompare(a.date)));
         const j = await db.getJournals(user.id);
         setJournals(j.sort((a, b) => b.date.localeCompare(a.date)));
-
-        // Load Wellness History
-        const history = await db.getWellnessHistory(7);
-        const historyWithScore = history.map(h => {
-            // Simple score calculation (0-100)
-            // Normalize:
-            // Sleep: 8hrs = 100%
-            const sleepScore = Math.min(100, (h.sleepHrs / 8) * 100);
-            // Walk: 5km = 100%
-            const walkScore = Math.min(100, (h.walkedKm / 5) * 100);
-            // Stress: 1 is best (100%), 10 is worst (0%)
-            const stressScore = (11 - h.stressLevel) * 10;
-            // Productivity: 0-100
-            const prodScore = h.productivity;
-            
-            const score = (sleepScore * 0.25 + walkScore * 0.15 + stressScore * 0.35 + prodScore * 0.25);
-            return { ...h, score: Math.round(score) };
-        });
-        // Sort oldest to newest for chart
-        setWellnessHistory(historyWithScore.sort((a, b) => new Date(a.date) - new Date(b.date)));
-
     }, [user]);
 
     useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
@@ -91,48 +55,6 @@ export default function WellnessScreen({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <Modal
-                visible={!!selectedLog}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setSelectedLog(null)}
-            >
-                <TouchableWithoutFeedback onPress={() => setSelectedLog(null)}>
-                    <View style={styles.modalOverlay}>
-                        <TouchableWithoutFeedback>
-                            <View style={styles.modalContent}>
-                                <Text style={styles.modalTitle}>Daily Snapshot</Text>
-                                <Text style={styles.modalDate}>{selectedLog && format(new Date(selectedLog.date), 'EEEE, MMMM do')}</Text>
-
-                                <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
-                                    <View style={styles.modalGrid}>
-                                        <DetailItem label="Score" value={selectedLog?.score ?? '—'} color={COLORS.primary} big />
-                                        <DetailItem label="Occupation" value={selectedLog?.occupation || '—'} />
-                                        <DetailItem label="Work Mode" value={selectedLog?.workMode || '—'} />
-                                        <DetailItem label="Exercise" value={`${selectedLog?.exerciseMins ?? 0}m`} />
-                                        <DetailItem label="Steps" value={`${selectedLog?.steps ?? 0}`} />
-                                        <DetailItem label="Walked" value={`${selectedLog?.walkedKm ?? 0}km`} />
-                                        <DetailItem label="Sleep" value={`${selectedLog?.sleepHrs ?? 0}h`} />
-                                        <DetailItem label="Screen" value={`${selectedLog?.screenTimeHrs ?? 0}h`} />
-                                        <DetailItem label="Work Screen" value={`${selectedLog?.workScreenHrs ?? 0}h`} />
-                                        <DetailItem label="Leisure Screen" value={`${selectedLog?.leisureScreenHrs ?? 0}h`} />
-                                        <DetailItem label="Social" value={`${selectedLog?.socialHrs ?? 0}h`} />
-                                        <DetailItem label="Sleep Quality" value={`${selectedLog?.sleepQuality ?? '—'}/5`} />
-                                        <DetailItem label="Stress" value={`${selectedLog?.stressLevel ?? '—'}/10`} />
-                                        <DetailItem label="Productivity" value={`${selectedLog?.productivity ?? '—'}/100`} />
-                                        <DetailItem label="Time" value={selectedLog?.timestamp ? format(new Date(selectedLog.timestamp), 'p') : '—'} />
-                                    </View>
-                                </ScrollView>
-
-                                <TouchableOpacity style={styles.closeBtn} onPress={() => setSelectedLog(null)}>
-                                    <Text style={styles.closeBtnText}>Close</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </TouchableWithoutFeedback>
-                    </View>
-                </TouchableWithoutFeedback>
-            </Modal>
-
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
@@ -160,42 +82,6 @@ export default function WellnessScreen({ navigation }) {
                     )}
                 </GradientCard>
 
-                {/* Mental Wellness Score Trend */}
-                <SectionHeader title="Wellness Score Trend" />
-                {wellnessHistory.length > 0 ? (
-                    <View style={styles.chartContainer}>
-                        <LineChart
-                            data={{
-                                labels: wellnessHistory.map(h => format(new Date(h.date), 'dd/MM')),
-                                datasets: [{ data: wellnessHistory.map(h => h.score) }]
-                            }}
-                            width={width - SPACING.lg * 2}
-                            height={220}
-                            chartConfig={{
-                                backgroundColor: COLORS.surface,
-                                backgroundGradientFrom: COLORS.surface,
-                                backgroundGradientTo: COLORS.surface,
-                                decimalPlaces: 0,
-                                color: (opacity = 1) => `rgba(255, 111, 97, ${opacity})`, // COLORS.primary
-                                labelColor: (opacity = 1) => COLORS.textSecondary,
-                                style: { borderRadius: 16 },
-                                propsForDots: { r: "6", strokeWidth: "2", stroke: COLORS.primary }
-                            }}
-                            bezier
-                            style={{ marginVertical: 8, borderRadius: 16 }}
-                            onDataPointClick={({ index }) => setSelectedLog(wellnessHistory[index])}
-                        />
-                        <Text style={styles.chartHint}>Tap a point to view details</Text>
-                    </View>
-                ) : (
-                    <View style={styles.emptyChart}>
-                        <Text style={styles.emptyText}>No wellness data yet. Complete a check-in!</Text>
-                    </View>
-                )}
-
-                {/* Sleep Tracker */}
-                <SleepTracker />
-
                 {/* Quick Actions */}
                 <View style={styles.actions}>
                     <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('MoodLog')}>
@@ -214,12 +100,6 @@ export default function WellnessScreen({ navigation }) {
                         <LinearGradient colors={COLORS.gradientAccent} style={styles.actionGradient}>
                             <Text style={styles.actionEmoji}>🤝</Text>
                             <Text style={styles.actionLabel}>Circles</Text>
-                        </LinearGradient>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('DailyJournal')}>
-                        <LinearGradient colors={COLORS.gradientSunset} style={styles.actionGradient}>
-                            <Text style={styles.actionEmoji}>🧠</Text>
-                            <Text style={styles.actionLabel}>AI Journal</Text>
                         </LinearGradient>
                     </TouchableOpacity>
                 </View>
@@ -290,9 +170,9 @@ const styles = StyleSheet.create({
     moodCard: { marginHorizontal: SPACING.lg },
     todayMood: { flexDirection: 'row', alignItems: 'center' },
     todayMoodEmoji: { fontSize: 48, marginRight: SPACING.lg },
-    todayMoodLabel: { color: COLORS.textInverse, fontSize: FONT_SIZES.sm, opacity: 0.8 },
-    todayMoodText: { color: COLORS.textInverse, fontSize: FONT_SIZES.xxl, ...FONTS.bold },
-    todayMoodNote: { color: COLORS.textInverse, fontSize: FONT_SIZES.sm, opacity: 0.9, marginTop: SPACING.xs },
+    todayMoodLabel: { color: COLORS.text, fontSize: FONT_SIZES.sm, opacity: 0.7 },
+    todayMoodText: { color: COLORS.text, fontSize: FONT_SIZES.xxl, ...FONTS.bold },
+    todayMoodNote: { color: COLORS.text, fontSize: FONT_SIZES.sm, opacity: 0.8, marginTop: SPACING.xs },
     logMoodPrompt: { alignItems: 'center', paddingVertical: SPACING.md },
     logMoodEmoji: { fontSize: 40, marginBottom: SPACING.md },
     logMoodText: { color: COLORS.text, fontSize: FONT_SIZES.lg, ...FONTS.semiBold },
@@ -303,40 +183,35 @@ const styles = StyleSheet.create({
         borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, alignItems: 'center',
     },
     actionEmoji: { fontSize: 28, marginBottom: SPACING.sm },
-    actionLabel: { color: COLORS.textInverse, fontSize: FONT_SIZES.sm, ...FONTS.semiBold },
+    actionLabel: { color: COLORS.text, fontSize: FONT_SIZES.sm, ...FONTS.semiBold },
     statsGrid: { flexDirection: 'row', paddingHorizontal: SPACING.lg, gap: SPACING.md, marginTop: SPACING.lg },
     moodChart: {
         flexDirection: 'row', justifyContent: 'space-around',
-        height: 150, alignItems: 'flex-end', paddingBottom: SPACING.md,
+        marginHorizontal: SPACING.lg, backgroundColor: COLORS.surface,
+        padding: SPACING.lg, borderRadius: BORDER_RADIUS.lg,
+        borderWidth: 1, borderColor: COLORS.glassBorder, height: 120,
     },
-    moodChartItem: { alignItems: 'center', width: 30 },
-    moodChartDot: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.xs },
-    moodChartDay: { color: COLORS.textSecondary, fontSize: FONT_SIZES.xs, ...FONTS.medium },
-    moodLogItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.glassBorder },
-    moodLogEmoji: { fontSize: 32, marginRight: SPACING.md },
+    moodChartItem: { alignItems: 'center', justifyContent: 'flex-end', flex: 1 },
+    moodChartDot: {
+        width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+    },
+    moodChartDay: { color: COLORS.textMuted, fontSize: FONT_SIZES.xs, marginTop: SPACING.sm },
+    moodLogItem: {
+        flexDirection: 'row', alignItems: 'center', marginHorizontal: SPACING.lg,
+        paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.glassBorder,
+    },
+    moodLogEmoji: { fontSize: 24, marginRight: SPACING.md },
     moodLogInfo: { flex: 1 },
-    moodLogDate: { color: COLORS.textSecondary, fontSize: FONT_SIZES.xs, ...FONTS.medium },
+    moodLogDate: { color: COLORS.textMuted, fontSize: FONT_SIZES.xs },
     moodLogNote: { color: COLORS.text, fontSize: FONT_SIZES.sm, marginTop: 2 },
-    moodBadge: { paddingHorizontal: SPACING.sm, paddingVertical: 4, borderRadius: BORDER_RADIUS.sm },
-    moodBadgeText: { fontSize: 10, ...FONTS.bold },
-    journalItem: { marginHorizontal: SPACING.lg, padding: SPACING.md, backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg, marginBottom: SPACING.md, ...SHADOWS.small },
-    journalTitle: { fontSize: FONT_SIZES.md, ...FONTS.bold, color: COLORS.text },
-    journalDate: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2 },
-    journalPreview: { fontSize: FONT_SIZES.sm, color: COLORS.textMuted, marginTop: SPACING.sm },
-
-    // Chart & Modal
-    chartContainer: { alignItems: 'center', marginHorizontal: SPACING.lg },
-    chartHint: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: -SPACING.sm, marginBottom: SPACING.md },
-    emptyChart: { padding: SPACING.xl, alignItems: 'center' },
-    emptyText: { color: COLORS.textSecondary, fontSize: FONT_SIZES.md },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-    modalContent: { width: '85%', backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl, ...SHADOWS.medium },
-    modalTitle: { fontSize: FONT_SIZES.xl, ...FONTS.bold, color: COLORS.text, textAlign: 'center' },
-    modalDate: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, textAlign: 'center', marginBottom: SPACING.lg },
-    modalGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-    detailItem: { width: '45%', marginBottom: SPACING.md, alignItems: 'center', padding: SPACING.sm, backgroundColor: COLORS.background, borderRadius: BORDER_RADIUS.md },
-    detailValue: { fontSize: FONT_SIZES.lg, ...FONTS.bold, color: COLORS.text },
-    detailLabel: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary },
-    closeBtn: { marginTop: SPACING.md, backgroundColor: COLORS.primary, padding: SPACING.md, borderRadius: BORDER_RADIUS.lg, alignItems: 'center' },
-    closeBtnText: { color: COLORS.white, ...FONTS.bold },
+    moodBadge: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs, borderRadius: BORDER_RADIUS.round },
+    moodBadgeText: { fontSize: FONT_SIZES.xs, ...FONTS.semiBold },
+    journalItem: {
+        marginHorizontal: SPACING.lg, marginBottom: SPACING.md,
+        backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.md, padding: SPACING.lg,
+        borderWidth: 1, borderColor: COLORS.glassBorder,
+    },
+    journalTitle: { color: COLORS.text, fontSize: FONT_SIZES.lg, ...FONTS.semiBold },
+    journalDate: { color: COLORS.textMuted, fontSize: FONT_SIZES.xs, marginTop: SPACING.xs },
+    journalPreview: { color: COLORS.textSecondary, fontSize: FONT_SIZES.sm, marginTop: SPACING.sm, lineHeight: 20 },
 });

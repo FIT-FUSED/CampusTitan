@@ -1,15 +1,13 @@
 // Fitness Tracking Screen
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, RefreshControl, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS, ACTIVITY_TYPES } from '../../theme';
+import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, ACTIVITY_TYPES } from '../../theme';
 import { GradientCard, StatCard, SectionHeader, AnimatedButton, ProgressBar } from '../../components/common';
 import { useAuth } from '../../services/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import db from '../../services/database';
-import { format, subDays, startOfDay } from 'date-fns';
-import sensorService from '../../services/SensorService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { format, subDays } from 'date-fns';
 
 const { width } = Dimensions.get('window');
 
@@ -18,39 +16,6 @@ export default function FitnessScreen({ navigation }) {
     const [activities, setActivities] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
     const [selectedFilter, setSelectedFilter] = useState('week');
-
-    // Automation state
-    const [steps, setSteps] = useState(0);
-    const [kms, setKms] = useState(0);
-    const [calories, setCalories] = useState(0);
-    const [exerciseMins, setExerciseMins] = useState('');
-
-    useEffect(() => {
-        const loadExercise = async () => {
-            const saved = await AsyncStorage.getItem('@exercise_mins_week');
-            if (saved) setExerciseMins(saved);
-        };
-        loadExercise();
-    }, []);
-
-    // Subscribe to SensorService for consistent step tracking
-    useEffect(() => {
-        const init = async () => {
-            await sensorService.loadPersistedSteps();
-            setSteps(sensorService.getTodaySteps());
-            setKms(sensorService.getKm());
-            setCalories(sensorService.getCalories());
-        };
-        init();
-
-        const onSteps = (newSteps) => {
-            setSteps(newSteps);
-            setKms(sensorService.getKm());
-            setCalories(sensorService.getCalories());
-        };
-        sensorService.addListener(onSteps);
-        return () => sensorService.removeListener(onSteps);
-    }, []);
 
     const loadData = useCallback(async () => {
         if (!user) return;
@@ -146,41 +111,6 @@ export default function FitnessScreen({ navigation }) {
                         </View>
                     </View>
                 </GradientCard>
-
-                {/* Today's quick stats */}
-                <SectionHeader title="Today" />
-                <View style={styles.statsGrid}>
-                    <StatCard title="Total Steps" value={steps} icon="🚶" color={COLORS.success} />
-                    <StatCard title="Distance Logged" value={kms} unit="km" icon="📍" color={COLORS.primary} />
-                    <StatCard title="Calories Burned" value={calories} unit="kcal" icon="🔥" color={COLORS.coral} />
-                </View>
-
-                {/* --- Automations --- */}
-                <SectionHeader title="Daily Auto-Tracking" />
-                <View style={styles.statsGrid}>
-                    <StatCard title="Total Steps" value={steps} icon="🚶" color={COLORS.success} />
-                    <StatCard title="Distance Logged" value={kms} unit="km" icon="📍" color={COLORS.primary} />
-                </View>
-
-                {/* --- Manual Overrides --- */}
-                <SectionHeader title="Weekly Goals" />
-                <View style={[styles.statsGrid, { alignItems: 'center' }]}>
-                    <View style={styles.inputCard}>
-                        <Text style={styles.inputLabel}>Exercise (min/week)</Text>
-                        <TextInput
-                            style={styles.manualInput}
-                            keyboardType="numeric"
-                            value={exerciseMins}
-                            placeholder="0"
-                            placeholderTextColor={COLORS.textMuted}
-                            onChangeText={(t) => {
-                                setExerciseMins(t);
-                                AsyncStorage.setItem('@exercise_mins_week', t);
-                            }}
-                        />
-                    </View>
-                    <StatCard title="Sessions" value={weekSessions} icon="💪" color={COLORS.primary} />
-                </View>
 
                 {/* Stats Grid */}
                 <SectionHeader title="This Week" />
@@ -278,24 +208,17 @@ const styles = StyleSheet.create({
     headerTitle: { fontSize: FONT_SIZES.xxl, ...FONTS.bold, color: COLORS.text },
     logButton: { paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg },
     summaryCard: { marginHorizontal: SPACING.lg, marginBottom: SPACING.md },
-    summaryLabel: { color: COLORS.textInverse, fontSize: FONT_SIZES.sm, ...FONTS.medium, opacity: 0.9, marginBottom: SPACING.md },
+    summaryLabel: { color: COLORS.text, fontSize: FONT_SIZES.sm, ...FONTS.medium, opacity: 0.8, marginBottom: SPACING.md },
     summaryRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
-    summaryValue: { color: COLORS.textInverse, fontSize: FONT_SIZES.xxxl, ...FONTS.bold, textAlign: 'center' },
-    summaryUnit: { color: COLORS.textInverse, fontSize: FONT_SIZES.xs, textAlign: 'center', opacity: 0.8 },
+    summaryValue: { color: COLORS.text, fontSize: FONT_SIZES.xxxl, ...FONTS.bold, textAlign: 'center' },
+    summaryUnit: { color: COLORS.text, fontSize: FONT_SIZES.xs, textAlign: 'center', opacity: 0.7 },
     summaryDivider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.2)' },
     statsGrid: { flexDirection: 'row', paddingHorizontal: SPACING.lg, gap: SPACING.md },
-    inputCard: {
-        flex: 1, backgroundColor: COLORS.surface, padding: SPACING.md,
-        borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.glassBorder
-    },
-    inputLabel: { color: COLORS.textMuted, fontSize: 10, ...FONTS.bold, textTransform: 'uppercase', marginBottom: 4 },
-    manualInput: { color: COLORS.primary, fontSize: 24, ...FONTS.bold, padding: 0 },
     chartContainer: {
         flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end',
         marginHorizontal: SPACING.lg, backgroundColor: COLORS.surface,
         padding: SPACING.lg, paddingBottom: SPACING.sm,
         borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.glassBorder, height: 140,
-        ...SHADOWS.small,
     },
     chartBar: { alignItems: 'center' },
     chartValue: { color: COLORS.textMuted, fontSize: 9, marginBottom: 4 },
@@ -304,7 +227,6 @@ const styles = StyleSheet.create({
     breakdownContainer: {
         marginHorizontal: SPACING.lg, backgroundColor: COLORS.surface,
         borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.glassBorder, padding: SPACING.lg,
-        ...SHADOWS.small,
     },
     breakdownItem: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
