@@ -50,6 +50,7 @@ import CampusPulseLeaderboardScreen from "../screens/community/CampusPulseLeader
 import WellnessQuizScreen from "../screens/wellness/WellnessQuizScreen";
 import DailyJournalScreen from "../screens/wellness/DailyJournalScreen";
 import DailyWellnessCheckInScreen from "../screens/wellness/DailyWellnessCheckInScreen";
+import AIChatInterface from "../components/AIChatInterface";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -77,7 +78,10 @@ function CustomTabBar({ state, descriptors, navigation }) {
               unfocused: "analytics-outline",
             },
             Alerts: { focused: "alert", unfocused: "alert-outline" },
-            Operations: { focused: "construct", unfocused: "construct-outline" },
+            Operations: {
+              focused: "construct",
+              unfocused: "construct-outline",
+            },
           };
           const iconSet = icons[route.name] || {
             focused: "ellipse",
@@ -129,6 +133,7 @@ function HomeStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HomeMain" component={HomeScreen} />
+      <Stack.Screen name="AIChat" component={AIChatInterface} />
     </Stack.Navigator>
   );
 }

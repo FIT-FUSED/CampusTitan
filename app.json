@@ -36,9 +36,15 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-secure-store", "expo-camera", "expo-sensors"],
+    "plugins": [
+      "expo-secure-store",
+      "expo-camera",
+      "expo-sensors"
+    ],
     "extra": {
-      "eas": {}
+      "eas": {
+        "projectId": "0ed1cf5f-f5ef-4c8d-95ff-f3b9661600c5"
+      }
     }
   }
 }

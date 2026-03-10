@@ -60,6 +60,16 @@ export default function FitnessScreen({ navigation }) {
 
     useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
+    useEffect(() => {
+        if (!user?.id) return;
+        const unsub = db.subscribeToActivities(user.id, () => {
+            loadData();
+        });
+        return () => {
+            if (typeof unsub === 'function') unsub();
+        };
+    }, [user?.id, loadData]);
+
     const today = format(new Date(), 'yyyy-MM-dd');
     const todayActs = activities.filter(a => a.date === today);
     const todayMinutes = todayActs.reduce((s, a) => s + (a.duration || 0), 0);
