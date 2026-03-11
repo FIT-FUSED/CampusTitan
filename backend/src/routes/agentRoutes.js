@@ -31,7 +31,17 @@ router.post("/query", async (req, res) => {
       });
     }
 
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    try {
+      if (authHeader) {
+        const v = String(authHeader);
+        console.log(
+          `[agentRoutes/query] auth header len=${v.length} prefix=${v.slice(0, 18)}`,
+        );
+      } else {
+        console.log("[agentRoutes/query] no auth header");
+      }
+    } catch (_) {}
     const response = await axios.post(
       `${PYTHON_AGENT_URL}/agent/query`,
       {
@@ -39,7 +49,10 @@ router.post("/query", async (req, res) => {
         user_id,
         user_context: user_context || {},
       },
-      { timeout: 30000, headers: authHeader ? { Authorization: authHeader } : undefined },
+      {
+        timeout: 30000,
+        headers: authHeader ? { Authorization: authHeader } : {},
+      },
     );
 
     res.json(response.data);
@@ -67,7 +80,17 @@ router.post("/log", async (req, res) => {
       });
     }
 
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    try {
+      if (authHeader) {
+        const v = String(authHeader);
+        console.log(
+          `[agentRoutes/log] auth header len=${v.length} prefix=${v.slice(0, 18)}`,
+        );
+      } else {
+        console.log("[agentRoutes/log] no auth header");
+      }
+    } catch (_) {}
     const response = await axios.post(
       `${PYTHON_AGENT_URL}/agent/log`,
       {
@@ -75,7 +98,10 @@ router.post("/log", async (req, res) => {
         user_id,
         date: date || new Date().toISOString().split("T")[0],
       },
-      { timeout: 30000, headers: authHeader ? { Authorization: authHeader } : undefined },
+      {
+        timeout: 30000,
+        headers: authHeader ? { Authorization: authHeader } : {},
+      },
     );
 
     res.json(response.data);

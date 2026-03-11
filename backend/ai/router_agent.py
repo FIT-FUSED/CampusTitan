@@ -169,7 +169,7 @@ def process_user_prompt(*, query: str, user_id: str, date: Optional[str] = None,
                 "duration_minutes": action.get("duration_minutes") or action.get("duration") or 0,
                 "calories_burned": action.get("calories_burned") or 0,
             }
-            activity_results.append(activity_tool.execute(activity=activity_payload, user_id=user_id, date=date, user_jwt=user_jwt))
+            activity_results.append(activity_tool.execute(user_id=user_id, date=date, user_jwt=user_jwt))
 
     # For backward-compatible response generation, summarize first results
     nutrition_result = nutrition_results[0] if nutrition_results else None

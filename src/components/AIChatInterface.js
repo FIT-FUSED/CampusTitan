@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS } from "../theme";
@@ -18,6 +19,7 @@ import { useAuth } from "../services/AuthContext";
 
 export default function AIChatInterface({ onClose }) {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState([
     {
       id: "welcome",
@@ -152,85 +154,102 @@ export default function AIChatInterface({ onClose }) {
   };
 
   return React.createElement(
-    KeyboardAvoidingView,
-    {
-      style: styles.container,
-      behavior: Platform.OS === "ios" ? "padding" : undefined,
-    },
+    SafeAreaView,
+    { style: styles.container, edges: ["top", "left", "right", "bottom"] },
     React.createElement(
-      LinearGradient,
-      { colors: COLORS.gradientPrimary, style: styles.header },
+      KeyboardAvoidingView,
+      {
+        style: styles.body,
+        behavior: Platform.OS === "ios" ? "padding" : undefined,
+        keyboardVerticalOffset: Platform.OS === "ios" ? 8 : 0,
+      },
       React.createElement(
-        TouchableOpacity,
-        { onPress: onClose, style: styles.closeButton },
-        React.createElement(Ionicons, {
-          name: "close",
-          size: 24,
-          color: COLORS.textInverse,
-        }),
-      ),
-      React.createElement(
-        View,
-        { style: styles.headerText },
+        LinearGradient,
+        { colors: COLORS.gradientPrimary, style: styles.header },
         React.createElement(
-          Text,
-          { style: styles.headerTitle },
-          "Titan AI Coach",
+          TouchableOpacity,
+          { onPress: onClose, style: styles.closeButton },
+          React.createElement(Ionicons, {
+            name: "close",
+            size: 24,
+            color: COLORS.textInverse,
+          }),
         ),
         React.createElement(
-          Text,
-          { style: styles.headerSubtitle },
-          "Ask me anything",
+          View,
+          { style: styles.headerText },
+          React.createElement(
+            Text,
+            { style: styles.headerTitle },
+            "Titan AI Coach",
+          ),
+          React.createElement(
+            Text,
+            { style: styles.headerSubtitle },
+            "Ask me anything",
+          ),
         ),
       ),
-    ),
-    React.createElement(FlatList, {
-      ref: flatListRef,
-      data: messages,
-      renderItem: renderMessage,
-      keyExtractor: (item) => item.id,
-      contentContainerStyle: styles.messagesList,
-      ListFooterComponent: loading
-        ? React.createElement(
-            View,
-            { style: styles.loadingContainer },
-            React.createElement(ActivityIndicator, { color: COLORS.primary }),
-            React.createElement(
-              Text,
-              { style: styles.loadingText },
-              "Thinking...",
-            ),
-          )
-        : null,
-      ListHeaderComponent: messages.length === 1 ? renderSuggestions : null,
-    }),
-    React.createElement(
-      View,
-      { style: styles.inputContainer },
-      React.createElement(TextInput, {
-        style: styles.input,
-        value: inputText,
-        onChangeText: setInputText,
-        placeholder: "Ask...",
-        placeholderTextColor: COLORS.textMuted,
-        multiline: true,
-        maxLength: 500,
+      React.createElement(FlatList, {
+        ref: flatListRef,
+        data: messages,
+        renderItem: renderMessage,
+        keyExtractor: (item) => item.id,
+        style: styles.list,
+        contentContainerStyle: [
+          styles.messagesList,
+          { paddingBottom: (insets.bottom || 0) + 104 },
+        ],
+        ListFooterComponent: loading
+          ? React.createElement(
+              View,
+              { style: styles.loadingContainer },
+              React.createElement(ActivityIndicator, { color: COLORS.primary }),
+              React.createElement(
+                Text,
+                { style: styles.loadingText },
+                "Thinking...",
+              ),
+            )
+          : null,
+        ListHeaderComponent: messages.length === 1 ? renderSuggestions : null,
+        onContentSizeChange: () => flatListRef.current?.scrollToEnd({ animated: true }),
       }),
       React.createElement(
-        TouchableOpacity,
+        View,
         {
           style: [
-            styles.sendButton,
-            (!inputText.trim() || loading) && styles.sendButtonDisabled,
+            styles.inputContainer,
+            {
+              paddingBottom: Math.max(insets.bottom, SPACING.md),
+            },
           ],
-          onPress: () => sendMessage(inputText),
-          disabled: !inputText.trim() || loading,
         },
-        React.createElement(Ionicons, {
-          name: "send",
-          size: 20,
-          color: COLORS.textInverse,
+        React.createElement(TextInput, {
+          style: styles.input,
+          value: inputText,
+          onChangeText: setInputText,
+          placeholder: "Ask...",
+          placeholderTextColor: COLORS.textMuted,
+          multiline: true,
+          maxLength: 500,
         }),
+        React.createElement(
+          TouchableOpacity,
+          {
+            style: [
+              styles.sendButton,
+              (!inputText.trim() || loading) && styles.sendButtonDisabled,
+            ],
+            onPress: () => sendMessage(inputText),
+            disabled: !inputText.trim() || loading,
+          },
+          React.createElement(Ionicons, {
+            name: "send",
+            size: 20,
+            color: COLORS.textInverse,
+          }),
+        ),
       ),
     ),
   );
@@ -238,6 +257,8 @@ export default function AIChatInterface({ onClose }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  body: { flex: 1 },
+  list: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",

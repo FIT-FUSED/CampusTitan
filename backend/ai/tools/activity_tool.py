@@ -41,7 +41,7 @@ class ActivityTool:
     def execute(self, *, activity: Dict[str, Any], user_id: str, date: Optional[str] = None, user_jwt: Optional[str] = None) -> Dict[str, Any]:
         date = date or datetime.now().strftime("%Y-%m-%d")
 
-        activity_name = (activity.get("type") or activity.get("activity") or "").strip().lower()
+        
         duration_minutes = int(_safe_number(activity.get("duration_minutes") or activity.get("duration"), 30.0) or 30)
         calories_burned = int(_safe_number(activity.get("calories_burned") or activity.get("caloriesBurned"), 0.0) or 0)
 
@@ -52,8 +52,7 @@ class ActivityTool:
             "date": date,
         }
         # Some schemas use 'type' instead of 'activity'
-        if activity_name:
-            payload["type"] = activity_name
+        
 
         supabase = self._get_supabase_for_user(user_jwt)
         inserted = supabase.table("activities").insert(payload).execute()
@@ -64,7 +63,6 @@ class ActivityTool:
             "tool_name": self.name,
             "data": {
                 "logged": True,
-                "activity": activity_name,
                 "duration_minutes": duration_minutes,
                 "calories_burned": calories_burned,
                 "date": date,
