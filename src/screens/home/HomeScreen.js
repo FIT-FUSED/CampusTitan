@@ -147,8 +147,33 @@ export default function HomeScreen({ navigation }) {
   const [steps, setSteps] = useState(0);
   const [weeklyActivity, setWeeklyActivity] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
+  const [sheet, setSheet] = useState({ visible: false, type: null });
+  const [checkInCompleted, setCheckInCompleted] = useState(false);
+  const [usagePermission, setUsagePermission] = useState(false);
+  const [stepPermissionGranted, setStepPermissionGranted] = useState(false);
+  const [stepPermissionStatus, setStepPermissionStatus] = useState("undetermined");
+  const [km, setKm] = useState("0.00");
+  const [calories, setCalories] = useState(0);
 
   const today = format(new Date(), 'yyyy-MM-dd');
+
+  useEffect(() => {
+    async function checkStatus() {
+      // Check check-in completion
+      const lastCheckin = await AsyncStorage.getItem("@last_checkin_date");
+      if (lastCheckin === today) {
+        setCheckInCompleted(true);
+      }
+
+      // Check permissions
+      setUsagePermission(hasUsagePermissionSafely());
+
+      // Step tracking status
+      // Note: We don't call startTracking here to avoid multi-listeners on every mount
+      // unless permission is already granted.
+    }
+    checkStatus();
+  }, [today]);
 
   const loadData = useCallback(async () => {
     if (!user) return;

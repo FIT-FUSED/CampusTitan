@@ -73,7 +73,7 @@ class BackendAPI {
   async getHealthSummary(payload) {
     try {
       console.log('[BackendAPI] Requesting health insights...');
-      const response = await this.axios.post('/api/health/summary', payload, {
+      const response = await this.axios.post('/api/health_summary', payload, {
         timeout: 180000,
         headers: {
           'Content-Type': 'application/json',

@@ -9,9 +9,16 @@ import {
   Dimensions,
   TouchableOpacity,
   Alert,
+  Image,
 } from "react-native";
+import { useState, useEffect, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import db from "../../services/database";
+import AchievementService from "../../services/AchievementService";
+import { ACHIEVEMENTS } from "../../constants/achievements";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS } from "../../theme";
+import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS } from "../../theme";
 import {
   Header,
   Avatar,
@@ -30,6 +37,37 @@ function capitalize(str) {
 
 export default function ProfileScreen({ navigation }) {
   const { user, userRole, setUserRoleOverride } = useAuth();
+  const [unlockedAchievements, setUnlockedAchievements] = useState([]);
+
+  const loadAchievements = useCallback(async () => {
+    if (!user) return;
+    try {
+      const foodLogs = await db.getFoodLogs(user.id);
+      const activities = await db.getActivities(user.id);
+      const moodLogs = await db.getMoodLogs(user.id);
+      const journals = await db.getJournals(user.id);
+
+      // Pass userId for persistence + notifications
+      const earnedIds = await AchievementService.checkAndNotify({
+        userId: user.id,
+        foodLogs,
+        activities,
+        moodLogs,
+        journals,
+      });
+
+      const processed = ACHIEVEMENTS.filter(ach => earnedIds.includes(ach.id));
+      setUnlockedAchievements(processed);
+    } catch (err) {
+      console.error("Error loading profile achievements:", err);
+    }
+  }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAchievements();
+    }, [loadAchievements])
+  );
 
   if (!user) return null;
 
@@ -123,6 +161,42 @@ export default function ProfileScreen({ navigation }) {
             color={COLORS.orange}
           />
         </View>
+
+        {/* Badges Section */}
+        <View style={styles.badgeHeaderRow}>
+          <SectionHeader title="Your Badges" containerStyle={{ flex: 1, marginBottom: 0 }} />
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate("Achievements")}
+            style={styles.viewAllButton}
+          >
+            <Text style={styles.viewAllText}>View All</Text>
+            <Ionicons name="chevron-forward" size={14} color={COLORS.primary} />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.badgeScroll}
+        >
+          {unlockedAchievements.map((ach, i) => (
+            <TouchableOpacity
+              key={ach.id}
+              style={styles.badgeItem}
+              onPress={() => navigation.navigate("Achievements")}
+              activeOpacity={0.8}
+            >
+              <View style={styles.badgeCircle}>
+                <Image source={ach.icon} style={styles.badgeIconSmall} />
+              </View>
+              <Text style={styles.badgeLabel} numberOfLines={1}>{ach.title}</Text>
+            </TouchableOpacity>
+          ))}
+          {unlockedAchievements.length === 0 && (
+            <Text style={styles.noBadgesText}>Start your journey to earn badges!</Text>
+          )}
+        </ScrollView>
 
         {/* Academic Info */}
         <SectionHeader title="Academic Information" />
@@ -274,5 +348,56 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xs,
     color: COLORS.textMuted,
     textAlign: "center",
+  },
+  badgeHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingRight: SPACING.lg,
+    marginTop: SPACING.lg,
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  viewAllText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
+    ...FONTS.medium,
+    marginRight: 2,
+  },
+  badgeScroll: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+  },
+  badgeItem: {
+    alignItems: 'center',
+    marginRight: SPACING.xl,
+    width: 65,
+  },
+  badgeCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  badgeIconSmall: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
+  },
+  badgeLabel: {
+    fontSize: 10,
+    color: COLORS.textSecondary,
+    ...FONTS.medium,
+    marginTop: SPACING.xs,
+    textAlign: 'center',
+  },
+  noBadgesText: {
+    color: COLORS.textMuted,
+    fontSize: FONT_SIZES.sm,
+    fontStyle: 'italic',
   },
 });

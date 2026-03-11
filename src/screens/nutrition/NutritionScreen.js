@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, Modal, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, MEAL_TYPES } from '../../theme';
+import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS, MEAL_TYPES } from '../../theme';
 import { GradientCard, SectionHeader, AnimatedButton, ProgressBar, Chip } from '../../components/common';
 import { useAuth } from '../../services/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
@@ -44,14 +44,14 @@ export default function NutritionScreen({ navigation }) {
     console.log('[NutritionScreen] Selected date:', selectedDate);
     console.log('[NutritionScreen] Day logs dates:', foodLogs.map(l => extractDate(l.date)));
     console.log('[NutritionScreen] Day logs:', dayLogs);
-    
+
     const totals = dayLogs.reduce((acc, l) => ({
         calories: acc.calories + (l.calories || 0),
         protein: acc.protein + (l.protein || 0),
         carbs: acc.carbs + (l.carbs || 0),
         fat: acc.fat + (l.fat || 0),
     }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
-    
+
     console.log('[NutritionScreen] Totals:', totals);
 
     const calorieGoal = 2000;
@@ -183,8 +183,8 @@ export default function NutritionScreen({ navigation }) {
                                 <Text style={styles.mealEmpty}>No items logged</Text>
                             ) : (
                                 meals.map((item, i) => (
-                                    <TouchableOpacity 
-                                        key={i} 
+                                    <TouchableOpacity
+                                        key={i}
                                         style={styles.foodItem}
                                         onPress={() => handleFoodClick(item)}
                                         activeOpacity={0.7}
@@ -233,7 +233,7 @@ export default function NutritionScreen({ navigation }) {
 
                 <View style={{ height: 100 }} />
             </ScrollView>
-            
+
             {/* Food Detail Modal */}
             <Modal
                 animationType="slide"
@@ -252,7 +252,7 @@ export default function NutritionScreen({ navigation }) {
                                 <Text style={styles.closeButtonText}>✕</Text>
                             </TouchableOpacity>
                         </View>
-                        
+
                         <View style={styles.modalBody}>
                             <View style={styles.nutritionGrid}>
                                 <View style={styles.nutritionItem}>
@@ -272,12 +272,12 @@ export default function NutritionScreen({ navigation }) {
                                     <Text style={styles.nutritionValue}>{selectedFood?.fat || 0}g</Text>
                                 </View>
                             </View>
-                            
+
                             <View style={styles.mealInfo}>
                                 <Text style={styles.mealInfoLabel}>Meal Type</Text>
                                 <Text style={styles.mealInfoValue}>{selectedFood?.mealType || 'Unknown'}</Text>
                             </View>
-                            
+
                             <View style={styles.mealInfo}>
                                 <Text style={styles.mealInfoLabel}>Date</Text>
                                 <Text style={styles.mealInfoValue}>{selectedFood?.date || 'Unknown'}</Text>

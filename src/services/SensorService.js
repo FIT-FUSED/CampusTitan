@@ -1,5 +1,11 @@
 import { Pedometer } from 'expo-sensors';
 import { Alert, Linking } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const DAILY_STEPS_KEY = '@today_steps';
+const LAST_STEP_DATE_KEY = '@last_step_date';
+const STRIDE_KM_PER_STEP = 0.00076; // 0.76 meters per step avg
+const CALORIES_PER_STEP = 0.04;    // ~0.04 calories burned per step
 
 class SensorService {
   constructor() {

@@ -68,14 +68,38 @@ async function refreshStudentTip() {
   }
 }
 
+import achievementService from "./AchievementService";
+
+const SHOW_NOTIFICATIONS = true;
+
 const SyncService = {
+  async runAchievementCheck(userId) {
+    if (!userId) return;
+    try {
+      const foodLogs = await db.getFoodLogs(userId);
+      const activities = await db.getActivities(userId);
+      const moodLogs = await db.getMoodLogs(userId);
+      const journals = await db.getJournals(userId);
+
+      await achievementService.checkAndNotify({
+        id: userId,
+        foodLogs,
+        activities,
+        moodLogs,
+        journals
+      });
+    } catch (e) {
+      console.warn("Achievement check failed:", e);
+    }
+  },
+
   /**
    * Submits a wellness check-in in an offline-first way.
    * - Always saves the log locally for charts/history.
    * - If online, also POSTs to the backend and refreshes the AI summary.
    * - If offline, enqueues the payload to be flushed when connectivity returns.
    */
-  async submitWellnessCheckin(log) {
+  async submitWellnessCheckin(log, userId) {
     // Persist locally first so the UI can immediately reflect the new data,
     // regardless of network conditions.
     await db.saveDailyWellnessLog(log);
@@ -83,6 +107,12 @@ const SyncService = {
     // Assume online for now - send to backend
     await sendToBackend(log);
     await refreshStudentTip();
+
+    // Check for new achievements
+    if (userId) {
+      await this.runAchievementCheck(userId);
+    }
+
     showToast("Check-in synced and AI insights updated.");
   },
 

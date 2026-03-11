@@ -6,6 +6,7 @@ import { Header, AnimatedButton } from '../../components/common';
 import { useAuth } from '../../services/AuthContext';
 import db from '../../services/database';
 import { format } from 'date-fns';
+import SyncService from '../../services/SyncService';
 
 export default function JournalEntryScreen({ navigation, route }) {
     const { user } = useAuth();
@@ -34,6 +35,9 @@ export default function JournalEntryScreen({ navigation, route }) {
                     date: format(new Date(), 'yyyy-MM-dd'),
                 });
             }
+            // Check for new achievements (like Night Owl)
+            await SyncService.runAchievementCheck(user?.id);
+
             Alert.alert('Saved! ✨', '', [{ text: 'OK', onPress: () => navigation.goBack() }]);
         } catch (e) {
             Alert.alert('Error', 'Failed to save journal entry');

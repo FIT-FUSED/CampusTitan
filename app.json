@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "FitFusion",
-    "slug": "fit",
+    "slug": "sentinel",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -27,9 +27,6 @@
       "permissions": [
         "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.ACTIVITY_RECOGNITION",
-        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.rishi126.fit"
@@ -43,16 +40,16 @@
       "expo-sensors",
       "expo-font"
     ],
-    "extra": {
+"extra": {
       "eas": {
-        "projectId": "3f54f3cc-82f1-4215-84da-16ba2ecc7228"
-      }
+        "projectId": "f7dd4a80-d64e-41ec-82f9-d98aceeca9ac"
+      },
+      "weatherApiKey": "e92c524e563cce742552736ec729266a"
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/3f54f3cc-82f1-4215-84da-16ba2ecc7228"
-    }
+    },
+    "owner": "rishi_69"
   }
 }

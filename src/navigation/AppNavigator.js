@@ -49,8 +49,8 @@ import LeaderboardScreen from "../screens/leaderboard/LeaderboardScreen";
 import CampusPulseLeaderboardScreen from "../screens/community/CampusPulseLeaderboardScreen";
 import HealthInsightsScreen from "../screens/community/HealthInsightsScreen";
 import WellnessQuizScreen from "../screens/wellness/WellnessQuizScreen";
-import DailyJournalScreen from "../screens/wellness/DailyJournalScreen";
 import DailyWellnessCheckInScreen from "../screens/wellness/DailyWellnessCheckInScreen";
+import AchievementsScreen from "../screens/fitness/AchievementsScreen";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -149,6 +149,7 @@ function FitnessStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="FitnessMain" component={FitnessScreen} />
       <Stack.Screen name="LogActivity" component={LogActivityScreen} />
+      <Stack.Screen name="Achievements" component={AchievementsScreen} />
     </Stack.Navigator>
   );
 }
@@ -161,7 +162,6 @@ function WellnessStack() {
       <Stack.Screen name="Journal" component={JournalScreen} />
       <Stack.Screen name="JournalEntry" component={JournalEntryScreen} />
       <Stack.Screen name="WellnessCircle" component={WellnessCircleScreen} />
-      <Stack.Screen name="DailyJournal" component={DailyJournalScreen} />
       <Stack.Screen
         name="DailyWellnessCheckIn"
         component={DailyWellnessCheckInScreen}
@@ -180,11 +180,9 @@ function CommunityStack() {
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
       <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
-      <Stack.Screen
-        name="CampusPulse"
-        component={CampusPulseLeaderboardScreen}
-      />
+      <Stack.Screen name="CampusPulse" component={CampusPulseLeaderboardScreen} />
       <Stack.Screen name="HealthInsights" component={HealthInsightsScreen} />
+      <Stack.Screen name="Achievements" component={AchievementsScreen} />
     </Stack.Navigator>
   );
 }
@@ -209,6 +207,12 @@ function MoreMenu({ navigation }) {
       label: "Leaderboard",
       screen: "Leaderboard",
       color: COLORS.orange,
+    },
+    {
+      icon: "🏅",
+      label: "Achievements",
+      screen: "Achievements",
+      color: COLORS.mint,
     },
     {
       icon: "🌍",

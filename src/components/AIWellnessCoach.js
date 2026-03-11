@@ -249,7 +249,8 @@ export default function AIWellnessCoach({ navigation }) {
 
             // Get campus environment for display
             if (mounted) {
-                setEnvData(getCurrentCampusEnvironment());
+                const env = await getCurrentCampusEnvironment();
+                setEnvData(env);
             }
 
             try {

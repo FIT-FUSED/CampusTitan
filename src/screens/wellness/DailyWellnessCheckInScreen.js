@@ -54,137 +54,137 @@ function formatHours(n) {
 
 // Premium Auto Tag Component
 function AutoTag({ label, isAuto }) {
-    return (
-        <View style={[styles.autoTag, { backgroundColor: isAuto ? COLORS.successSubtle : COLORS.surfaceElevated }]}>
-            <View style={[styles.autoDot, { backgroundColor: isAuto ? COLORS.success : COLORS.textMuted }]} />
-            <Text style={[styles.autoTagText, { color: isAuto ? COLORS.success : COLORS.textMuted }]}>
-                {isAuto ? 'Auto' : 'Manual'}
-            </Text>
-        </View>
-    );
+  return (
+    <View style={[styles.autoTag, { backgroundColor: isAuto ? COLORS.successSubtle : COLORS.surfaceElevated }]}>
+      <View style={[styles.autoDot, { backgroundColor: isAuto ? COLORS.success : COLORS.textMuted }]} />
+      <Text style={[styles.autoTagText, { color: isAuto ? COLORS.success : COLORS.textMuted }]}>
+        {isAuto ? 'Auto' : 'Manual'}
+      </Text>
+    </View>
+  );
 }
 
 // Premium Metric Card with stunning gradient border
 function MetricCard({ title, subtitle, isAuto, children, icon }) {
   return (
     <View style={styles.metricCard}>
-        <View style={styles.metricHeader}>
-            <View style={styles.metricTitleRow}>
-                {icon && (
-                    <LinearGradient colors={COLORS.gradientPrimary} style={styles.metricIconGradient}>
-                        <Text style={styles.metricIcon}>{icon}</Text>
-                    </LinearGradient>
-                )}
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.metricTitle}>{title}</Text>
-                    {!!subtitle && <Text style={styles.metricSubtitle}>{subtitle}</Text>}
-                </View>
-            </View>
-            {isAuto !== undefined && <AutoTag label="" isAuto={isAuto} />}
+      <View style={styles.metricHeader}>
+        <View style={styles.metricTitleRow}>
+          {icon && (
+            <LinearGradient colors={COLORS.gradientPrimary} style={styles.metricIconGradient}>
+              <Text style={styles.metricIcon}>{icon}</Text>
+            </LinearGradient>
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.metricTitle}>{title}</Text>
+            {!!subtitle && <Text style={styles.metricSubtitle}>{subtitle}</Text>}
+          </View>
         </View>
-        <View style={styles.metricContent}>
-            {children}
-        </View>
+        {isAuto !== undefined && <AutoTag label="" isAuto={isAuto} />}
+      </View>
+      <View style={styles.metricContent}>
+        {children}
+      </View>
     </View>
   );
 }
 
 // Premium Slider for productivity with gradient
 function PremiumSlider({ value, onValueChange, min = 0, max = 100, step = 5, color = COLORS.primary }) {
-    const percentage = ((value - min) / (max - min)) * 100;
-    
-    return (
-        <View style={styles.sliderContainer}>
-            <TouchableOpacity
-                style={styles.sliderBtn}
-                onPress={() => onValueChange(Math.max(min, value - step))}
-            >
-                <LinearGradient colors={COLORS.gradientPrimary} style={styles.sliderBtnGradient}>
-                    <Text style={styles.sliderBtnText}>−</Text>
-                </LinearGradient>
-            </TouchableOpacity>
-            
-            <View style={styles.sliderTrack}>
-                <LinearGradient
-                    colors={[color, color + '80']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={[styles.sliderFill, { width: `${percentage}%` }]}
-                />
-                <View style={[styles.sliderThumb, { left: `${percentage}%`, backgroundColor: color }]} />
-            </View>
-            
-            <TouchableOpacity
-                style={styles.sliderBtn}
-                onPress={() => onValueChange(Math.min(max, value + step))}
-            >
-                <LinearGradient colors={COLORS.gradientPrimary} style={styles.sliderBtnGradient}>
-                    <Text style={styles.sliderBtnText}>+</Text>
-                </LinearGradient>
-            </TouchableOpacity>
-        </View>
-    );
+  const percentage = ((value - min) / (max - min)) * 100;
+
+  return (
+    <View style={styles.sliderContainer}>
+      <TouchableOpacity
+        style={styles.sliderBtn}
+        onPress={() => onValueChange(Math.max(min, value - step))}
+      >
+        <LinearGradient colors={COLORS.gradientPrimary} style={styles.sliderBtnGradient}>
+          <Text style={styles.sliderBtnText}>−</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+
+      <View style={styles.sliderTrack}>
+        <LinearGradient
+          colors={[color, color + '80']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[styles.sliderFill, { width: `${percentage}%` }]}
+        />
+        <View style={[styles.sliderThumb, { left: `${percentage}%`, backgroundColor: color }]} />
+      </View>
+
+      <TouchableOpacity
+        style={styles.sliderBtn}
+        onPress={() => onValueChange(Math.min(max, value + step))}
+      >
+        <LinearGradient colors={COLORS.gradientPrimary} style={styles.sliderBtnGradient}>
+          <Text style={styles.sliderBtnText}>+</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
+  );
 }
 
 // Premium Emoji Selector for mood/quality
 function EmojiSelector({ value, onValueChange, options, color = COLORS.primary }) {
-    return (
-        <View style={styles.emojiSelector}>
-            {options.map((opt) => (
-                <TouchableOpacity
-                    key={opt.value}
-                    style={[
-                        styles.emojiOption,
-                        value === opt.value && { 
-                            backgroundColor: color + '15',
-                            borderColor: color,
-                        }
-                    ]}
-                    onPress={() => onValueChange(opt.value)}
-                    activeOpacity={0.7}
-                >
-                    <Text style={styles.emojiText}>{opt.emoji}</Text>
-                    <Text style={[
-                        styles.emojiLabel,
-                        value === opt.value && { color }
-                    ]}>
-                        {opt.label}
-                    </Text>
-                </TouchableOpacity>
-            ))}
-        </View>
-    );
+  return (
+    <View style={styles.emojiSelector}>
+      {options.map((opt) => (
+        <TouchableOpacity
+          key={opt.value}
+          style={[
+            styles.emojiOption,
+            value === opt.value && {
+              backgroundColor: color + '15',
+              borderColor: color,
+            }
+          ]}
+          onPress={() => onValueChange(opt.value)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.emojiText}>{opt.emoji}</Text>
+          <Text style={[
+            styles.emojiLabel,
+            value === opt.value && { color }
+          ]}>
+            {opt.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
 }
 
 // Number Circle Selector for stress - Premium
 function NumberCircleSelector({ value, onValueChange, min = 1, max = 10, color = COLORS.accent }) {
-    const numbers = Array.from({ length: max - min + 1 }, (_, i) => min + i);
-    
-    return (
-        <View style={styles.numberCircleContainer}>
-            {numbers.map((num) => (
-                <TouchableOpacity
-                    key={num}
-                    style={[
-                        styles.numberCircle,
-                        value === num && {
-                            backgroundColor: color,
-                            transform: [{ scale: 1.15 }],
-                        },
-                    ]}
-                    onPress={() => onValueChange(num)}
-                    activeOpacity={0.7}
-                >
-                    <Text style={[
-                        styles.numberCircleText,
-                        value === num && { color: COLORS.textInverse },
-                    ]}>
-                        {num}
-                    </Text>
-                </TouchableOpacity>
-            ))}
-        </View>
-    );
+  const numbers = Array.from({ length: max - min + 1 }, (_, i) => min + i);
+
+  return (
+    <View style={styles.numberCircleContainer}>
+      {numbers.map((num) => (
+        <TouchableOpacity
+          key={num}
+          style={[
+            styles.numberCircle,
+            value === num && {
+              backgroundColor: color,
+              transform: [{ scale: 1.15 }],
+            },
+          ]}
+          onPress={() => onValueChange(num)}
+          activeOpacity={0.7}
+        >
+          <Text style={[
+            styles.numberCircleText,
+            value === num && { color: COLORS.textInverse },
+          ]}>
+            {num}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
 }
 
 export default function DailyWellnessCheckInScreen({ navigation }) {
@@ -381,8 +381,8 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
           usageStats: permissions.usageStats,
         },
       };
-      
-      await SyncService.submitWellnessCheckin(log);
+
+      await SyncService.submitWellnessCheckin(log, user?.id);
       await AsyncStorage.setItem("@last_logged_date", today);
       await AsyncStorage.setItem("@last_checkin_date", today);
       setLocked(true);
@@ -437,24 +437,24 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
               <View style={styles.headerCardRight}>
                 <Text style={styles.headerTitle}>Train Your AI</Text>
                 <Text style={styles.headerSubtitle}>
-                    Log daily to help predict your wellness
+                  Log daily to help predict your wellness
                 </Text>
               </View>
             </View>
             <View style={styles.headerStats}>
-                <View style={styles.headerStat}>
-                    <LinearGradient colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.1)']} style={styles.headerStatGradient}>
-                        <Text style={styles.headerStatValue}>+10</Text>
-                        <Text style={styles.headerStatLabel}>Points</Text>
-                    </LinearGradient>
-                </View>
-                <View style={styles.headerStatDivider} />
-                <View style={styles.headerStat}>
-                    <LinearGradient colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.1)']} style={styles.headerStatGradient}>
-                        <Text style={styles.headerStatValue}>100%</Text>
-                        <Text style={styles.headerStatLabel}>Private</Text>
-                    </LinearGradient>
-                </View>
+              <View style={styles.headerStat}>
+                <LinearGradient colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.1)']} style={styles.headerStatGradient}>
+                  <Text style={styles.headerStatValue}>+10</Text>
+                  <Text style={styles.headerStatLabel}>Points</Text>
+                </LinearGradient>
+              </View>
+              <View style={styles.headerStatDivider} />
+              <View style={styles.headerStat}>
+                <LinearGradient colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.1)']} style={styles.headerStatGradient}>
+                  <Text style={styles.headerStatValue}>100%</Text>
+                  <Text style={styles.headerStatLabel}>Private</Text>
+                </LinearGradient>
+              </View>
             </View>
           </GradientCard>
 
@@ -463,16 +463,16 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
             <View style={styles.profileRow}>
               {profile.occupation ? (
                 <View style={styles.profileTag}>
-                    <LinearGradient colors={COLORS.gradientPrimary} style={styles.profileTagGradient}>
-                        <Text style={styles.profileTagText}>{profile.occupation}</Text>
-                    </LinearGradient>
+                  <LinearGradient colors={COLORS.gradientPrimary} style={styles.profileTagGradient}>
+                    <Text style={styles.profileTagText}>{profile.occupation}</Text>
+                  </LinearGradient>
                 </View>
               ) : null}
               {profile.workMode ? (
                 <View style={[styles.profileTag, styles.profileTagSecondary]}>
-                    <LinearGradient colors={COLORS.gradientViolet} style={styles.profileTagGradient}>
-                        <Text style={[styles.profileTagText, styles.profileTagTextSecondary]}>{profile.workMode}</Text>
-                    </LinearGradient>
+                  <LinearGradient colors={COLORS.gradientViolet} style={styles.profileTagGradient}>
+                    <Text style={[styles.profileTagText, styles.profileTagTextSecondary]}>{profile.workMode}</Text>
+                  </LinearGradient>
                 </View>
               ) : null}
               <TouchableOpacity
@@ -507,15 +507,15 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
             >
               <View style={styles.lockedContent}>
                 <View style={styles.lockedEmojiWrap}>
-                    <Text style={styles.lockedEmoji}>✅</Text>
+                  <Text style={styles.lockedEmoji}>✅</Text>
                 </View>
                 <View style={styles.lockedTextContainer}>
-                    <Text style={styles.lockedTitle}>
-                        You're all set for today!
-                    </Text>
-                    <Text style={styles.lockedSubtitle}>
-                        Come back tomorrow for your next check-in
-                    </Text>
+                  <Text style={styles.lockedTitle}>
+                    You're all set for today!
+                  </Text>
+                  <Text style={styles.lockedSubtitle}>
+                    Come back tomorrow for your next check-in
+                  </Text>
                 </View>
               </View>
               <TouchableOpacity
@@ -523,7 +523,7 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
                 onPress={() => navigation.navigate("WellnessMain")}
               >
                 <LinearGradient colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.15)']} style={styles.lockedButtonGradient}>
-                    <Text style={styles.lockedButtonText}>View Today's Insights</Text>
+                  <Text style={styles.lockedButtonText}>View Today's Insights</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </GradientCard>
@@ -552,11 +552,11 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
               />
             ) : (
               <View style={styles.autoValueDisplay}>
-                  <LinearGradient colors={COLORS.gradientPrimary} style={styles.autoValueGradient}>
-                    <Text style={styles.autoValueText}>
-                        {coerceNumber(form.steps, 0).toLocaleString()} steps
-                    </Text>
-                  </LinearGradient>
+                <LinearGradient colors={COLORS.gradientPrimary} style={styles.autoValueGradient}>
+                  <Text style={styles.autoValueText}>
+                    {coerceNumber(form.steps, 0).toLocaleString()} steps
+                  </Text>
+                </LinearGradient>
               </View>
             )}
           </MetricCard>
@@ -569,11 +569,11 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
           >
             {sources.exerciseMins !== "manual" ? (
               <View style={styles.autoValueDisplay}>
-                  <LinearGradient colors={COLORS.gradientSuccess} style={styles.autoValueGradient}>
-                    <Text style={styles.autoValueText}>
-                        {coerceNumber(form.exerciseMins, 0)} minutes
-                    </Text>
-                  </LinearGradient>
+                <LinearGradient colors={COLORS.gradientSuccess} style={styles.autoValueGradient}>
+                  <Text style={styles.autoValueText}>
+                    {coerceNumber(form.exerciseMins, 0)} minutes
+                  </Text>
+                </LinearGradient>
               </View>
             ) : (
               <StyledInput
@@ -598,11 +598,11 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
           >
             {sources.walkedKm !== "manual" ? (
               <View style={styles.autoValueDisplay}>
-                  <LinearGradient colors={COLORS.gradientCalm} style={styles.autoValueGradient}>
-                    <Text style={styles.autoValueText}>
-                        {coerceNumber(form.walkedKm, 0)} km
-                    </Text>
-                  </LinearGradient>
+                <LinearGradient colors={COLORS.gradientCalm} style={styles.autoValueGradient}>
+                  <Text style={styles.autoValueText}>
+                    {coerceNumber(form.walkedKm, 0)} km
+                  </Text>
+                </LinearGradient>
               </View>
             ) : (
               <StyledInput
@@ -646,16 +646,16 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
             icon="⭐"
           >
             <EmojiSelector
-                value={form.sleepQuality}
-                onValueChange={(v) => setForm((prev) => ({ ...prev, sleepQuality: v }))}
-                options={[
-                    { value: 1, emoji: '😫', label: 'Terrible' },
-                    { value: 2, emoji: '😔', label: 'Poor' },
-                    { value: 3, emoji: '😐', label: 'Okay' },
-                    { value: 4, emoji: '🙂', label: 'Good' },
-                    { value: 5, emoji: '😄', label: 'Great' },
-                ]}
-                color={COLORS.primary}
+              value={form.sleepQuality}
+              onValueChange={(v) => setForm((prev) => ({ ...prev, sleepQuality: v }))}
+              options={[
+                { value: 1, emoji: '😫', label: 'Terrible' },
+                { value: 2, emoji: '😔', label: 'Poor' },
+                { value: 3, emoji: '😐', label: 'Okay' },
+                { value: 4, emoji: '🙂', label: 'Good' },
+                { value: 5, emoji: '😄', label: 'Great' },
+              ]}
+              color={COLORS.primary}
             />
           </MetricCard>
 
@@ -675,55 +675,55 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
             {permissions.usageStats ? (
               <View style={styles.screenTimeGrid}>
                 <View style={styles.screenTimeItem}>
-                    <LinearGradient colors={COLORS.gradientPrimary} style={styles.screenTimeItemGradient}>
-                        <Text style={styles.screenTimeLabel}>Work</Text>
-                    </LinearGradient>
-                    <Text style={styles.screenTimeValue}>{formatHours(form.workScreenHrs)}h</Text>
+                  <LinearGradient colors={COLORS.gradientPrimary} style={styles.screenTimeItemGradient}>
+                    <Text style={styles.screenTimeLabel}>Work</Text>
+                  </LinearGradient>
+                  <Text style={styles.screenTimeValue}>{formatHours(form.workScreenHrs)}h</Text>
                 </View>
                 <View style={styles.screenTimeItem}>
-                    <LinearGradient colors={COLORS.gradientViolet} style={styles.screenTimeItemGradient}>
-                        <Text style={styles.screenTimeLabel}>Leisure</Text>
-                    </LinearGradient>
-                    <Text style={styles.screenTimeValue}>{formatHours(form.leisureScreenHrs)}h</Text>
+                  <LinearGradient colors={COLORS.gradientViolet} style={styles.screenTimeItemGradient}>
+                    <Text style={styles.screenTimeLabel}>Leisure</Text>
+                  </LinearGradient>
+                  <Text style={styles.screenTimeValue}>{formatHours(form.leisureScreenHrs)}h</Text>
                 </View>
                 <View style={[styles.screenTimeItem, styles.screenTimeTotal]}>
-                    <LinearGradient colors={COLORS.gradientSuccess} style={styles.screenTimeItemGradient}>
-                        <Text style={styles.screenTimeLabel}>Total</Text>
-                    </LinearGradient>
-                    <Text style={[styles.screenTimeValue, { color: COLORS.primary }]}>
-                        {formatHours(form.screenTimeHrs)}h
-                    </Text>
+                  <LinearGradient colors={COLORS.gradientSuccess} style={styles.screenTimeItemGradient}>
+                    <Text style={styles.screenTimeLabel}>Total</Text>
+                  </LinearGradient>
+                  <Text style={[styles.screenTimeValue, { color: COLORS.primary }]}>
+                    {formatHours(form.screenTimeHrs)}h
+                  </Text>
                 </View>
               </View>
             ) : (
               <View style={styles.screenTimeManual}>
                 <View style={styles.screenTimeInput}>
-                    <Text style={styles.screenTimeInputLabel}>Work (hrs)</Text>
-                    <StyledInput
-                      value={form.workScreenHrs}
-                      onChangeText={(t) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          workScreenHrs: t.replace(/[^0-9.]/g, ""),
-                        }))
-                      }
-                      placeholder="0.0"
-                      keyboardType="decimal-pad"
-                    />
+                  <Text style={styles.screenTimeInputLabel}>Work (hrs)</Text>
+                  <StyledInput
+                    value={form.workScreenHrs}
+                    onChangeText={(t) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        workScreenHrs: t.replace(/[^0-9.]/g, ""),
+                      }))
+                    }
+                    placeholder="0.0"
+                    keyboardType="decimal-pad"
+                  />
                 </View>
                 <View style={styles.screenTimeInput}>
-                    <Text style={styles.screenTimeInputLabel}>Leisure (hrs)</Text>
-                    <StyledInput
-                      value={form.leisureScreenHrs}
-                      onChangeText={(t) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          leisureScreenHrs: t.replace(/[^0-9.]/g, ""),
-                        }))
-                      }
-                      placeholder="0.0"
-                      keyboardType="decimal-pad"
-                    />
+                  <Text style={styles.screenTimeInputLabel}>Leisure (hrs)</Text>
+                  <StyledInput
+                    value={form.leisureScreenHrs}
+                    onChangeText={(t) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        leisureScreenHrs: t.replace(/[^0-9.]/g, ""),
+                      }))
+                    }
+                    placeholder="0.0"
+                    keyboardType="decimal-pad"
+                  />
                 </View>
               </View>
             )}
@@ -759,18 +759,18 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
             icon="🔥"
           >
             <View style={styles.stressLabels}>
-                <Text style={styles.stressLabelLow}>Relaxed</Text>
-                <Text style={styles.stressLabelHigh}>Stressed</Text>
+              <Text style={styles.stressLabelLow}>Relaxed</Text>
+              <Text style={styles.stressLabelHigh}>Stressed</Text>
             </View>
             <NumberCircleSelector
-                value={form.stressLevel}
-                onValueChange={(v) => setForm((prev) => ({ ...prev, stressLevel: v }))}
-                min={1}
-                max={10}
-                color={form.stressLevel > 6 ? COLORS.error : form.stressLevel > 3 ? COLORS.warning : COLORS.success}
+              value={form.stressLevel}
+              onValueChange={(v) => setForm((prev) => ({ ...prev, stressLevel: v }))}
+              min={1}
+              max={10}
+              color={form.stressLevel > 6 ? COLORS.error : form.stressLevel > 3 ? COLORS.warning : COLORS.success}
             />
             <View style={styles.stressValueDisplay}>
-                <Text style={styles.stressValueText}>Current: <Text style={styles.stressValue}>{form.stressLevel}/10</Text></Text>
+              <Text style={styles.stressValueText}>Current: <Text style={styles.stressValue}>{form.stressLevel}/10</Text></Text>
             </View>
           </MetricCard>
 
@@ -780,16 +780,16 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
             icon="⚡"
           >
             <View style={styles.productivityDisplay}>
-                <Text style={styles.productivityValue}>{form.productivity}</Text>
-                <Text style={styles.productivityMax}>/ 100</Text>
+              <Text style={styles.productivityValue}>{form.productivity}</Text>
+              <Text style={styles.productivityMax}>/ 100</Text>
             </View>
             <PremiumSlider
-                value={form.productivity}
-                onValueChange={(v) => setForm((prev) => ({ ...prev, productivity: v }))}
-                min={0}
-                max={100}
-                step={5}
-                color={COLORS.primary}
+              value={form.productivity}
+              onValueChange={(v) => setForm((prev) => ({ ...prev, productivity: v }))}
+              min={0}
+              max={100}
+              step={5}
+              color={COLORS.primary}
             />
           </MetricCard>
 
@@ -817,13 +817,13 @@ export default function DailyWellnessCheckInScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: COLORS.background 
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background
   },
-  content: { 
-    paddingHorizontal: SPACING.lg, 
-    paddingBottom: SPACING.xxxl 
+  content: {
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.xxxl
   },
   loading: {
     flex: 1,
@@ -1050,10 +1050,10 @@ const styles = StyleSheet.create({
   metricIcon: {
     fontSize: 20,
   },
-  metricTitle: { 
-    fontSize: FONT_SIZES.lg, 
-    ...FONTS.bold, 
-    color: COLORS.text 
+  metricTitle: {
+    fontSize: FONT_SIZES.lg,
+    ...FONTS.bold,
+    color: COLORS.text
   },
   metricSubtitle: {
     marginTop: 2,

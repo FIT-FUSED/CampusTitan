@@ -32,7 +32,6 @@ import { useAuth } from "../../services/AuthContext";
 import { useFocusEffect } from "@react-navigation/native";
 import db from "../../services/database";
 import { format, subDays } from "date-fns";
-import SleepTracker from "./SleepTracker";
 import { LineChart } from "react-native-chart-kit";
 
 const { width } = Dimensions.get("window");
@@ -378,9 +377,6 @@ export default function WellnessScreen({ navigation }) {
           </View>
         )}
 
-        {/* Sleep Tracker */}
-        <SleepTracker />
-
         {/* Quick Actions - Premium Grid */}
         <SectionHeader title="Quick Actions" />
         <View style={styles.actions}>
@@ -418,18 +414,6 @@ export default function WellnessScreen({ navigation }) {
             >
               <Text style={styles.actionEmoji}>🤝</Text>
               <Text style={styles.actionLabel}>Circles</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={() => navigation.navigate("DailyJournal")}
-          >
-            <LinearGradient
-              colors={COLORS.gradientEnergy}
-              style={styles.actionGradient}
-            >
-              <Text style={styles.actionEmoji}>🧠</Text>
-              <Text style={styles.actionLabel}>AI Journal</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
