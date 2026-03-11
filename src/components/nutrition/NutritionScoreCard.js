@@ -36,7 +36,7 @@ export default function NutritionScoreCard({ nutritionData, onLogFood, onRetake 
           <Text style={styles.foodName}>{food_name}</Text>
           <Text style={styles.portionSize}>1 serving</Text>
         </View>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.saveButton}
           onPress={() => onLogFood && onLogFood(nutritionData)}
           activeOpacity={0.8}

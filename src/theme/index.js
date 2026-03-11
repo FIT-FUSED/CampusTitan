@@ -73,6 +73,7 @@ export const COLORS = {
   gradientPrimaryLight: ['#818CF8', '#6366F1'],
   gradientAccent: ['#F59E0B', '#D97706'],
   gradientSunset: ['#F59E0B', '#EF4444'],
+  gradientCoral: ['#FB7185', '#EF4444'],
   gradientOcean: ['#06B6D4', '#0EA5E9'],
   gradientViolet: ['#8B5CF6', '#6366F1'],
   gradientMint: ['#10B981', '#34D399'],
@@ -84,7 +85,7 @@ export const COLORS = {
   gradientSurface: ['#FFFFFF', '#F9FAFB'],
   gradientWarm: ['#FEF3C7', '#FDE68A'],
   gradientSuccess: ['#34D399', '#10B981'],
-  
+
   // Premium gradient combinations for cards
   gradientHero: ['#6366F1', '#8B5CF6', '#A78BFA'],
   gradientEnergy: ['#F59E0B', '#FB923C', '#F472B6'],
@@ -137,7 +138,7 @@ export const BORDER_RADIUS = {
   full: 9999,
 };
 
-export const SHADOWS = {
+const _SHADOWS = {
   small: Platform.select({
     ios: {
       shadowColor: '#6366F1',
@@ -162,7 +163,7 @@ export const SHADOWS = {
     ios: {
       shadowColor: '#6366F1',
       shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.12,
+      shadowOpacity: 0.2,
       shadowRadius: 16,
     },
     android: { elevation: 8 },
@@ -210,13 +211,15 @@ export const SHADOWS = {
   }),
 };
 
+export const SHADOWS = _SHADOWS;
+
 export const CARD_STYLE = {
   backgroundColor: '#FFFFFF',
   borderRadius: BORDER_RADIUS.xl,
   borderWidth: 1,
   borderColor: '#F3F4F6',
   padding: SPACING.lg,
-  ...SHADOWS.small,
+  ..._SHADOWS.small,
 };
 
 export const GLASS_STYLE = {
@@ -240,14 +243,22 @@ export const MOOD_EMOJIS = [
 
 // Activity types — Vibrant palette
 export const ACTIVITY_TYPES = [
-  { id: 'gym', label: 'Gym Workout', icon: 'fitness-center', color: '#6366F1' },
-  { id: 'running', label: 'Running', icon: 'directions-run', color: '#F59E0B' },
-  { id: 'cycling', label: 'Cycling', icon: 'pedal-bike', color: '#06B6D4' },
-  { id: 'sports', label: 'Sports', icon: 'sports-soccer', color: '#10B981' },
-  { id: 'yoga', label: 'Yoga', icon: 'self-improvement', color: '#8B5CF6' },
-  { id: 'swimming', label: 'Swimming', icon: 'pool', color: '#0EA5E9' },
-  { id: 'walking', label: 'Walking', icon: 'directions-walk', color: '#34D399' },
-  { id: 'other', label: 'Other', icon: 'sports', color: '#EC4899' },
+  { id: 'gym', label: 'Gym Workout', icon: 'fitness-center', color: '#6366F1', unit: 'min' },
+  { id: 'running', label: 'Running', icon: 'directions-run', color: '#F59E0B', unit: 'min' },
+  { id: 'cycling', label: 'Cycling', icon: 'pedal-bike', color: '#06B6D4', unit: 'min' },
+  { id: 'sports', label: 'Sports', icon: 'sports-soccer', color: '#10B981', unit: 'min' },
+  { id: 'yoga', label: 'Yoga', icon: 'self-improvement', color: '#8B5CF6', unit: 'min' },
+  { id: 'swimming', label: 'Swimming', icon: 'pool', color: '#0EA5E9', unit: 'min' },
+  { id: 'walking', label: 'Walking', icon: 'directions-walk', color: '#34D399', unit: 'min' },
+  // Bodyweight exercises
+  { id: 'pushups', label: 'Push-ups', icon: 'fitness-center', color: '#EF4444', unit: 'reps' },
+  { id: 'pullups', label: 'Pull-ups', icon: 'fitness-center', color: '#EC4899', unit: 'reps' },
+  { id: 'squats', label: 'Squats', icon: 'fitness-center', color: '#F97316', unit: 'reps' },
+  { id: 'planks', label: 'Planks', icon: 'timer', color: '#8B5CF6', unit: 'sec' },
+  { id: 'situps', label: 'Sit-ups', icon: 'fitness-center', color: '#14B8A6', unit: 'reps' },
+  { id: 'lunges', label: 'Lunges', icon: 'directions-walk', color: '#84CC16', unit: 'reps' },
+  { id: 'burpees', label: 'Burpees', icon: 'fitness-center', color: '#EAB308', unit: 'reps' },
+  { id: 'other', label: 'Other', icon: 'sports', color: '#EC4899', unit: 'min' },
 ];
 
 // Meal types

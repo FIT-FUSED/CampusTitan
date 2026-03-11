@@ -1,9 +1,17 @@
 /**
  * Campus Environment Matrix
  * Returns time-based simulated campus zone data for the AI Wellness Coach
+ * Now uses real weather data from EnvironmentService when API key is configured
  */
 
-export const getCurrentCampusEnvironment = () => {
+import environmentService from '../services/EnvironmentService';
+
+// Cache for weather data to avoid too many API calls
+let cachedWeatherData = null;
+let lastWeatherFetch = null;
+const WEATHER_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+export const getCurrentCampusEnvironment = async () => {
     const hour = new Date().getHours();
     
     let timePeriod;
@@ -43,13 +51,45 @@ export const getCurrentCampusEnvironment = () => {
         ];
     }
     
-    // Mock weather data
-    const weather = {
-        aqi: 120,
-        temperature: 32,
-        humidity: 65,
-        condition: 'Partly Cloudy',
-    };
+    // Get real weather data from EnvironmentService
+    let weather;
+    try {
+        // Check if we have valid cached data
+        const now = Date.now();
+        if (cachedWeatherData && lastWeatherFetch && (now - lastWeatherFetch < WEATHER_CACHE_DURATION)) {
+            weather = cachedWeatherData;
+        } else {
+            // Fetch fresh weather data
+            const envData = await environmentService.getEnvironmentData();
+            if (envData?.weather) {
+                cachedWeatherData = {
+                    aqi: envData.aqi?.aqi || null,
+                    temperature: envData.weather.temperature,
+                    humidity: envData.weather.humidity,
+                    condition: envData.weather.description,
+                };
+                lastWeatherFetch = now;
+                weather = cachedWeatherData;
+            } else {
+                // Fallback if API fails
+                weather = {
+                    aqi: 120,
+                    temperature: 32,
+                    humidity: 65,
+                    condition: 'Partly Cloudy',
+                };
+            }
+        }
+    } catch (error) {
+        console.warn('[campusEnvironment] Failed to fetch weather:', error.message);
+        // Fallback weather data
+        weather = {
+            aqi: 120,
+            temperature: 32,
+            humidity: 65,
+            condition: 'Partly Cloudy',
+        };
+    }
     
     return {
         timePeriod,
@@ -61,8 +101,8 @@ export const getCurrentCampusEnvironment = () => {
 };
 
 // Helper to get just the zone recommendations
-export const getZoneRecommendation = (preference = 'quiet') => {
-    const env = getCurrentCampusEnvironment();
+export const getZoneRecommendation = async (preference = 'quiet') => {
+    const env = await getCurrentCampusEnvironment();
     const openZones = env.zones.filter(z => z.status === 'Open');
     
     if (preference === 'quiet') {

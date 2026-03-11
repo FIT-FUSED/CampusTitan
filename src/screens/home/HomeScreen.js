@@ -141,117 +141,80 @@ function BottomSheet({
 export default function HomeScreen({ navigation }) {
   const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
-  const [todayStats, setTodayStats] = useState({
-    calories: 0,
-    protein: 0,
-    carbs: 0,
-    fat: 0,
-    meals: 0,
-  });
-  const [todayActivity, setTodayActivity] = useState({
-    minutes: 0,
-    burned: 0,
-    count: 0,
-  });
+  const [todayStats, setTodayStats] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0, meals: 0 });
+  const [todayActivity, setTodayActivity] = useState({ minutes: 0, burned: 0, count: 0 });
   const [todayMood, setTodayMood] = useState(null);
   const [steps, setSteps] = useState(0);
-  const [km, setKm] = useState("0.00");
-  const [calories, setCalories] = useState(0);
   const [weeklyActivity, setWeeklyActivity] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
-  const [stepPermissionGranted, setStepPermissionGranted] = useState(false);
-  const [stepPermissionStatus, setStepPermissionStatus] = useState(null);
-
-  // Wellness Check-in & permission state
+  const [sheet, setSheet] = useState({ visible: false, type: null });
   const [checkInCompleted, setCheckInCompleted] = useState(false);
   const [usagePermission, setUsagePermission] = useState(false);
-  const [sheet, setSheet] = useState({ visible: false, type: null });
+  const [stepPermissionGranted, setStepPermissionGranted] = useState(false);
+  const [stepPermissionStatus, setStepPermissionStatus] = useState("undetermined");
+  const [km, setKm] = useState("0.00");
+  const [calories, setCalories] = useState(0);
 
-  const today = format(new Date(), "yyyy-MM-dd");
+  const today = format(new Date(), 'yyyy-MM-dd');
+
+  useEffect(() => {
+    async function checkStatus() {
+      // Check check-in completion
+      const lastCheckin = await AsyncStorage.getItem("@last_checkin_date");
+      if (lastCheckin === today) {
+        setCheckInCompleted(true);
+      }
+
+      // Check permissions
+      setUsagePermission(hasUsagePermissionSafely());
+
+      // Step tracking status
+      // Note: We don't call startTracking here to avoid multi-listeners on every mount
+      // unless permission is already granted.
+    }
+    checkStatus();
+  }, [today]);
 
   const loadData = useCallback(async () => {
     if (!user) return;
     try {
-      // Check if wellness check-in is done today
-      const lastCheckIn =
-        (await AsyncStorage.getItem("@last_logged_date")) ||
-        (await AsyncStorage.getItem("@last_checkin_date"));
-      setCheckInCompleted(lastCheckIn === today);
-      setUsagePermission(hasUsagePermissionSafely());
-
       const foods = await db.getFoodLogs(user.id);
-      const todayFoods = foods.filter((f) => f.date === today);
-      const totals = todayFoods.reduce(
-        (acc, f) => ({
-          calories: acc.calories + (f.calories || 0),
-          protein: acc.protein + (f.protein || 0),
-          carbs: acc.carbs + (f.carbs || 0),
-          fat: acc.fat + (f.fat || 0),
-        }),
-        { calories: 0, protein: 0, carbs: 0, fat: 0 },
-      );
+      const todayFoods = foods.filter(f => f.date === today);
+      const totals = todayFoods.reduce((acc, f) => ({
+        calories: acc.calories + (f.calories || 0),
+        protein: acc.protein + (f.protein || 0),
+        carbs: acc.carbs + (f.carbs || 0),
+        fat: acc.fat + (f.fat || 0),
+      }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
       setTodayStats({ ...totals, meals: todayFoods.length });
 
       const activities = await db.getActivities(user.id);
-      const todayActs = activities.filter((a) => a.date === today);
+      const todayActs = activities.filter(a => a.date === today);
       setTodayActivity({
         minutes: todayActs.reduce((s, a) => s + (a.duration || 0), 0),
         burned: todayActs.reduce((s, a) => s + (a.caloriesBurned || 0), 0),
         count: todayActs.length,
       });
-      setRecentActivities(
-        activities.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3),
-      );
+      setRecentActivities(activities.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3));
 
       const last7 = [];
       for (let i = 6; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        const dateStr = format(d, "yyyy-MM-dd");
-        const dayActs = activities.filter((a) => a.date === dateStr);
+        const dateStr = format(d, 'yyyy-MM-dd');
+        const dayActs = activities.filter(a => a.date === dateStr);
         last7.push(dayActs.reduce((s, a) => s + (a.duration || 0), 0));
       }
       setWeeklyActivity(last7);
 
       const moods = await db.getMoodLogs(user.id);
-      setTodayMood(moods.find((m) => m.date === today));
+      setTodayMood(moods.find(m => m.date === today));
     } catch (e) {
-      console.error("Load error:", e);
+      console.error('Load error:', e);
     }
   }, [user, today]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  // Check Physical Activity permission on mount
-  useEffect(() => {
-    const checkStepPermission = async () => {
-      const { granted } = await sensorService.checkPermissions();
-      setStepPermissionGranted(!!granted);
-    };
-    checkStepPermission();
-  }, []);
-
-  // Load persisted steps and subscribe to live updates
-  useEffect(() => {
-    const loadAndSubscribe = async () => {
-      await sensorService.loadPersistedSteps();
-      const currentSteps = sensorService.getSteps();
-      setSteps(currentSteps);
-      setKm(sensorService.getKm().toFixed(2));
-      setCalories(Math.round(sensorService.getCalories()));
-    };
-    loadAndSubscribe();
-
-    const onSteps = (newSteps) => {
-      setSteps(newSteps);
-      setKm(sensorService.getKm().toFixed(2));
-      setCalories(Math.round(sensorService.getCalories()));
-    };
-    sensorService.addListener(onSteps);
-    return () => sensorService.removeListener(onSteps);
-  }, []);
+  useEffect(() => { loadData(); }, [loadData]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -310,9 +273,8 @@ export default function HomeScreen({ navigation }) {
   const actProg = Math.min((todayActivity.minutes / actGoal) * 100, 100);
 
   const hour = new Date().getHours();
-  const greetEmoji = hour < 12 ? "☀️" : hour < 17 ? "🌤️" : "🌙";
-  const greetText =
-    hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
+  const greetEmoji = hour < 12 ? '☀️' : hour < 17 ? '🌤️' : '🌙';
+  const greetText = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
 
   return (
     <View style={s.container}>
@@ -414,6 +376,7 @@ export default function HomeScreen({ navigation }) {
             {/* Decorative elements */}
             <View style={s.quizDecor1} />
             <View style={s.quizDecor2} />
+
 
             <View style={s.quizContent}>
               <View style={s.quizIconWrap}>
@@ -844,24 +807,15 @@ export default function HomeScreen({ navigation }) {
             {weeklyActivity.map((val, i) => {
               const maxVal = Math.max(...weeklyActivity, 1);
               const h = Math.max((val / maxVal) * 70, 3);
-              const days = ["M", "T", "W", "T", "F", "S", "S"];
+              const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
               const isToday = i === 6;
               return (
                 <View key={i} style={s.barCol}>
                   <LinearGradient
-                    colors={
-                      isToday
-                        ? COLORS.gradientPrimary
-                        : [COLORS.surfaceElevated, COLORS.surfaceElevated]
-                    }
+                    colors={isToday ? COLORS.gradientPrimary : [COLORS.surfaceElevated, COLORS.surfaceElevated]}
                     style={[s.bar, { height: h }]}
                   />
-                  <Text
-                    style={[
-                      s.barLabel,
-                      isToday && { color: COLORS.primary, ...FONTS.bold },
-                    ]}
-                  >
+                  <Text style={[s.barLabel, isToday && { color: COLORS.primary, ...FONTS.bold }]}>
                     {days[i]}
                   </Text>
                   {isToday && <View style={s.barDot} />}

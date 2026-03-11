@@ -36,8 +36,8 @@ import LeaderboardScreen from "../screens/leaderboard/LeaderboardScreen";
 import CampusPulseLeaderboardScreen from "../screens/community/CampusPulseLeaderboardScreen";
 import HealthInsightsScreen from "../screens/community/HealthInsightsScreen";
 import WellnessQuizScreen from "../screens/wellness/WellnessQuizScreen";
-import DailyJournalScreen from "../screens/wellness/DailyJournalScreen";
 import DailyWellnessCheckInScreen from "../screens/wellness/DailyWellnessCheckInScreen";
+import AchievementsScreen from "../screens/fitness/AchievementsScreen";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -106,7 +106,13 @@ function NutritionStack() {
 }
 
 function FitnessStack() {
-  return <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="FitnessMain" component={FitnessScreen} /><Stack.Screen name="LogActivity" component={LogActivityScreen} /></Stack.Navigator>;
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="FitnessMain" component={FitnessScreen} />
+      <Stack.Screen name="LogActivity" component={LogActivityScreen} />
+      <Stack.Screen name="Achievements" component={AchievementsScreen} />
+    </Stack.Navigator>
+  );
 }
 
 function WellnessStack() {
@@ -117,7 +123,6 @@ function WellnessStack() {
       <Stack.Screen name="Journal" component={JournalScreen} />
       <Stack.Screen name="JournalEntry" component={JournalEntryScreen} />
       <Stack.Screen name="WellnessCircle" component={WellnessCircleScreen} />
-      <Stack.Screen name="DailyJournal" component={DailyJournalScreen} />
       <Stack.Screen name="DailyWellnessCheckIn" component={DailyWellnessCheckInScreen} />
     </Stack.Navigator>
   );
@@ -135,6 +140,7 @@ function CommunityStack() {
       <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
       <Stack.Screen name="CampusPulse" component={CampusPulseLeaderboardScreen} />
       <Stack.Screen name="HealthInsights" component={HealthInsightsScreen} />
+      <Stack.Screen name="Achievements" component={AchievementsScreen} />
     </Stack.Navigator>
   );
 }
@@ -145,6 +151,12 @@ function MoreMenu({ navigation }) {
     { icon: "🧠", label: "AI Health Insights", screen: "HealthInsights", color: COLORS.violet },
     { icon: "🔥", label: "Campus Pulse", screen: "CampusPulse", color: COLORS.primary },
     { icon: "🏆", label: "Leaderboard", screen: "Leaderboard", color: COLORS.orange },
+    {
+      icon: "🏅",
+      label: "Achievements",
+      screen: "Achievements",
+      color: COLORS.mint,
+    },
     { icon: "🌍", label: "Environment", screen: "Environment", color: COLORS.accentLight },
     { icon: "👤", label: "Profile", screen: "Profile", color: COLORS.coral },
     { icon: "⚙️", label: "Settings", screen: "Settings", color: COLORS.orange },

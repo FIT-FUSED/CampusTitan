@@ -1,56 +1,43 @@
 // Fitness Tracking Screen
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, RefreshControl, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, RefreshControl } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS, ACTIVITY_TYPES } from '../../theme';
+import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, ACTIVITY_TYPES, SHADOWS } from '../../theme';
 import { GradientCard, StatCard, SectionHeader, AnimatedButton, ProgressBar } from '../../components/common';
 import { useAuth } from '../../services/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import db from '../../services/database';
-import { format, subDays, startOfDay } from 'date-fns';
-import sensorService from '../../services/SensorService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { format, subDays } from 'date-fns';
 
 const { width } = Dimensions.get('window');
+
+// Helper to get emoji for activity type
+const getActivityEmoji = (typeId) => {
+  switch (typeId) {
+    case 'gym': return '🏋️';
+    case 'running': return '🏃';
+    case 'cycling': return '🚴';
+    case 'sports': return '⚽';
+    case 'yoga': return '🧘';
+    case 'swimming': return '🏊';
+    case 'walking': return '🚶';
+    case 'pushups': return '💪';
+    case 'pullups': return '🔝';
+    case 'squats': return '🦵';
+    case 'planks': return '⏱️';
+    case 'situps': return '🪑';
+    case 'lunges': return '🚶';
+    case 'burpees': return '🔥';
+    default: return '🏅';
+  }
+};
 
 export default function FitnessScreen({ navigation }) {
     const { user } = useAuth();
     const [activities, setActivities] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
     const [selectedFilter, setSelectedFilter] = useState('week');
-
-    // Automation state
-    const [steps, setSteps] = useState(0);
-    const [kms, setKms] = useState(0);
-    const [calories, setCalories] = useState(0);
-    const [exerciseMins, setExerciseMins] = useState('');
-
-    useEffect(() => {
-        const loadExercise = async () => {
-            const saved = await AsyncStorage.getItem('@exercise_mins_week');
-            if (saved) setExerciseMins(saved);
-        };
-        loadExercise();
-    }, []);
-
-    // Subscribe to SensorService for consistent step tracking
-    useEffect(() => {
-        const init = async () => {
-            await sensorService.loadPersistedSteps();
-            setSteps(sensorService.getTodaySteps());
-            setKms(sensorService.getKm());
-            setCalories(sensorService.getCalories());
-        };
-        init();
-
-        const onSteps = (newSteps) => {
-            setSteps(newSteps);
-            setKms(sensorService.getKm());
-            setCalories(sensorService.getCalories());
-        };
-        sensorService.addListener(onSteps);
-        return () => sensorService.removeListener(onSteps);
-    }, []);
 
     const loadData = useCallback(async () => {
         if (!user) return;
@@ -147,40 +134,28 @@ export default function FitnessScreen({ navigation }) {
                     </View>
                 </GradientCard>
 
-                {/* Today's quick stats */}
-                <SectionHeader title="Today" />
-                <View style={styles.statsGrid}>
-                    <StatCard title="Total Steps" value={steps} icon="🚶" color={COLORS.success} />
-                    <StatCard title="Distance Logged" value={kms} unit="km" icon="📍" color={COLORS.primary} />
-                    <StatCard title="Calories Burned" value={calories} unit="kcal" icon="🔥" color={COLORS.coral} />
-                </View>
-
-                {/* --- Automations --- */}
-                <SectionHeader title="Daily Auto-Tracking" />
-                <View style={styles.statsGrid}>
-                    <StatCard title="Total Steps" value={steps} icon="🚶" color={COLORS.success} />
-                    <StatCard title="Distance Logged" value={kms} unit="km" icon="📍" color={COLORS.primary} />
-                </View>
-
-                {/* --- Manual Overrides --- */}
-                <SectionHeader title="Weekly Goals" />
-                <View style={[styles.statsGrid, { alignItems: 'center' }]}>
-                    <View style={styles.inputCard}>
-                        <Text style={styles.inputLabel}>Exercise (min/week)</Text>
-                        <TextInput
-                            style={styles.manualInput}
-                            keyboardType="numeric"
-                            value={exerciseMins}
-                            placeholder="0"
-                            placeholderTextColor={COLORS.textMuted}
-                            onChangeText={(t) => {
-                                setExerciseMins(t);
-                                AsyncStorage.setItem('@exercise_mins_week', t);
-                            }}
-                        />
-                    </View>
-                    <StatCard title="Sessions" value={weekSessions} icon="💪" color={COLORS.primary} />
-                </View>
+                {/* Badges and Milestones Entry */}
+                <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => navigation.navigate('Achievements')}
+                    style={styles.achievementsCard}
+                >
+                    <LinearGradient
+                        colors={['#8B5CF6', '#6366F1']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.achievementsGradient}
+                    >
+                        <View style={styles.achievementsIconContainer}>
+                            <Text style={{ fontSize: 28 }}>🏆</Text>
+                        </View>
+                        <View style={styles.achievementsTextContainer}>
+                            <Text style={styles.achievementsTitle}>Milestone Badges</Text>
+                            <Text style={styles.achievementsSubtitle}>View your earned and locked achievements</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={24} color={COLORS.textInverse} style={{ opacity: 0.7 }} />
+                    </LinearGradient>
+                </TouchableOpacity>
 
                 {/* Stats Grid */}
                 <SectionHeader title="This Week" />
@@ -241,11 +216,15 @@ export default function FitnessScreen({ navigation }) {
                 <SectionHeader title="Recent Activities" />
                 {activities.slice(0, 10).map((act, i) => {
                     const actType = ACTIVITY_TYPES.find(t => t.id === act.type);
+                    const isRepBased = ['pushups', 'pullups', 'squats', 'situps', 'lunges', 'burpees'].includes(act.type);
+                    const isTimeBased = act.type === 'planks';
+                    const unitLabel = actType?.unit === 'reps' ? 'reps' : actType?.unit === 'sec' ? 'sec' : 'min';
+                    
                     return (
                         <View key={i} style={styles.activityItem}>
                             <View style={[styles.activityIcon, { backgroundColor: (actType?.color || COLORS.primary) + '22' }]}>
                                 <Text style={{ fontSize: 20 }}>
-                                    {act.type === 'gym' ? '🏋️' : act.type === 'running' ? '🏃' : act.type === 'cycling' ? '🚴' : act.type === 'sports' ? '⚽' : act.type === 'yoga' ? '🧘' : act.type === 'swimming' ? '🏊' : '🚶'}
+                                    {getActivityEmoji(act.type)}
                                 </Text>
                             </View>
                             <View style={styles.activityInfo}>
@@ -255,7 +234,7 @@ export default function FitnessScreen({ navigation }) {
                                 </Text>
                             </View>
                             <View style={styles.activityStats}>
-                                <Text style={styles.activityDuration}>{act.duration}min</Text>
+                                <Text style={styles.activityDuration}>{act.duration}{unitLabel}</Text>
                                 <Text style={styles.activityCals}>{act.caloriesBurned} kcal</Text>
                             </View>
                         </View>
@@ -278,24 +257,17 @@ const styles = StyleSheet.create({
     headerTitle: { fontSize: FONT_SIZES.xxl, ...FONTS.bold, color: COLORS.text },
     logButton: { paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg },
     summaryCard: { marginHorizontal: SPACING.lg, marginBottom: SPACING.md },
-    summaryLabel: { color: COLORS.textInverse, fontSize: FONT_SIZES.sm, ...FONTS.medium, opacity: 0.9, marginBottom: SPACING.md },
+    summaryLabel: { color: COLORS.text, fontSize: FONT_SIZES.sm, ...FONTS.medium, opacity: 0.8, marginBottom: SPACING.md },
     summaryRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
-    summaryValue: { color: COLORS.textInverse, fontSize: FONT_SIZES.xxxl, ...FONTS.bold, textAlign: 'center' },
-    summaryUnit: { color: COLORS.textInverse, fontSize: FONT_SIZES.xs, textAlign: 'center', opacity: 0.8 },
+    summaryValue: { color: COLORS.text, fontSize: FONT_SIZES.xxxl, ...FONTS.bold, textAlign: 'center' },
+    summaryUnit: { color: COLORS.text, fontSize: FONT_SIZES.xs, textAlign: 'center', opacity: 0.7 },
     summaryDivider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.2)' },
     statsGrid: { flexDirection: 'row', paddingHorizontal: SPACING.lg, gap: SPACING.md },
-    inputCard: {
-        flex: 1, backgroundColor: COLORS.surface, padding: SPACING.md,
-        borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.glassBorder
-    },
-    inputLabel: { color: COLORS.textMuted, fontSize: 10, ...FONTS.bold, textTransform: 'uppercase', marginBottom: 4 },
-    manualInput: { color: COLORS.primary, fontSize: 24, ...FONTS.bold, padding: 0 },
     chartContainer: {
         flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end',
         marginHorizontal: SPACING.lg, backgroundColor: COLORS.surface,
         padding: SPACING.lg, paddingBottom: SPACING.sm,
         borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.glassBorder, height: 140,
-        ...SHADOWS.small,
     },
     chartBar: { alignItems: 'center' },
     chartValue: { color: COLORS.textMuted, fontSize: 9, marginBottom: 4 },
@@ -304,7 +276,6 @@ const styles = StyleSheet.create({
     breakdownContainer: {
         marginHorizontal: SPACING.lg, backgroundColor: COLORS.surface,
         borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.glassBorder, padding: SPACING.lg,
-        ...SHADOWS.small,
     },
     breakdownItem: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -330,4 +301,44 @@ const styles = StyleSheet.create({
     activityDuration: { color: COLORS.accent, fontSize: FONT_SIZES.md, ...FONTS.bold },
     activityCals: { color: COLORS.textMuted, fontSize: FONT_SIZES.xs, marginTop: 2 },
     noData: { color: COLORS.textMuted, textAlign: 'center', fontSize: FONT_SIZES.md },
+    achievementsCard: {
+        marginHorizontal: SPACING.lg,
+        marginBottom: SPACING.lg,
+        borderRadius: BORDER_RADIUS.xl,
+        overflow: 'hidden',
+        elevation: 4,
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+    },
+    achievementsGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: SPACING.lg,
+    },
+    achievementsIconContainer: {
+        width: 50,
+        height: 50,
+        borderRadius: BORDER_RADIUS.md,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: SPACING.md,
+    },
+    achievementsTextContainer: {
+        flex: 1,
+    },
+    achievementsTitle: {
+        color: COLORS.textInverse,
+        fontSize: FONT_SIZES.lg,
+        fontFamily: FONTS.bold.fontFamily,
+        fontWeight: '700',
+    },
+    achievementsSubtitle: {
+        color: COLORS.textInverse,
+        fontSize: FONT_SIZES.xs,
+        opacity: 0.8,
+        marginTop: 2,
+    },
 });

@@ -570,11 +570,107 @@ class Database {
                 };
             });
 
-            console.log(`🧠 [Wellness] Found ${normalizedData.length} records for user ${userId}`);
-            return normalizedData;
+            console.log(`🧠 [Wellness] Found ${normalizedData.length} wellness records for user ${userId}`);
+            console.log(`🧠 [Wellness] Sample record:`, normalizedData[0]);
+
+            // Sort by date and limit
+            return normalizedData.slice(0, days);
         } catch (e) {
             console.error('getWellnessHistory error:', e);
             return [];
+        }
+    }
+
+    // ========================
+    // User Badges (Persistent)
+    // ========================
+    
+    // Get all badges for a user
+    async getUserBadges(userId) {
+        try {
+            const { data, error } = await supabase
+                .from('user_badges')
+                .select('*')
+                .eq('user_id', userId)
+                .order('unlocked_at', { ascending: false });
+            
+            if (error) {
+                console.error('getUserBadges error:', error);
+                return [];
+            }
+            
+            return data || [];
+        } catch (e) {
+            console.error('getUserBadges error:', e);
+            return [];
+        }
+    }
+
+    // Get badge IDs for a user (returns array of badge_id strings)
+    async getUserBadgeIds(userId) {
+        try {
+            const badges = await this.getUserBadges(userId);
+            return badges.map(b => b.badge_id);
+        } catch (e) {
+            console.error('getUserBadgeIds error:', e);
+            return [];
+        }
+    }
+
+    // Save a single badge for a user
+    async saveUserBadge(userId, badge) {
+        try {
+            const payload = {
+                user_id: userId,
+                badge_id: badge.id,
+                badge_title: badge.title,
+                badge_description: badge.description || '',
+                unlocked_at: new Date().toISOString(),
+            };
+            
+            // First try to insert, if exists then do nothing (idempotent)
+            const { data, error } = await supabase
+                .from('user_badges')
+                .upsert(payload, { onConflict: 'user_id, badge_id' })
+                .select()
+                .single();
+            
+            if (error) {
+                console.error('saveUserBadge error:', error);
+                return null;
+            }
+            
+            return data;
+        } catch (e) {
+            console.error('saveUserBadge error:', e);
+            return null;
+        }
+    }
+
+    // Save multiple badges for a user (bulk)
+    async saveUserBadges(userId, badges) {
+        try {
+            const payload = badges.map(badge => ({
+                user_id: userId,
+                badge_id: badge.id,
+                badge_title: badge.title,
+                badge_description: badge.description || '',
+                unlocked_at: new Date().toISOString(),
+            }));
+            
+            const { data, error } = await supabase
+                .from('user_badges')
+                .upsert(payload, { onConflict: 'user_id, badge_id' });
+            
+            if (error) {
+                console.error('saveUserBadges error:', error);
+                return false;
+            }
+            
+            return true;
+        } catch (e) {
+            console.error('saveUserBadges error:', e);
+            return false;
         }
     }
 }

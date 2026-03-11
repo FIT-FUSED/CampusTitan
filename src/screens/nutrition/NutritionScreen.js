@@ -7,6 +7,7 @@ import { GradientCard, SectionHeader, AnimatedButton, ProgressBar } from '../../
 import { useAuth } from '../../services/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import db from '../../services/database';
+import nutritionAnalysis from '../../services/nutritionAnalysis';
 import { format, subDays } from 'date-fns';
 import { calculateNutritionGoals, getDefaultGoals, calculateBMI, ACTIVITY_LEVELS, FITNESS_GOALS } from '../../utils/nutritionCalculator';
 
@@ -291,13 +292,20 @@ export default function NutritionScreen({ navigation }) {
                 <View style={{ height: 100 }} />
             </ScrollView>
 
-            <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
+            {/* Food Detail Modal */}
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={modalVisible}
+                onRequestClose={() => setModalVisible(false)}
+            >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>{selectedFood?.foodName}</Text>
                             <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}><Text style={styles.closeButtonText}>✕</Text></TouchableOpacity>
                         </View>
+
                         <View style={styles.modalBody}>
                             <View style={styles.nutritionGrid}>
                                 <View style={styles.nutritionItem}><Text style={styles.nutritionLabel}>Calories</Text><Text style={styles.nutritionValue}>{selectedFood?.calories || 0} kcal</Text></View>
@@ -361,6 +369,10 @@ export default function NutritionScreen({ navigation }) {
                                 <View style={styles.goalInputRow}><Text style={[styles.goalInputLabel, !editedGoals?.useCustom && styles.textDisabled]}>Protein (g)</Text><TextInput style={[styles.goalInput, !editedGoals?.useCustom && styles.inputDisabled]} value={editedGoals?.protein?.toString() || ''} onChangeText={(text) => handleCustomGoalChange('protein', text)} keyboardType="numeric" editable={editedGoals?.useCustom} /></View>
                                 <View style={styles.goalInputRow}><Text style={[styles.goalInputLabel, !editedGoals?.useCustom && styles.textDisabled]}>Carbs (g)</Text><TextInput style={[styles.goalInput, !editedGoals?.useCustom && styles.inputDisabled]} value={editedGoals?.carbs?.toString() || ''} onChangeText={(text) => handleCustomGoalChange('carbs', text)} keyboardType="numeric" editable={editedGoals?.useCustom} /></View>
                                 <View style={styles.goalInputRow}><Text style={[styles.goalInputLabel, !editedGoals?.useCustom && styles.textDisabled]}>Fat (g)</Text><TextInput style={[styles.goalInput, !editedGoals?.useCustom && styles.inputDisabled]} value={editedGoals?.fat?.toString() || ''} onChangeText={(text) => handleCustomGoalChange('fat', text)} keyboardType="numeric" editable={editedGoals?.useCustom} /></View>
+
+                            <View style={styles.mealInfo}>
+                                <Text style={styles.mealInfoLabel}>Meal Type</Text>
+                                <Text style={styles.mealInfoValue}>{selectedFood?.mealType || 'Unknown'}</Text>
                             </View>
 
                             {user?.height && user?.weight && user?.age && (
@@ -374,6 +386,10 @@ export default function NutritionScreen({ navigation }) {
                             <View style={styles.goalButtons}>
                                 <TouchableOpacity style={styles.recalcButton} onPress={handleReset}><Text style={styles.recalcButtonText}>Reset</Text></TouchableOpacity>
                                 <AnimatedButton title={savingGoals ? "Saving..." : "Save Goals"} onPress={handleSaveGoals} disabled={savingGoals} style={{ flex: 1 }} />
+
+                            <View style={styles.mealInfo}>
+                                <Text style={styles.mealInfoLabel}>Date</Text>
+                                <Text style={styles.mealInfoValue}>{selectedFood?.date || 'Unknown'}</Text>
                             </View>
                         </ScrollView>
                     </View>
@@ -409,7 +425,11 @@ const styles = StyleSheet.create({
     macroLabel: { color: COLORS.textSecondary, fontSize: FONT_SIZES.xs, ...FONTS.medium },
     macroValue: { fontSize: FONT_SIZES.xl, ...FONTS.bold, marginTop: SPACING.xs },
     macroGoal: { color: COLORS.textMuted, fontSize: FONT_SIZES.xs, marginTop: SPACING.xs },
-    mealSection: { marginHorizontal: SPACING.lg, marginTop: SPACING.lg, backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.glassBorder, padding: SPACING.lg, ...SHADOWS.small },
+    mealSection: {
+        marginHorizontal: SPACING.lg, marginTop: SPACING.lg,
+        backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg,
+        borderWidth: 1, borderColor: COLORS.glassBorder, padding: SPACING.lg,
+    },
     mealHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
     mealHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
     mealEmoji: { fontSize: 24, marginRight: SPACING.md },
@@ -419,9 +439,31 @@ const styles = StyleSheet.create({
     mealEmpty: { color: COLORS.textMuted, fontSize: FONT_SIZES.sm, fontStyle: 'italic' },
     foodItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: SPACING.sm, borderTopWidth: 1, borderTopColor: COLORS.glassBorder },
     vegDot: { width: 8, height: 8, borderRadius: 4, marginRight: SPACING.md },
-    foodName: { flex: 1, color: COLORS.text, fontSize: FONT_SIZES.md },
+    foodInfo: { flex: 1 },
+    foodName: { color: COLORS.text, fontSize: FONT_SIZES.md },
+    nutritionScore: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: SPACING.xs,
+        gap: SPACING.sm,
+    },
+    gradeText: {
+        fontSize: FONT_SIZES.xs,
+        ...FONTS.semiBold,
+    },
+    scoreText: {
+        fontSize: FONT_SIZES.xs,
+        ...FONTS.medium,
+        color: COLORS.textSecondary,
+    },
     foodCalories: { color: COLORS.textSecondary, fontSize: FONT_SIZES.sm },
-    weekChart: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', marginHorizontal: SPACING.lg, backgroundColor: COLORS.surface, padding: SPACING.lg, paddingBottom: SPACING.sm, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.glassBorder, height: 140, ...SHADOWS.small },
+    weekChart: {
+        flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end',
+        marginHorizontal: SPACING.lg, backgroundColor: COLORS.surface,
+        padding: SPACING.lg, paddingBottom: SPACING.sm,
+        borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.glassBorder,
+        height: 140,
+    },
     weekBar: { alignItems: 'center' },
     weekCalValue: { color: COLORS.textMuted, fontSize: 9, marginBottom: 4 },
     weekBarFill: { width: 28, borderRadius: BORDER_RADIUS.sm },

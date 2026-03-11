@@ -171,27 +171,16 @@ export default function FoodLogScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Header
-        title="Log Food"
-        subtitle="What did you eat?"
-        onBack={() => navigation.goBack()}
-      />
+      <Header title="Log Food" subtitle="What did you eat?" onBack={() => navigation.goBack()} />
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {/* Meal Type Selector */}
         <Text style={styles.label}>Meal Type</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.chipScroll}
-        >
-          {MEAL_TYPES.map((m) => (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+          {MEAL_TYPES.map(m => (
             <Chip
               key={m.id}
-              label={`${m.id === "breakfast" ? "🌅" : m.id === "lunch" ? "☀️" : m.id === "snack" ? "🍪" : "🌙"} ${m.label}`}
+              label={`${m.id === 'breakfast' ? '🌅' : m.id === 'lunch' ? '☀️' : m.id === 'snack' ? '🍪' : '🌙'} ${m.label}`}
               selected={selectedMealType === m.id}
               onPress={() => setSelectedMealType(m.id)}
               color={COLORS.primary}

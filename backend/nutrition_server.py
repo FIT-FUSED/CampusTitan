@@ -22,9 +22,9 @@ print(f"Loaded .env from: {env_path}")
 # Import nutrition_score
 try:
     import nutrition_score
-    print("✓ nutrition_score.py loaded successfully")
+    print("nutrition_score.py loaded successfully")
 except ImportError as e:
-    print(f"✗ Failed to load nutrition_score.py: {e}")
+    print(f"Failed to load nutrition_score.py: {e}")
     nutrition_score = None
 
 app = Flask(__name__)
@@ -78,14 +78,14 @@ def analyze_nutrition():
                 os.remove(temp_image_path)
 
             if result and 'food_name' in result:
-                print(f"✓ Analysis successful: {result.get('food_name', 'Unknown')}")
+                print(f"Analysis successful: {result.get('food_name', 'Unknown')}")
                 return jsonify(result)
             else:
-                print("✗ Pipeline returned no result")
+                print("Pipeline returned no result")
                 return jsonify({'error': 'AI pipeline returned no result. The food could not be identified.'}), 500
 
         except Exception as e:
-            print(f"✗ nutrition_score.py error: {e}")
+            print(f"nutrition_score.py error: {e}")
             import traceback
             traceback.print_exc()
             if os.path.exists(temp_image_path):
@@ -327,15 +327,16 @@ def analyze_mess_menu():
 # ============================================
 
 OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://localhost:11434')
-OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'myllama:latest')
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'my-llama:latest')
+print(f"Ollama Model Configured: {OLLAMA_MODEL}")
 
 try:
     from context_engine import compress_historical_context, build_ollama_prompt, calculate_moving_averages
     from engine import EMATracker
     ema_tracker = EMATracker(alpha=0.3)
-    print("✓ context_engine.py and engine.py loaded successfully")
+    print("context_engine.py and engine.py loaded successfully")
 except ImportError as e:
-    print(f"✗ Failed to load context_engine/engine: {e}")
+    print(f"Failed to load context_engine/engine: {e}")
     ema_tracker = None
 
 def _generate_arbitrary_activity():
@@ -422,7 +423,7 @@ def _call_ollama(prompt, timeout=180):
     except http_requests.exceptions.Timeout:
         raise Exception('Ollama request timed out.')
     except Exception as e:
-        raise Exception(f'Ollama error: {str(e)}')
+        raise Exception(f'Ollama error: {str(e)} (model: {OLLAMA_MODEL})')
 
 import threading
 import uuid
@@ -488,9 +489,9 @@ def _run_health_pipeline(job_id, data, gemini_key):
                 with concurrent.futures.ThreadPoolExecutor() as pool:
                     future = pool.submit(compress_historical_context, history_data, gemini_key)
                     trend_summary = future.result(timeout=20)
-                print(f"  [{job_id[:8]}] ✓ Gemini trend: {trend_summary[:80]}...")
+                print(f"  [{job_id[:8]}] Gemini trend: {trend_summary[:80]}...")
             except Exception as ge:
-                print(f"  [{job_id[:8]}] ✗ Gemini failed: {ge}")
+                print(f"  [{job_id[:8]}] Gemini failed: {ge}")
 
         if not trend_summary:
             trend_summary = (
@@ -512,7 +513,7 @@ def _run_health_pipeline(job_id, data, gemini_key):
 
         print(f"  [{job_id[:8]}] Sending to Ollama '{OLLAMA_MODEL}'...")
         ai_response = _call_ollama(structured_prompt)
-        print(f"  [{job_id[:8]}] ✓ Ollama response received ({len(ai_response)} chars)")
+        print(f"  [{job_id[:8]}] Ollama response received ({len(ai_response)} chars)")
 
         _health_jobs[job_id] = {
             'status': 'done',
@@ -538,7 +539,7 @@ def _run_health_pipeline(job_id, data, gemini_key):
             }
         }
     except Exception as e:
-        print(f"  [{job_id[:8]}] ✗ Pipeline error: {e}")
+        print(f"  [{job_id[:8]}] Pipeline error: {e}")
         import traceback
         traceback.print_exc()
         _health_jobs[job_id] = {'status': 'error', 'error': str(e)}
@@ -557,7 +558,7 @@ def health_summary_start():
     print(f"  → Started health summary job {job_id[:8]}...")
     return jsonify({'jobId': job_id, 'status': 'processing'})
 
-@app.route('/api/health/summary', methods=['POST'])
+@app.route('/api/health_summary', methods=['POST'])
 def health_summary_sync():
     data = request.get_json() or {}
     gemini_key = os.getenv('GEMINI_API_KEY')

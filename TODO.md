@@ -1,24 +1,16 @@
-# CampusTitan UI Redesign - TODO List
+# Badge Persistence Implementation
 
-## Phase 1: Theme Foundation ✅ COMPLETED
-- [x] 1.1 Update color palette in src/theme/index.js - Complete new premium colors
-- [x] 1.2 Enhance shadows and border radius
-- [x] 1.3 Add new gradient definitions
+## Task: Add badge notifications and ensure badges persist across login/logout
 
-## Phase 2: Core Screens ✅ COMPLETED
-- [x] 2.1 Redesign HomeScreen hero and branding
-- [x] 2.2 Improve daily wellness check-in card with stunning gradient
-- [x] 2.3 Enhance bento grid with better cards
-- [x] 2.4 Improve progress rings styling
-- [x] 2.5 Redesign DailyWellnessCheckInScreen with premium styling
-- [x] 2.6 Enhance WellnessScreen
+### Steps:
+- [x] 1. Create database migration for user_badges table
+- [x] 2. Update database.js with methods to save/load user badges
+- [x] 3. Update AchievementService.js to persist badges and send notifications
+- [x] 4. Update AuthContext.js to load badges on login
+- [x] 5. Update AchievementsScreen.js to use checkAndNotify
+- [x] 6. Update ProfileScreen.js to use checkAndNotify
 
-## Phase 3: Components ✅ COMPLETED
-- [x] 3.1 Update AIWellnessCoach with new avatar gradient
-- [x] 3.2 Improve common components (GradientCard, StatCard, AnimatedButton)
-
-## Phase 4: Testing & Polish ✅ COMPLETED
-- [x] 4.1 Review all changes
-- [x] 4.2 Ensure functionality works
-- [x] 4.3 Final polish
+### Next Steps:
+1. Run the migration `migration_user_badges.sql` in your Supabase dashboard
+2. Test the implementation by logging in, earning badges, logging out, and logging back in
 

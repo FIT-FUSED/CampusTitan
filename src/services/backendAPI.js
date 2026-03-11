@@ -46,7 +46,7 @@ class BackendAPI {
   async analyzeFoodImage(imageUri, context = '') {
     try {
       console.log('[BackendAPI] Analyzing food image:', imageUri);
-      
+
       // Create form data
       const formData = new FormData();
       formData.append('image', {
@@ -92,7 +92,7 @@ class BackendAPI {
   async getHealthSummary(payload) {
     try {
       console.log('[BackendAPI] Requesting health insights...');
-      const response = await this.axios.post('/api/health/summary', payload, {
+      const response = await this.axios.post('/api/health_summary', payload, {
         timeout: 180000,
         headers: {
           'Content-Type': 'application/json',

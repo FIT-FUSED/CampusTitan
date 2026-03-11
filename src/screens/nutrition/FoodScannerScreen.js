@@ -16,17 +16,17 @@ export default function FoodScannerScreen({ navigation }) {
     const insets = useSafeAreaInsets();
     const { user } = useAuth();
     const [permission, requestPermission] = useCameraPermissions();
-    
+
     // Fix ref initialization
     const cameraRef = useRef(null);
     const scanAnim = useRef(new Animated.Value(0)).current;
-    
+
     const [capturedImage, setCapturedImage] = useState(null);
     const [analyzing, setAnalyzing] = useState(false);
     const [nutritionData, setNutritionData] = useState(null);
     const [scanning, setScanning] = useState(true);
     const [cameraReady, setCameraReady] = useState(false);
-    
+
     const handleCameraReady = useCallback(() => {
         console.log('[FoodScanner] Camera is ready');
         setCameraReady(true);
@@ -218,7 +218,7 @@ export default function FoodScannerScreen({ navigation }) {
 
         try {
             console.log('[FoodScanner] Attempting to save food data:', foodData);
-            
+
             const normalized = normalizeNutritionResult(foodData);
             const dateStr = getLocalDateString();
             const detectedMealType = getMealTypeFromTime();
@@ -331,13 +331,13 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#000' },
     cameraContainer: { flex: 1, position: 'relative' },
     camera: { flex: 1 },
-    overlay: { 
-        position: 'absolute', 
-        top: 0, 
-        left: 0, 
-        right: 0, 
-        bottom: 0, 
-        backgroundColor: 'rgba(0,0,0,0.5)' 
+    overlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)'
     },
     unfocusedContainer: { flex: 1 },
     middleContainer: { flexDirection: 'row', height: width * 0.7 },

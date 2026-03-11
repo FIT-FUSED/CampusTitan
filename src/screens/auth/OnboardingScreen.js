@@ -5,8 +5,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS } from '../../theme';
 import { AnimatedButton } from '../../components/common';
 import { useAuth } from '../../services/AuthContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Picker } from '@react-native-picker/picker';
 
 const { width, height } = Dimensions.get('window');
 
@@ -32,14 +30,6 @@ const slides = [
         subtitle: 'Track your mood, journal your thoughts, and join wellness circles to thrive on campus.',
         gradient: COLORS.gradientCoral,
     },
-    {
-        id: '4',
-        emoji: '🧠',
-        title: 'Personalize\nYour Insights',
-        subtitle: 'Set your occupation and work mode. You can change these anytime in Settings.',
-        gradient: COLORS.gradientCard,
-        type: 'profile',
-    },
 ];
 
 export default function OnboardingScreen({ navigation }) {
@@ -47,8 +37,6 @@ export default function OnboardingScreen({ navigation }) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const scrollX = useRef(new Animated.Value(0)).current;
     const flatListRef = useRef(null);
-    const [occupation, setOccupation] = useState('Student');
-    const [workMode, setWorkMode] = useState('Onsite');
 
     const viewableItemsChanged = useRef(({ viewableItems }) => {
         if (viewableItems[0]) setCurrentIndex(viewableItems[0].index);
@@ -57,38 +45,6 @@ export default function OnboardingScreen({ navigation }) {
     const viewConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
     function renderSlide({ item }) {
-        if (item.type === 'profile') {
-            return (
-                <View style={styles.slide}>
-                    <View style={styles.emojiContainer}>
-                        <Text style={styles.emoji}>{item.emoji}</Text>
-                    </View>
-                    <Text style={styles.title}>{item.title}</Text>
-                    <Text style={styles.subtitle}>{item.subtitle}</Text>
-
-                    <View style={styles.formCard}>
-                        <Text style={styles.formLabel}>Occupation</Text>
-                        <View style={styles.pickerWrap}>
-                            <Picker selectedValue={occupation} onValueChange={setOccupation}>
-                                <Picker.Item label="Student" value="Student" />
-                                <Picker.Item label="Corporate" value="Corporate" />
-                                <Picker.Item label="Freelancer" value="Freelancer" />
-                                <Picker.Item label="Other" value="Other" />
-                            </Picker>
-                        </View>
-
-                        <Text style={[styles.formLabel, { marginTop: SPACING.md }]}>Work Mode</Text>
-                        <View style={styles.pickerWrap}>
-                            <Picker selectedValue={workMode} onValueChange={setWorkMode}>
-                                <Picker.Item label="Onsite" value="Onsite" />
-                                <Picker.Item label="Remote" value="Remote" />
-                                <Picker.Item label="Hybrid" value="Hybrid" />
-                            </Picker>
-                        </View>
-                    </View>
-                </View>
-            );
-        }
         return (
             <View style={styles.slide}>
                 <View style={styles.emojiContainer}>
@@ -100,11 +56,10 @@ export default function OnboardingScreen({ navigation }) {
         );
     }
 
-    async function handleNext() {
+    function handleNext() {
         if (currentIndex < slides.length - 1) {
             flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
         } else {
-            await AsyncStorage.setItem('@wellness_profile', JSON.stringify({ occupation, workMode }));
             setIsOnboarded(true);
         }
     }
@@ -210,17 +165,6 @@ const styles = StyleSheet.create({
         lineHeight: 24,
         paddingHorizontal: SPACING.lg,
     },
-    formCard: {
-        marginTop: SPACING.xxl,
-        width: '100%',
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.lg,
-        padding: SPACING.lg,
-        borderWidth: 1,
-        borderColor: COLORS.glassBorder,
-    },
-    formLabel: { color: COLORS.textSecondary, fontSize: FONT_SIZES.sm, ...FONTS.semiBold, marginBottom: SPACING.xs },
-    pickerWrap: { borderWidth: 1, borderColor: COLORS.glassBorder, borderRadius: BORDER_RADIUS.md, overflow: 'hidden', backgroundColor: COLORS.surfaceLight },
     dotsContainer: {
         flexDirection: 'row',
         justifyContent: 'center',

@@ -23,19 +23,98 @@ import { useAuth } from "../../services/AuthContext";
 import db from "../../services/database";
 import { format } from "date-fns";
 import { CAMPUS_ZONES } from "../../data/seedData";
+import SyncService from "../../services/SyncService";
 
 const { width } = Dimensions.get("window");
+
+// Helper to get unit label for activity type
+const getUnitLabel = (typeId) => {
+  const type = ACTIVITY_TYPES.find(t => t.id === typeId);
+  if (!type) return 'min';
+  if (type.unit === 'reps') return 'reps';
+  if (type.unit === 'sec') return 'seconds';
+  return 'min';
+};
+
+// Helper to get emoji for activity type
+const getActivityEmoji = (typeId) => {
+  switch (typeId) {
+    case 'gym': return '🏋️';
+    case 'running': return '🏃';
+    case 'cycling': return '🚴';
+    case 'sports': return '⚽';
+    case 'yoga': return '🧘';
+    case 'swimming': return '🏊';
+    case 'walking': return '🚶';
+    case 'pushups': return '💪';
+    case 'pullups': return '🔝';
+    case 'squats': return '🦵';
+    case 'planks': return '⏱️';
+    case 'situps': return '🪑';
+    case 'lunges': return '🚶';
+    case 'burpees': return '🔥';
+    default: return '🏅';
+  }
+};
+
+// Helper to calculate calories based on activity type and value
+const calculateCalories = (typeId, value) => {
+  const numValue = parseInt(value) || 0;
+  
+  // For duration-based activities (calories per minute)
+  const durationRates = {
+    gym: 8,
+    running: 11,
+    cycling: 9,
+    swimming: 10,
+    yoga: 4,
+    walking: 4,
+    sports: 7,
+    other: 5,
+  };
+  
+  // For rep-based exercises (calories per rep)
+  const repRates = {
+    pushups: 0.5,
+    pullups: 1.0,
+    squats: 0.3,
+    situps: 0.25,
+    lunges: 0.3,
+    burpees: 0.8,
+  };
+  
+  // For time-based exercises (calories per second)
+  const secRates = {
+    planks: 0.05,
+  };
+  
+  if (durationRates[typeId]) {
+    return Math.round(numValue * durationRates[typeId]);
+  } else if (repRates[typeId]) {
+    return Math.round(numValue * repRates[typeId]);
+  } else if (secRates[typeId]) {
+    return Math.round(numValue * secRates[typeId]);
+  }
+  return 0;
+};
 
 export default function LogActivityScreen({ navigation }) {
   const { user } = useAuth();
   const [selectedType, setSelectedType] = useState(null);
   const [duration, setDuration] = useState("30");
+  const [reps, setReps] = useState("12");
+  const [sets, setSets] = useState("3");
   const [selectedZone, setSelectedZone] = useState("Gym");
   const [exercises, setExercises] = useState([
     { name: "", sets: "3", reps: "12", weight: "" },
   ]);
   const [distance, setDistance] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Determine if selected activity is rep-based
+  const isRepBased = selectedType && ['pushups', 'pullups', 'squats', 'situps', 'lunges', 'burpees'].includes(selectedType);
+  const isTimeBased = selectedType && ['planks'].includes(selectedType);
+  const isDurationBased = selectedType && !isRepBased && !isTimeBased;
 
   function addExercise() {
     setExercises((prev) => [
@@ -58,49 +137,62 @@ export default function LogActivityScreen({ navigation }) {
       return;
     }
     setSaving(true);
-    const dur = parseInt(duration) || 30;
-    const caloriesBurned = Math.round(
-      dur *
-        (selectedType === "gym"
-          ? 8
-          : selectedType === "running"
-            ? 11
-            : selectedType === "cycling"
-              ? 9
-              : selectedType === "swimming"
-                ? 10
-                : 7),
-    );
+
+    let durationValue, caloriesBurned, activityDetails;
+
+    if (isRepBased || isTimeBased) {
+      // For bodyweight exercises
+      const numReps = parseInt(reps) || 0;
+      const numSets = parseInt(sets) || 0;
+      const totalReps = numReps * numSets;
+      durationValue = isTimeBased ? parseInt(duration) || 30 : totalReps;
+      caloriesBurned = calculateCalories(selectedType, durationValue);
+      activityDetails = {
+        sets: numSets,
+        reps: numReps,
+        totalReps: totalReps,
+      };
+    } else {
+      // For duration-based activities
+      durationValue = parseInt(duration) || 30;
+      caloriesBurned = calculateCalories(selectedType, durationValue);
+      activityDetails = {};
+    }
 
     try {
       await db.addActivity({
         userId: user.id,
         date: format(new Date(), "yyyy-MM-dd"),
         type: selectedType,
-        duration: dur,
+        duration: durationValue,
         caloriesBurned,
         zone: selectedZone,
-        details:
+        details: isRepBased || isTimeBased ? activityDetails :
           selectedType === "gym"
             ? {
-                exercises: exercises
-                  .filter((e) => e.name)
-                  .map((e) => ({
-                    name: e.name,
-                    sets: parseInt(e.sets) || 3,
-                    reps: parseInt(e.reps) || 12,
-                    weight: parseInt(e.weight) || 0,
-                  })),
-              }
+              exercises: exercises
+                .filter((e) => e.name)
+                .map((e) => ({
+                  name: e.name,
+                  sets: parseInt(e.sets) || 3,
+                  reps: parseInt(e.reps) || 12,
+                  weight: parseInt(e.weight) || 0,
+                })),
+            }
             : selectedType === "running" || selectedType === "cycling"
               ? {
-                  distance: parseFloat(distance) || 0,
-                }
+                distance: parseFloat(distance) || 0,
+              }
               : {},
       });
+
+      // Check for fitness achievements
+      await SyncService.runAchievementCheck(user?.id);
+
+      const unitLabel = getUnitLabel(selectedType);
       Alert.alert(
         "Activity Logged! 💪",
-        `${ACTIVITY_TYPES.find((t) => t.id === selectedType)?.label} for ${dur} minutes`,
+        `${ACTIVITY_TYPES.find((t) => t.id === selectedType)?.label} for ${durationValue} ${unitLabel}`,
         [{ text: "Done", onPress: () => navigation.goBack() }],
       );
     } catch (e) {
@@ -136,21 +228,7 @@ export default function LogActivityScreen({ navigation }) {
               onPress={() => setSelectedType(type.id)}
             >
               <Text style={styles.activityEmoji}>
-                {type.id === "gym"
-                  ? "🏋️"
-                  : type.id === "running"
-                    ? "🏃"
-                    : type.id === "cycling"
-                      ? "🚴"
-                      : type.id === "sports"
-                        ? "⚽"
-                        : type.id === "yoga"
-                          ? "🧘"
-                          : type.id === "swimming"
-                            ? "🏊"
-                            : type.id === "walking"
-                              ? "🚶"
-                              : "🏅"}
+                {getActivityEmoji(type.id)}
               </Text>
               <Text
                 style={[
@@ -164,36 +242,107 @@ export default function LogActivityScreen({ navigation }) {
           ))}
         </View>
 
-        {/* Duration */}
-        <Text style={styles.label}>Duration</Text>
-        <View style={styles.durationRow}>
-          {["15", "30", "45", "60", "90"].map((d) => (
-            <TouchableOpacity
-              key={d}
-              style={[
-                styles.durationBtn,
-                duration === d && styles.durationBtnActive,
-              ]}
-              onPress={() => setDuration(d)}
-            >
-              <Text
-                style={[
-                  styles.durationText,
-                  duration === d && styles.durationTextActive,
-                ]}
-              >
-                {d}m
+        {/* Duration or Reps based on activity type */}
+        {isDurationBased && (
+          <>
+            <Text style={styles.label}>Duration</Text>
+            <View style={styles.durationRow}>
+              {["15", "30", "45", "60", "90"].map((d) => (
+                <TouchableOpacity
+                  key={d}
+                  style={[
+                    styles.durationBtn,
+                    duration === d && styles.durationBtnActive,
+                  ]}
+                  onPress={() => setDuration(d)}
+                >
+                  <Text
+                    style={[
+                      styles.durationText,
+                      duration === d && styles.durationTextActive,
+                    ]}
+                  >
+                    {d}m
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <StyledInput
+              label="Custom Duration (minutes)"
+              value={duration}
+              onChangeText={setDuration}
+              keyboardType="numeric"
+              placeholder="30"
+            />
+          </>
+        )}
+
+        {/* Reps/Sets for bodyweight exercises */}
+        {isRepBased && (
+          <>
+            <Text style={styles.label}>Sets & Reps</Text>
+            <View style={styles.repsRow}>
+              <View style={styles.repsInput}>
+                <Text style={styles.repsLabel}>Sets</Text>
+                <StyledInput
+                  value={sets}
+                  onChangeText={setSets}
+                  keyboardType="numeric"
+                  placeholder="3"
+                />
+              </View>
+              <View style={styles.repsInput}>
+                <Text style={styles.repsLabel}>Reps per set</Text>
+                <StyledInput
+                  value={reps}
+                  onChangeText={setReps}
+                  keyboardType="numeric"
+                  placeholder="12"
+                />
+              </View>
+            </View>
+            <View style={styles.totalReps}>
+              <Text style={styles.totalRepsText}>
+                Total: {(parseInt(sets) || 0) * (parseInt(reps) || 0)} reps
               </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <StyledInput
-          label="Custom Duration (minutes)"
-          value={duration}
-          onChangeText={setDuration}
-          keyboardType="numeric"
-          placeholder="30"
-        />
+            </View>
+          </>
+        )}
+
+        {/* Duration for planks (time-based) */}
+        {isTimeBased && (
+          <>
+            <Text style={styles.label}>Duration (seconds)</Text>
+            <View style={styles.durationRow}>
+              {["30", "60", "90", "120", "180"].map((d) => (
+                <TouchableOpacity
+                  key={d}
+                  style={[
+                    styles.durationBtn,
+                    duration === d && styles.durationBtnActive,
+                  ]}
+                  onPress={() => setDuration(d)}
+                >
+                  <Text
+                    style={[
+                      styles.durationText,
+                      duration === d && styles.durationTextActive,
+                    ]}
+                  >
+                    {d}s
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <StyledInput
+              label="Custom Duration (seconds)"
+              value={duration}
+              onChangeText={setDuration}
+              keyboardType="numeric"
+              placeholder="60"
+            />
+          </>
+        )}
 
         {/* Location */}
         <Text style={styles.label}>Location</Text>
@@ -281,17 +430,9 @@ export default function LogActivityScreen({ navigation }) {
             <Text style={styles.estimateLabel}>Estimated Calories Burned</Text>
             <Text style={styles.estimateValue}>
               🔥{" "}
-              {Math.round(
-                (parseInt(duration) || 30) *
-                  (selectedType === "gym"
-                    ? 8
-                    : selectedType === "running"
-                      ? 11
-                      : selectedType === "cycling"
-                        ? 9
-                        : selectedType === "swimming"
-                          ? 10
-                          : 7),
+              {calculateCalories(selectedType, isRepBased || isTimeBased 
+                ? (isRepBased ? (parseInt(sets) || 0) * (parseInt(reps) || 0) : parseInt(duration) || 0)
+                : parseInt(duration) || 30
               )}{" "}
               kcal
             </Text>
@@ -413,5 +554,30 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xxl,
     ...FONTS.bold,
     marginTop: SPACING.sm,
+  },
+  // Reps input styles
+  repsRow: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  repsInput: {
+    flex: 1,
+  },
+  repsLabel: {
+    color: COLORS.textSecondary,
+    fontSize: FONT_SIZES.sm,
+    marginBottom: SPACING.xs,
+  },
+  totalReps: {
+    backgroundColor: COLORS.surfaceHighlight,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    alignItems: 'center',
+  },
+  totalRepsText: {
+    color: COLORS.primary,
+    fontSize: FONT_SIZES.md,
+    ...FONTS.semiBold,
   },
 });

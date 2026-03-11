@@ -18,14 +18,60 @@ import {
   SHADOWS,
 } from "../theme";
 import environmentService from "../services/EnvironmentService";
+import notificationService from "../services/NotificationService";
 
-// AQI colour scale
-function getAQIColor(aqi) {
-  if (aqi <= 50) return "#34D399"; // Good
-  if (aqi <= 100) return "#F59E0B"; // Moderate
-  if (aqi <= 150) return "#F87171"; // Unhealthy for Sensitive Groups
-  if (aqi <= 200) return "#EF4444"; // Unhealthy
-  return "#B91C1C"; // Very Unhealthy
+// AQI colour scale (OpenWeather air_pollution uses a 1-5 index)
+function getAQIColor(aqiIndex) {
+  if (aqiIndex === 1) return "#34D399"; // Good
+  if (aqiIndex === 2) return "#A3E635"; // Fair
+  if (aqiIndex === 3) return "#F59E0B"; // Moderate
+  if (aqiIndex === 4) return "#EF4444"; // Poor
+  if (aqiIndex === 5) return "#B91C1C"; // Very Poor
+  return COLORS.textMuted;
+}
+
+function getActivitySuggestions({ aqiIndex, temp, weatherCondition }) {
+  const suggestions = [];
+
+  const condition = (weatherCondition || "").toLowerCase();
+  const isRainy = condition.includes("rain") || condition.includes("drizzle") || condition.includes("thunder");
+  const isVeryHot = typeof temp === "number" && temp >= 35;
+  const isHot = typeof temp === "number" && temp >= 30;
+
+  const aqiBad = aqiIndex === 4 || aqiIndex === 5;
+  const aqiOkay = aqiIndex === 1 || aqiIndex === 2;
+
+  if (aqiBad) {
+    suggestions.push("Indoor workout (gym / room circuit)");
+    suggestions.push("Yoga / mobility session");
+    if (isHot || isVeryHot) suggestions.push("Stay hydrated and avoid peak sun");
+    return suggestions.slice(0, 3);
+  }
+
+  if (isRainy) {
+    suggestions.push("Indoor cardio (treadmill / skipping)");
+    suggestions.push("Strength training indoors");
+    return suggestions.slice(0, 3);
+  }
+
+  if (isVeryHot) {
+    suggestions.push("Outdoor walk before 8 AM / after 6 PM");
+    suggestions.push("Indoor workout during midday");
+    suggestions.push("Extra hydration + electrolytes");
+    return suggestions.slice(0, 3);
+  }
+
+  if (aqiOkay) {
+    suggestions.push("Outdoor run / brisk walk");
+    suggestions.push("Sports (football / basketball)");
+    suggestions.push("Outdoor stretching / cooldown");
+    return suggestions.slice(0, 3);
+  }
+
+  suggestions.push("Light outdoor walk");
+  suggestions.push("Gym workout");
+  suggestions.push("Stretching / mobility");
+  return suggestions.slice(0, 3);
 }
 
 // ─── Crowd colour scale ────────────────────────────────────────────────────────
@@ -45,10 +91,10 @@ function getCrowdLabel(pct) {
 // Priority order: most-constrained condition wins.
 // All comparisons are against thresholds; never raw totals.
 function getDynamicInsight(env) {
-  const { aqi, temp, gymCrowdPercent } = env;
+  const { aqiIndex, temp, gymCrowdPercent } = env;
 
-  const aqiHigh = aqi > 100;
-  const aqiVeryHigh = aqi > 150;
+  const aqiHigh = aqiIndex === 4 || aqiIndex === 5;
+  const aqiVeryHigh = aqiIndex === 5;
   const tempHot = temp > 35;
   const gymCrowded = gymCrowdPercent >= 75;
   const gymModerate = gymCrowdPercent >= 50 && gymCrowdPercent < 75;
@@ -69,7 +115,7 @@ function getDynamicInsight(env) {
       emoji: "🧘",
       tone: "warn",
       text:
-        "Insight: AQI is high and the gym is crowded. Consider a light indoor room workout or yoga today to maintain your Mental Wellness score.",
+        "Insight: Air quality is poor and the gym is crowded. Consider a light indoor room workout or yoga today to maintain your Mental Wellness score.",
     };
   }
 
@@ -79,7 +125,7 @@ function getDynamicInsight(env) {
       emoji: "🏋️",
       tone: "warn",
       text:
-        "Insight: AQI is elevated — skip the run and head to the gym instead. The gym is currently " +
+        "Insight: Air quality is elevated — skip the run and head to the gym instead. The gym is currently " +
         getCrowdLabel(gymCrowdPercent).toLowerCase() +
         ", so you'll have plenty of space.",
     };
@@ -160,6 +206,34 @@ export default function EnvironmentWidget({ onPress }) {
     fetchEnvironmentData();
   }, []);
 
+  useEffect(() => {
+    const maybeNotifyRain = async () => {
+      try {
+        const condition = environmentData?.weather?.description;
+        const conditionLower = (condition || "").toLowerCase();
+        const isRainy = conditionLower.includes("rain") || conditionLower.includes("drizzle") || conditionLower.includes("thunder");
+        if (!isRainy) return;
+
+        const env = {
+          aqiIndex: environmentData?.aqi?.aqiIndex ?? null,
+          temp: environmentData?.weather?.temperature,
+          weatherCondition: condition,
+        };
+        const suggestions = getActivitySuggestions(env);
+        await notificationService.sendRainSuggestionNotification({
+          condition,
+          suggestions,
+        });
+      } catch {
+        // Ignore notification errors
+      }
+    };
+
+    if (environmentData?.weather) {
+      maybeNotifyRain();
+    }
+  }, [environmentData]);
+
   if (loading) {
     return (
       <View style={styles.wrapper}>
@@ -183,8 +257,9 @@ export default function EnvironmentWidget({ onPress }) {
   }
 
   const env = {
-    aqi: environmentData.aqi?.aqi || 50,
-    aqiLabel: environmentData.aqi?.aqiCategory || 'Good',
+    aqiIndex: environmentData.aqi?.aqiIndex ?? null,
+    aqiLabel: environmentData.aqi?.aqiCategory || 'Unknown',
+    healthRecommendation: environmentData.aqi?.healthRecommendation || 'Air quality information is unavailable.',
     temp: environmentData.weather?.temperature || 25,
     weatherCondition: environmentData.weather?.description || 'Clear',
     weatherIcon: "☀️",
@@ -193,9 +268,10 @@ export default function EnvironmentWidget({ onPress }) {
   };
 
   const insight = getDynamicInsight(env);
-  const aqiColor = getAQIColor(env.aqi);
+  const aqiColor = getAQIColor(env.aqiIndex);
   const crowdColor = getCrowdColor(env.gymCrowdPercent);
   const insightGradient = TONE_GRADIENTS[insight.tone] ?? TONE_GRADIENTS.info;
+  const activitySuggestions = getActivitySuggestions(env);
 
   return (
     <View style={styles.wrapper}>
@@ -218,7 +294,7 @@ export default function EnvironmentWidget({ onPress }) {
         <StatPill
           emoji="💨"
           label={env.aqiLabel}
-          value={env.aqi + ""}
+          value={env.aqiIndex ? `${env.aqiIndex}/5` : "--"}
           valueColor={aqiColor}
         />
 
@@ -269,6 +345,17 @@ export default function EnvironmentWidget({ onPress }) {
         <Text style={styles.insightEmoji}>{insight.emoji}</Text>
         <Text style={styles.insightText}>{insight.text}</Text>
       </LinearGradient>
+
+      <View style={styles.aqiDetailsCard}>
+        <Text style={styles.aqiDetailsTitle}>Air Quality</Text>
+        <Text style={styles.aqiDetailsText}>{env.healthRecommendation}</Text>
+        <Text style={styles.aqiDetailsTitle}>Suggested activities</Text>
+        {activitySuggestions.map((s, idx) => (
+          <Text key={`${idx}-${s}`} style={styles.aqiDetailsBullet}>
+            {"- "}{s}
+          </Text>
+        ))}
+      </View>
 
       {/* ── "See full report" tap target ── */}
       {onPress && (
@@ -398,6 +485,34 @@ const styles = StyleSheet.create({
     ...FONTS.medium,
     color: "#FFFFFF",
     lineHeight: 19,
+  },
+
+  aqiDetailsCard: {
+    marginTop: SPACING.md,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.surfaceElevated,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
+  },
+  aqiDetailsTitle: {
+    fontSize: FONT_SIZES.sm,
+    ...FONTS.bold,
+    color: COLORS.text,
+    marginBottom: 6,
+  },
+  aqiDetailsText: {
+    fontSize: FONT_SIZES.xs,
+    ...FONTS.medium,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.sm,
+    lineHeight: 18,
+  },
+  aqiDetailsBullet: {
+    fontSize: FONT_SIZES.xs,
+    ...FONTS.medium,
+    color: COLORS.textMuted,
+    lineHeight: 18,
   },
 
   // See more

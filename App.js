@@ -6,26 +6,24 @@ import { AuthProvider } from './src/services/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import sensorService from './src/services/SensorService';
 import SyncService from './src/services/SyncService';
+import notificationService from './src/services/NotificationService';
 
-function AppRoot() {
+export default function App() {
   useEffect(() => {
     // Start step tracking as early as possible
     sensorService.startTracking();
+
+    // Register for notifications
+    notificationService.register();
   }, []);
 
   return (
-    <AuthProvider>
-      <StatusBar style="dark" />
-      <AppNavigator />
-    </AuthProvider>
-  );
-}
-
-export default function App() {
-  return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <AppRoot />
+        <AuthProvider>
+          <StatusBar style="light" />
+          <AppNavigator />
+        </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

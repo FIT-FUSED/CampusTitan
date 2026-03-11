@@ -6,12 +6,24 @@ import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS } from '../.
 
 const { width } = Dimensions.get('window');
 
+function normalizeGradient(gradient) {
+    if (Array.isArray(gradient)) {
+        const cleaned = gradient.filter((c) => typeof c === 'string' && c.length > 0);
+        if (cleaned.length >= 2) return cleaned;
+        if (cleaned.length === 1) return [cleaned[0], cleaned[0]];
+    }
+    if (typeof gradient === 'string' && gradient.length > 0) {
+        return [gradient, gradient];
+    }
+    return Array.isArray(COLORS.gradientCard) ? COLORS.gradientCard : ['#6366F1', '#8B5CF6'];
+}
+
 // Premium Gradient Card with stunning gradients
 export function GradientCard({ children, gradient, style, onPress }) {
     const content = (
         <View style={styles.cardContainer}>
             <LinearGradient
-                colors={gradient || COLORS.gradientCard}
+                colors={normalizeGradient(gradient)}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[styles.gradientCard, style]}
@@ -81,9 +93,9 @@ export function AnimatedButton({ title, onPress, gradient, style, textStyle, dis
         sky: COLORS.gradientSky,
         calm: COLORS.gradientCalm,
     };
-    
-    const selectedGradient = gradient || gradients[variant] || COLORS.gradientPrimary;
-    
+
+    const selectedGradient = normalizeGradient(gradient || gradients[variant] || COLORS.gradientPrimary);
+
     return (
         <TouchableOpacity
             activeOpacity={0.85}
@@ -113,8 +125,8 @@ export function Header({ title, subtitle, onBack, rightAction, onLongPress }) {
         <View style={styles.header}>
             <View style={styles.headerLeft}>
                 {onBack && (
-                    <TouchableOpacity 
-                        style={styles.backButton} 
+                    <TouchableOpacity
+                        style={styles.backButton}
                         onPress={onBack}
                         delayPressIn={0}
                     >
@@ -126,18 +138,12 @@ export function Header({ title, subtitle, onBack, rightAction, onLongPress }) {
                         </LinearGradient>
                     </TouchableOpacity>
                 )}
+                <View>
+                    <Text style={styles.headerTitle}>{title}</Text>
+                    {subtitle && <Text style={styles.headerSubtitle}>{subtitle}</Text>}
+                </View>
             </View>
-            <TouchableOpacity 
-                style={styles.headerCenter} 
-                onLongPress={onLongPress}
-                delayLongPress={2000}
-            >
-                <Text style={styles.headerTitle}>{title}</Text>
-                {subtitle && <Text style={styles.headerSubtitle}>{subtitle}</Text>}
-            </TouchableOpacity>
-            <View style={styles.headerRight}>
-                {rightAction}
-            </View>
+            {rightAction && rightAction}
         </View>
     );
 }
@@ -230,9 +236,9 @@ export function Chip({ label, color, selected, onPress }) {
             onPress={onPress}
             style={[
                 styles.chip,
-                selected && { 
-                    backgroundColor: chipColor, 
-                    borderColor: chipColor 
+                selected && {
+                    backgroundColor: chipColor,
+                    borderColor: chipColor
                 },
             ]}
         >
@@ -349,9 +355,9 @@ const styles = StyleSheet.create({
         borderWidth: 0,
     },
     buttonText: {
-        color: COLORS.textInverse,
+        color: COLORS.text,
         fontSize: FONT_SIZES.lg,
-        ...FONTS.bold,
+        ...FONTS.semiBold,
     },
     buttonIcon: {
         fontSize: 18,

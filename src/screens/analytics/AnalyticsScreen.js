@@ -20,7 +20,7 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import analyticsService from "../../services/AnalyticsService";
 
-const { width } = Dimensions.get("window");
+const { width } = Dimensions.get('window');
 
 export default function AnalyticsScreen({ navigation }) {
   const [selectedView, setSelectedView] = useState("college");
@@ -143,21 +143,13 @@ export default function AnalyticsScreen({ navigation }) {
         {/* Privacy Notice */}
         <GradientCard gradient={COLORS.gradientCard} style={styles.privacyCard}>
           <Text style={styles.privacyEmoji}>🔒</Text>
-          <Text style={styles.privacyText}>
-            All analytics are anonymized. No personal data is shared.
-          </Text>
+          <Text style={styles.privacyText}>All analytics are anonymized. No personal data is shared.</Text>
         </GradientCard>
 
         {/* View Toggle */}
         <View style={styles.toggleRow}>
-          {["college", "department", "trends"].map((v) => (
-            <Chip
-              key={v}
-              label={v.charAt(0).toUpperCase() + v.slice(1)}
-              selected={selectedView === v}
-              onPress={() => setSelectedView(v)}
-              color={COLORS.primary}
-            />
+          {['hostel', 'department', 'trends'].map(v => (
+            <Chip key={v} label={v.charAt(0).toUpperCase() + v.slice(1)} selected={selectedView === v} onPress={() => setSelectedView(v)} color={COLORS.primary} />
           ))}
         </View>
 
@@ -365,9 +357,7 @@ export default function AnalyticsScreen({ navigation }) {
                 const barH = Math.max((d.totalActivities / maxAct) * 80, 4);
                 return (
                   <View key={i} style={styles.trendBarItem}>
-                    <Text style={styles.trendBarValue}>
-                      {d.totalActivities}
-                    </Text>
+                    <Text style={styles.trendBarValue}>{d.totalActivities}</Text>
                     <LinearGradient
                       colors={COLORS.gradientPrimary}
                       style={[styles.trendBarFill, { height: barH }]}
