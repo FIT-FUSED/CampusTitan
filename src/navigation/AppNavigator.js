@@ -37,6 +37,7 @@ import CampusPulseLeaderboardScreen from "../screens/community/CampusPulseLeader
 import HealthInsightsScreen from "../screens/community/HealthInsightsScreen";
 import WellnessQuizScreen from "../screens/wellness/WellnessQuizScreen";
 import DailyWellnessCheckInScreen from "../screens/wellness/DailyWellnessCheckInScreen";
+import AIChatInterface from "../components/AIChatInterface";
 import AchievementsScreen from "../screens/fitness/AchievementsScreen";
 
 const Stack = createStackNavigator();
@@ -56,7 +57,10 @@ function CustomTabBar({ state, descriptors, navigation }) {
             Community: { focused: "people", unfocused: "people-outline" },
             CampusAnalytics: { focused: "analytics", unfocused: "analytics-outline" },
             Alerts: { focused: "alert", unfocused: "alert-outline" },
-            Operations: { focused: "construct", unfocused: "construct-outline" },
+            Operations: {
+              focused: "construct",
+              unfocused: "construct-outline",
+            },
           };
           const iconSet = icons[route.name] || { focused: "ellipse", unfocused: "ellipse-outline" };
           return (
@@ -92,7 +96,12 @@ function StudentTabs() {
 }
 
 function HomeStack() {
-  return <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="HomeMain" component={HomeScreen} /></Stack.Navigator>;
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="HomeMain" component={HomeScreen} />
+      <Stack.Screen name="AIChat" component={AIChatInterface} />
+    </Stack.Navigator>
+  );
 }
 
 function NutritionStack() {

@@ -2,7 +2,10 @@ import os
 import json
 import time
 import requests
-from PIL import Image
+try:
+    from PIL import Image
+except ImportError:  # pragma: no cover
+    Image = None
 from pydantic import BaseModel, Field
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -84,7 +87,7 @@ def _call_gemini(model_name, contents, config, max_retries=3):
                 contents=contents,
                 generation_config=config
             )
-            print(f"  ✓ Success with {model_name}")
+            print(f"  Success with {model_name}")
             return response
         except Exception as e:
             error_str = str(e)
@@ -92,11 +95,11 @@ def _call_gemini(model_name, contents, config, max_retries=3):
             if '429' in error_str or 'RESOURCE_EXHAUSTED' in error_str:
                 # Rate limited - check if it's per-minute or per-day
                 if 'PerDay' in error_str or 'limit: 0' in error_str:
-                    print(f"  ✗ {model_name} daily quota exhausted, trying next model...")
+                    print(f"  {model_name} daily quota exhausted, trying next model...")
                     break  # Skip retries, try next model
                 else:
                     wait_time = min(15 * (attempt + 1), 30)
-                    print(f"  ⏳ Rate limited, waiting {wait_time}s before retry...")
+                    print(f"  Rate limited, waiting {wait_time}s before retry...")
                     time.sleep(wait_time)
             else:
                 raise  # Non-rate-limit error, propagate immediately
@@ -107,6 +110,8 @@ def execute_ml_vision_pipeline(image_path: str, user_text_context: str, gemini_k
     # Configure the API key
     print(f"  [Debug] Gemini key prefix: {gemini_key[:10]}..." if gemini_key else "  [Debug] No Gemini key!")
     genai.configure(api_key=gemini_key)
+    if Image is None:
+        raise Exception("Pillow (PIL) is not installed. Install 'pillow' to use the vision pipeline.")
     try:
         image = Image.open(image_path)
         print(f"Image loaded: {image.size}, mode={image.mode}")
