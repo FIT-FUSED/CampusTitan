@@ -107,16 +107,8 @@ def log_natural_language():
         if not query or not user_id:
             return jsonify({"success": False, "error": "Query and user_id required"}), 400
         
-        auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
-        user_jwt = None
-        if auth_header and isinstance(auth_header, str) and auth_header.lower().startswith("bearer "):
-            bearer = auth_header.split(" ", 1)[1].strip()
-            # Some clients may accidentally concatenate tokens; pick the first valid JWT-looking token.
-            m = re.search(r"([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)", bearer)
-            user_jwt = m.group(1) if m else bearer
-
         # Process the logging query
-        result = process_user_prompt(query=query, user_id=user_id, date=date, user_jwt=user_jwt)
+        result = process_user_prompt(query=query, user_id=user_id, date=date)
         
         return jsonify(result)
     except Exception as e:

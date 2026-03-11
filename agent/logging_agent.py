@@ -25,8 +25,7 @@ import requests
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from dotenv import load_dotenv
-import google.generativeai as genai
-from google.generativeai import types
+from cohere import ClientV2
 
 load_dotenv()
 
@@ -172,9 +171,8 @@ class IntentParser:
     """Intent Parser - Extracts structured data from natural language input"""
     
     def __init__(self):
-        self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
-        if self.gemini_api_key:
-            genai.configure(api_key=self.gemini_api_key)
+        self.cohere_api_key = os.environ.get("COHERE_API_KEY")
+        self._co = ClientV2(api_key=self.cohere_api_key) if self.cohere_api_key else None
     
     def parse(self, query: str) -> Dict[str, Any]:
         """Parse natural language query into structured data"""
@@ -198,17 +196,28 @@ class IntentParser:
         }}
         """
         
-        if self.gemini_api_key:
+        if self._co:
             try:
-                model = genai.GenerativeModel('gemini-2.5-flash')
-                response = model.generate_content(
-                    contents=prompt,
-                    generation_config=types.GenerateContentConfig(
-                        temperature=0.1,
-                        response_mime_type="application/json"
-                    )
+                resp = self._co.chat(
+                    model="command-r-plus-08-2024",
+                    messages=[{"role": "user", "content": prompt + "\n\nReturn ONLY valid JSON. Do not include markdown blocks or any other text."}],
+                    temperature=0.1,
+                    max_tokens=300,
                 )
-                return json.loads(response.text)
+                if resp and hasattr(resp, "message") and resp.message.content:
+                    text = resp.message.content[0].text
+                else:
+                    text = ""
+                # Strip markdown code blocks if any
+                text = text.strip()
+                if text.startswith("```json"):
+                    text = text[7:]
+                elif text.startswith("```"):
+                    text = text[3:]
+                if text.endswith("```"):
+                    text = text[:-3]
+                
+                return json.loads(text.strip())
             except Exception as e:
                 print(f"Intent parsing error: {e}")
         
@@ -293,9 +302,6 @@ class LoggingRouterAgent:
     """LLM-based router for natural language logging"""
     
     def __init__(self):
-        self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
-        if self.gemini_api_key:
-            genai.configure(api_key=self.gemini_api_key)
         self.intent_parser = IntentParser()
     
     def route(self, query: str) -> Dict[str, Any]:
@@ -319,10 +325,9 @@ class NutritionLoggingTool:
     
     def __init__(self):
         self.supabase_url = os.environ.get("SUPABASE_URL")
-        self.supabase_key = os.environ.get("SUPABASE_ANON_KEY")
-        self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
-        if self.gemini_api_key:
-            genai.configure(api_key=self.gemini_api_key)
+        self.supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        self.cohere_api_key = os.environ.get("COHERE_API_KEY")
+        self._co = ClientV2(api_key=self.cohere_api_key) if self.cohere_api_key else None
     
     def execute(self, meal_data: Dict, user_id: str, date: str = None) -> Dict:
         """Execute food logging"""
@@ -344,7 +349,7 @@ class NutritionLoggingTool:
                 "apikey": self.supabase_key,
                 "Authorization": f"Bearer {self.supabase_key}",
                 "Content-Type": "application/json",
-                "Prefer": "return=representation"
+                "Prefer": "resolution=merge-duplicates, return=representation"
             }
 
             payloads: List[Dict[str, Any]] = []
@@ -369,7 +374,7 @@ class NutritionLoggingTool:
                 payloads.append({
                     "user_id": user_id,
                     "food_name": food_name,
-                    "quantity": quantity,
+                    "portion": quantity,
                     "calories": int(round(calories)),
                     "protein": float(round(protein, 1)),
                     "carbs": float(round(carbs, 1)),
@@ -391,7 +396,7 @@ class NutritionLoggingTool:
                 return {"success": False, "error": "No valid foods found in extraction"}
 
             response = requests.post(
-                f"{self.supabase_url}/rest/v1/food_logs",
+                f"{self.supabase_url}/rest/v1/food_logs?on_conflict=user_id,date,meal_type,food_name",
                 headers=headers,
                 json=payloads
             )
@@ -415,7 +420,7 @@ class NutritionLoggingTool:
             return {"success": False, "error": str(e)}
 
     def _extract_meals_with_llm(self, query: str) -> Dict[str, Any]:
-        if not self.gemini_api_key:
+        if not self._co:
             # Fall back to old static lookup behavior when LLM key not present
             parsed_foods: List[Dict[str, Any]] = []
             q = query.lower()
@@ -456,7 +461,7 @@ class NutritionLoggingTool:
         - quantity should be a number (use 1 when unclear).
         - meal_type must be one of: breakfast, lunch, dinner, snack (infer from text; default snack).
 
-        Respond ONLY as JSON with this schema:
+        Respond ONLY as JSON with this schema, do not include any other text or markdown:
         {{
           "meals": [
             {{
@@ -469,16 +474,29 @@ class NutritionLoggingTool:
         }}
         """
 
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        response = model.generate_content(
-            contents=prompt,
-            generation_config=types.GenerateContentConfig(
+        try:
+            resp = self._co.chat(
+                model="command-r-plus-08-2024",
+                messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
-                response_mime_type="application/json"
+                max_tokens=400,
             )
-        )
-        parsed = json.loads(response.text)
-        return parsed if isinstance(parsed, dict) else {"meals": []}
+            if resp and hasattr(resp, "message") and resp.message.content:
+                text = resp.message.content[0].text
+            else:
+                text = ""
+            text = text.strip()
+            if text.startswith("```json"):
+                text = text[7:]
+            elif text.startswith("```"):
+                text = text[3:]
+            if text.endswith("```"):
+                text = text[:-3]
+            parsed = json.loads(text.strip())
+            return parsed if isinstance(parsed, dict) else {"meals": []}
+        except Exception as e:
+            print(f"Nutrition extraction error: {e}")
+            return {"meals": []}
 
 
 class ActivityLoggingTool:
@@ -486,7 +504,7 @@ class ActivityLoggingTool:
     
     def __init__(self):
         self.supabase_url = os.environ.get("SUPABASE_URL")
-        self.supabase_key = os.environ.get("SUPABASE_ANON_KEY")
+        self.supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     
     def execute(self, activity_data: Dict, user_id: str, date: str = None) -> Dict:
         """Execute activity logging"""
@@ -510,7 +528,7 @@ class ActivityLoggingTool:
             
             payload = {
                 "user_id": user_id,
-                "activity": activity_type,
+                "type": activity_type,
                 "duration": duration_minutes,
                 "calories_burned": calories_burned,
                 "date": date
@@ -622,13 +640,7 @@ def process_logging_query(query: str, user_id: str, date: str = None) -> Dict:
     
     for tool_name in routing.get("tools_to_call", []):
         if tool_name == "nutrition_logging_tool":
-            meals = parsed_intent.get("meals")
-            if meals is None and parsed_intent.get("meal"):
-                meals = [parsed_intent.get("meal")]
-            if meals:
-                result = nutrition_tool.execute({"extraction": {"meals": meals}, "raw_query": query}, user_id, date)
-            else:
-                result = nutrition_tool.execute({"raw_query": query}, user_id, date)
+            result = nutrition_tool.execute({"raw_query": query}, user_id, date)
             results.append(result)
         
         elif tool_name == "activity_logging_tool" and parsed_intent.get("activity"):

@@ -21,20 +21,19 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
 
-# Try to import google.genai (new package), fallback to deprecated one
+# Try different path locations for the .env
+if os.path.exists("../backend/.env"):
+    load_dotenv("../backend/.env")
+elif os.path.exists(".env"):
+    load_dotenv(".env")
+elif os.path.exists("../.env"):
+    load_dotenv("../.env")
+
+from cohere import ClientV2
 try:
-    from google import genai
-    from google.genai import types
-    GOOGLE_GENAI_V2 = True
+    from logging_agent import process_logging_query
 except ImportError:
-    try:
-        import google.generativeai as genai
-        from google.generativeai import types
-        GOOGLE_GENAI_V2 = False
-    except ImportError:
-        genai = None
-        types = None
-        GOOGLE_GENAI_V2 = False
+    pass
 
 # Try to import ML modules (optional - for prediction tool)
 try:
@@ -46,17 +45,6 @@ except ImportError:
     print("Warning: ML modules not available. Prediction features disabled.")
 
 load_dotenv()
-
-
-def _get_genai_client(api_key: str):
-    if not api_key:
-        return None
-    if GOOGLE_GENAI_V2:
-        return genai.Client(api_key=api_key)
-    genai.configure(api_key=api_key)
-    return None
-
-
 # ==========================================
 # Food Macro Lookup Table
 # ==========================================
@@ -237,6 +225,99 @@ class BaseTool:
     def execute(self, params: Dict[str, Any], user_id: str) -> ToolResult:
         raise NotImplementedError
 
+
+def _build_supabase_headers(*, supabase_key: str, user_jwt: Optional[str]) -> Dict[str, str]:
+    auth = user_jwt or supabase_key
+    return {"apikey": supabase_key, "Authorization": f"Bearer {auth}"}
+
+
+class UserStatsTool(BaseTool):
+    """Fetches user profile + today's aggregated nutrition/activity stats from Supabase."""
+
+    name = "user_stats"
+    description = "Fetches user profile (weight, goal_weight, diet_type) and today's calories/protein consumed and calories burned"
+    required_params = ["user_id"]
+
+    def __init__(self):
+        self.supabase_url = os.environ.get("SUPABASE_URL")
+        self.supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+
+    def execute(self, params: Dict[str, Any], user_id: str) -> ToolResult:
+        try:
+            date = params.get("date", datetime.now().strftime("%Y-%m-%d"))
+            user_jwt = params.get("user_jwt")
+            headers = _build_supabase_headers(supabase_key=self.supabase_key, user_jwt=user_jwt)
+
+            # User profile
+            user_resp = requests.get(
+                f"{self.supabase_url}/rest/v1/users",
+                headers=headers,
+                params={
+                    "id": f"eq.{user_id}",
+                    "select": "id,weight,goal_weight,diet_type,diet",
+                    "limit": 1,
+                },
+            )
+            user_row = (user_resp.json() or [None])[0] if user_resp.status_code == 200 else None
+
+            def _first_present(row: Optional[Dict[str, Any]], *keys: str):
+                if not isinstance(row, dict):
+                    return None
+                for k in keys:
+                    if row.get(k) is not None:
+                        return row.get(k)
+                return None
+
+            weight = _first_present(user_row, "weight")
+            goal_weight = _first_present(user_row, "goal_weight")
+            diet_type = _first_present(user_row, "diet_type", "diet")
+
+            # Today's food totals
+            food_resp = requests.get(
+                f"{self.supabase_url}/rest/v1/food_logs",
+                headers=headers,
+                params={
+                    "user_id": f"eq.{user_id}",
+                    "date": f"eq.{date}",
+                    "select": "calories,protein",
+                },
+            )
+            food_logs = food_resp.json() if food_resp.status_code == 200 else []
+
+            calories_consumed = sum((f.get("calories") or 0) for f in food_logs) if isinstance(food_logs, list) else 0
+            protein_consumed = sum((f.get("protein") or 0) for f in food_logs) if isinstance(food_logs, list) else 0
+
+            # Today's activity totals
+            act_resp = requests.get(
+                f"{self.supabase_url}/rest/v1/activities",
+                headers=headers,
+                params={
+                    "user_id": f"eq.{user_id}",
+                    "date": f"eq.{date}",
+                    "select": "calories_burned",
+                },
+            )
+            acts = act_resp.json() if act_resp.status_code == 200 else []
+            calories_burned = sum((a.get("calories_burned") or 0) for a in acts) if isinstance(acts, list) else 0
+
+            data = {
+                "user": {
+                    "weight": weight,
+                    "goal_weight": goal_weight,
+                    "diet_type": diet_type,
+                },
+                "today_stats": {
+                    "calories_consumed": calories_consumed,
+                    "calories_burned": calories_burned,
+                    "protein_consumed": protein_consumed,
+                },
+            }
+
+            return ToolResult(tool_name=self.name, success=True, data=data)
+
+        except Exception as e:
+            return ToolResult(tool_name=self.name, success=False, data={}, error=str(e))
+
 class NutritionTool(BaseTool):
     """
     Nutrition Tool - Fetches user's nutritional data from Supabase
@@ -248,7 +329,15 @@ class NutritionTool(BaseTool):
     
     def __init__(self):
         self.supabase_url = os.environ.get("SUPABASE_URL")
-        self.supabase_key = os.environ.get("SUPABASE_ANON_KEY")
+        self.supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+
+    def _build_headers(self, params: Dict[str, Any]) -> Dict[str, str]:
+        user_jwt = params.get("user_jwt") if isinstance(params, dict) else None
+        auth = user_jwt or self.supabase_key
+        return {
+            "apikey": self.supabase_key,
+            "Authorization": f"Bearer {auth}",
+        }
     
     def execute(self, params: Dict[str, Any], user_id: str) -> ToolResult:
         try:
@@ -268,10 +357,7 @@ class NutritionTool(BaseTool):
                 end_date = date
             
             # Fetch food logs from Supabase
-            headers = {
-                "apikey": self.supabase_key,
-                "Authorization": f"Bearer {self.supabase_key}"
-            }
+            headers = self._build_headers(params)
             
             response = requests.get(
                 f"{self.supabase_url}/rest/v1/food_logs",
@@ -347,7 +433,7 @@ class ActivityTool(BaseTool):
     
     def __init__(self):
         self.supabase_url = os.environ.get("SUPABASE_URL")
-        self.supabase_key = os.environ.get("SUPABASE_ANON_KEY")
+        self.supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     
     def execute(self, params: Dict[str, Any], user_id: str) -> ToolResult:
         try:
@@ -431,7 +517,7 @@ class WellnessTool(BaseTool):
     
     def __init__(self):
         self.supabase_url = os.environ.get("SUPABASE_URL")
-        self.supabase_key = os.environ.get("SUPABASE_ANON_KEY")
+        self.supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     
     def execute(self, params: Dict[str, Any], user_id: str) -> ToolResult:
         try:
@@ -580,6 +666,76 @@ class PredictionTool(BaseTool):
                 error=f"ML prediction error: {str(e)}"
             )
 
+class UserStatsTool(BaseTool):
+    """
+    UserStatsTool - Fetches personalized user data and today's summary
+    """
+    name = "user_stats"
+    description = "Fetches user profile, goals, and today's stats"
+    required_params = ["user_id"]
+    
+    def __init__(self):
+        self.supabase_url = os.environ.get("SUPABASE_URL")
+        self.supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    
+    def execute(self, params: Dict[str, Any], user_id: str) -> ToolResult:
+        try:
+            date = params.get("date", datetime.now().strftime("%Y-%m-%d"))
+            headers = {
+                "apikey": self.supabase_key,
+                "Authorization": f"Bearer {self.supabase_key}"
+            }
+            
+            # Fetch user data
+            user_resp = requests.get(
+                f"{self.supabase_url}/rest/v1/users?id=eq.{user_id}",
+                headers=headers
+            )
+            user_data = user_resp.json()[0] if user_resp.status_code == 200 and user_resp.json() else {}
+            
+            # Extract basic profile
+            weight = user_data.get("weight", 60)
+            goal_weight = user_data.get("goal_weight", 50)
+            diet_type = user_data.get("diet_type", "vegetarian")
+            
+            # Fetch today's food logs
+            food_resp = requests.get(
+                f"{self.supabase_url}/rest/v1/food_logs?user_id=eq.{user_id}&date=eq.{date}",
+                headers=headers
+            )
+            food_logs = food_resp.json() if food_resp.status_code == 200 else []
+            calories_consumed = sum(log.get("calories", 0) for log in food_logs)
+            protein_consumed = sum(log.get("protein", 0) for log in food_logs)
+            
+            # Fetch today's activity logs
+            activity_resp = requests.get(
+                f"{self.supabase_url}/rest/v1/activities?user_id=eq.{user_id}&date=eq.{date}",
+                headers=headers
+            )
+            activity_logs = activity_resp.json() if activity_resp.status_code == 200 else []
+            calories_burned = sum(log.get("calories_burned", 0) for log in activity_logs)
+            
+            data = {
+                "user": {
+                    "weight": weight,
+                    "diet_type": diet_type,
+                    "goal_weight": goal_weight
+                },
+                "today_stats": {
+                    "calories_consumed": calories_consumed,
+                    "calories_burned": calories_burned,
+                    "protein_consumed": protein_consumed
+                }
+            }
+            
+            return ToolResult(
+                tool_name=self.name,
+                success=True,
+                data=data
+            )
+        except Exception as e:
+            return ToolResult(tool_name=self.name, success=False, data={}, error=str(e))
+
 class RecommendationTool(BaseTool):
     """
     Recommendation Tool - Uses LLM to generate personalized recommendations
@@ -589,8 +745,8 @@ class RecommendationTool(BaseTool):
     required_params = ["user_id"]
     
     def __init__(self):
-        self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
-        self._client = _get_genai_client(self.gemini_api_key)
+        self.cohere_api_key = os.environ.get("COHERE_API_KEY")
+        self._co = ClientV2(api_key=self.cohere_api_key) if self.cohere_api_key else None
     
     def execute(self, params: Dict[str, Any], user_id: str) -> ToolResult:
         try:
@@ -621,13 +777,18 @@ class RecommendationTool(BaseTool):
             Format as a numbered list.
             """
             
-            if self.gemini_api_key:
-                model = genai.GenerativeModel('gemini-2.5-flash')
-                response = model.generate_content(
-                    contents=prompt,
-                    generation_config=types.GenerateContentConfig(temperature=0.7)
-                )
-                recommendations = response.text.strip()
+            if self._co:
+                try:
+                    resp = self._co.chat(
+                        model="command-r-plus-08-2024",
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.7,
+                        max_tokens=200,
+                    )
+                    text = getattr(resp, "text", None) or ""
+                    recommendations = text.strip() or "1. Eat more protein-rich foods like eggs, dal, or chicken\n2. Get 30+ minutes of exercise today\n3. Aim for 7+ hours of sleep tonight"
+                except Exception:
+                    recommendations = "1. Eat more protein-rich foods like eggs, dal, or chicken\n2. Get 30+ minutes of exercise today\n3. Aim for 7+ hours of sleep tonight"
             else:
                 recommendations = "1. Eat more protein-rich foods like eggs, dal, or chicken\n2. Get 30+ minutes of exercise today\n3. Aim for 7+ hours of sleep tonight"
             
@@ -659,104 +820,82 @@ class RouterAgent:
     """
     
     def __init__(self):
-        self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
-        self._client = _get_genai_client(self.gemini_api_key)
+        self.cohere_api_key = os.environ.get("COHERE_API_KEY")
+        self._co = ClientV2(api_key=self.cohere_api_key) if self.cohere_api_key else None
         
         # Tool descriptions for routing
         self.tools = {
-            "nutrition": "Handles queries about: protein, calories, carbs, fat, meals, food intake, eating habits, nutrition density, hunger, diet",
-            "activity": "Handles queries about: exercise, workouts, running, gym, cycling, sports, calories burned, steps, walking, fitness, movement",
-            "wellness": "Handles queries about: sleep, stress, mood, mental health, AQI, air quality, screen time, productivity, rest, relaxation",
-            "prediction": "Handles queries about: future predictions, wellness score forecast, health trends, expected outcomes, tomorrow's预测",
-            "recommendation": "Handles queries about: advice, suggestions, tips, what should I do, recommendations, help me improve"
+            "Food Logging": "User wants to log what they ate or drank (e.g. 'I ate 2 eggs', 'Had lunch chapatis').",
+            "Activity Logging": "User wants to log an activity or exercise (e.g. 'I played badminton for 3 hours', 'Ran 5km').",
+            "Nutrition Analysis": "User asking about their diet, protein, macros, or calories consumed.",
+            "Workout Recommendation": "User asking for advice on exercise, how to burn calories, or activity tips.",
+            "Goal Progress Query": "User asking about their goals, remaining goals today (e.g. 'How much more protein do I need today?', 'How many calories should I burn to reach my goal weight?')."
         }
     
     def classify_query(self, query: str) -> Dict[str, Any]:
         """
-        Uses LLM to classify the query and select appropriate tool(s)
+        Uses LLM to classify the query into the 5 core categories
         """
         tools_list = "\n".join([f"- {name}: {desc}" for name, desc in self.tools.items()])
         
         prompt = f"""
-        You are a query classifier for a campus health app.
+        You are a routing agent for a health tracking app.
         
-        Available Tools:
+        Categories:
         {tools_list}
         
         User Query: "{query}"
         
         Task: 
-        1. Classify the query into one or more of the above tools
-        2. Extract any specific parameters mentioned (e.g., "today", "this week", protein goal)
+        1. Classify the query into ONE of the above categories.
         
-        Respond in JSON format:
+        Respond ONLY in JSON format:
         {{
-            "primary_tool": "tool_name",
-            "secondary_tools": ["other_tool1", "other_tool2"],
-            "confidence": 0.95,
-            "extracted_params": {{
-                "time_range": "day|week|month",
-                "specific_topic": "protein|calories|sleep|etc",
-                "goal_mentioned": true/false
-            }},
-            "query_intent": "informational|actionable|predictive"
+            "primary_tool": "category_name",
+            "confidence": 0.95
         }}
         """
         
-        if self.gemini_api_key:
+        if self._co:
             try:
-                model = genai.GenerativeModel('gemini-2.5-flash')
-                response = model.generate_content(
-                    contents=prompt,
-                    generation_config=types.GenerateContentConfig(
-                        temperature=0.1,
-                        response_mime_type="application/json"
-                    )
+                resp = self._co.chat(
+                    model="command-r-plus-08-2024",
+                    messages=[{"role": "user", "content": prompt.strip() + "\n\nReturn ONLY valid JSON. Do not include markdown building blocks or any other text."}],
+                    temperature=0.1,
+                    max_tokens=200,
                 )
-                result = json.loads(response.text)
+                if resp and hasattr(resp, "message") and resp.message.content:
+                    text = resp.message.content[0].text
+                else:
+                    text = ""
+                text = text.strip()
+                if text.startswith("```json"):
+                    text = text[7:]
+                elif text.startswith("```"):
+                    text = text[3:]
+                if text.endswith("```"):
+                    text = text[:-3]
+                result = json.loads(text.strip())
                 return result
             except Exception as e:
                 print(f"Router classification error: {e}")
         
         # Fallback: keyword-based routing
+        # Fallback: keyword-based routing
         return self._keyword_based_routing(query)
     
     def _keyword_based_routing(self, query: str) -> Dict[str, Any]:
-        """Fallback keyword-based routing"""
         query_lower = query.lower()
+        if "ate" in query_lower or "eat" in query_lower or "had" in query_lower and ("lunch" in query_lower or "breakfast" in query_lower or "dinner" in query_lower):
+            return {"primary_tool": "Food Logging", "confidence": 0.8}
+        if "played" in query_lower or "ran" in query_lower or "minutes" in query_lower or "hours" in query_lower:
+            return {"primary_tool": "Activity Logging", "confidence": 0.8}
+        if "protein" in query_lower or "diet" in query_lower:
+            return {"primary_tool": "Nutrition Analysis", "confidence": 0.8}
+        if "goal" in query_lower or "more" in query_lower or "reach" in query_lower:
+            return {"primary_tool": "Goal Progress Query", "confidence": 0.8}
         
-        # Define keyword mappings
-        keyword_map = {
-            "nutrition": ["protein", "calories", "eat", "food", "meal", "diet", "carbs", "fat", "nutrition", "hungry", "breakfast", "lunch", "dinner"],
-            "activity": ["exercise", "workout", "gym", "run", "running", "cycling", "sports", "fitness", "steps", "walk", "active", "burned", "minutes"],
-            "wellness": ["sleep", "stress", "mood", "mental", "aqi", "air", "screen", "productivity", "rest", "tired", "energy"],
-            "prediction": ["predict", "future", "forecast", "will i", "expected", "trend"],
-            "recommendation": ["should", "advice", "tips", "suggest", "recommend", "help me", "what to"]
-        }
-        
-        # Score each category
-        scores = {}
-        for category, keywords in keyword_map.items():
-            score = sum(1 for kw in keywords if kw in query_lower)
-            scores[category] = score
-        
-        # Get highest scoring category
-        if max(scores.values()) > 0:
-            primary_tool = max(scores, key=scores.get)
-        else:
-            primary_tool = "recommendation"  # Default
-        
-        return {
-            "primary_tool": primary_tool,
-            "secondary_tools": [],
-            "confidence": 0.7,
-            "extracted_params": {
-                "time_range": "day",
-                "specific_topic": None,
-                "goal_mentioned": "goal" in query_lower or "target" in query_lower
-            },
-            "query_intent": "actionable" if "?" in query else "informational"
-        }
+        return {"primary_tool": "Workout Recommendation", "confidence": 0.6}
 
 # ==========================================
 # Response Generator
@@ -768,8 +907,8 @@ class ResponseGenerator:
     """
     
     def __init__(self):
-        self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
-        self._client = _get_genai_client(self.gemini_api_key)
+        self.cohere_api_key = os.environ.get("COHERE_API_KEY")
+        self._co = ClientV2(api_key=self.cohere_api_key) if self.cohere_api_key else None
     
     def generate_response(
         self, 
@@ -793,12 +932,15 @@ class ResponseGenerator:
         
         # Get the primary tool result for simpler queries
         primary_data = tool_results[0].data if tool_results else {}
+        user_stats_data = data_summary.get("user_stats")
         
         # Generate response based on query type
         query_lower = query.lower()
         
         # Handle specific common queries directly for speed
-        if "protein" in query_lower:
+        if user_stats_data and ("protein" in query_lower or "goal" in query_lower or "weight" in query_lower or "calorie" in query_lower or "burn" in query_lower or "plan" in query_lower or "how can i" in query_lower):
+            answer = self._generate_personalized_from_user_stats(user_stats_data, query)
+        elif "protein" in query_lower:
             answer = self._generate_protein_response(primary_data, query)
         elif "sleep" in query_lower:
             answer = self._generate_sleep_response(primary_data, query)
@@ -813,19 +955,24 @@ class ResponseGenerator:
             answer = self._generate_llm_response(query, context, user_context)
         
         # Determine confidence
-        confidence = 0.9 if tool_results[0].success else 0.5 if tool_results else 0.3
+        confidence = 0.3
+        if tool_results:
+            confidence = 0.9 if tool_results[0].success else 0.5
+            
+        tool_used = tool_results[0].tool_name if tool_results else "none"
+        sources = ["Supabase Database", "ML Model" if tool_results and any("prediction" in r.tool_name for r in tool_results) else "User Input"]
         
         return AgentResponse(
             answer=answer,
-            tool_used=tool_results[0].tool_name if tool_results else "none",
+            tool_used=tool_used,
             confidence=confidence,
             data=data_summary,
-            sources=["Supabase Database", "ML Model" if any("prediction" in r.tool_name for r in tool_results) else "User Input"]
+            sources=sources
         )
     
     def _generate_protein_response(self, data: Dict, query: str) -> str:
         """Generate response for protein-related queries"""
-        totals = data.get("totals", {})
+        totals = data.get("totals") or {}
         protein = totals.get("protein", 0)
         goal = data.get("protein_goal", 60)
         percentage = data.get("protein_percentage", 0)
@@ -843,8 +990,8 @@ class ResponseGenerator:
     
     def _generate_sleep_response(self, data: Dict, query: str) -> str:
         """Generate response for sleep-related queries"""
-        averages = data.get("averages", {})
-        today = data.get("today", {})
+        averages = data.get("averages") or {}
+        today = data.get("today") or {}
         
         sleep_hours = today.get("sleep_hrs") or averages.get("sleep_hours", 0)
         
@@ -857,7 +1004,7 @@ class ResponseGenerator:
     
     def _generate_activity_response(self, data: Dict, query: str) -> str:
         """Generate response for activity-related queries"""
-        totals = data.get("totals", {})
+        totals = data.get("totals") or {}
         today_progress = data.get("today_progress", 0)
         
         minutes = totals.get("total_minutes", 0)
@@ -872,7 +1019,7 @@ class ResponseGenerator:
     
     def _generate_stress_response(self, data: Dict, query: str) -> str:
         """Generate response for stress-related queries"""
-        averages = data.get("averages", {})
+        averages = data.get("averages") or {}
         stress = averages.get("stress_level", 5)
         
         if stress <= 3:
@@ -894,36 +1041,108 @@ class ResponseGenerator:
             return f"⚠️ Your predicted wellness is {prediction}/100. Let's work on self-care!"
     
     def _generate_llm_response(self, query: str, context: str, user_context: Dict) -> str:
-        """Generate response using LLM for complex queries"""
-        if not self.gemini_api_key:
-            return "I need more data to answer that. Try asking about your protein, sleep, exercise, or stress!"
-        
+        """Generate response using Cohere for complex queries"""
+        if not self._co:
+            return "LLM_ERROR: Missing COHERE_API_KEY"
+
         prompt = f"""
-        You are Titan AI, a friendly campus health coach.
-        
-        User Question: {query}
-        
-        Data Context:
-        {context}
-        
-        User Profile:
-        - Name: {user_context.get('name', 'Student')}
-        - College: {user_context.get('college', 'Campus')}
-        
-        Answer the user's question based on the data above.
-        Be friendly, concise, and actionable.
-        Keep it under 2 sentences.
-        """
-        
+You are Titan AI, a friendly campus health coach.
+
+User Question: {query}
+
+Data Context:
+{context}
+
+User Profile:
+- Name: {user_context.get('name', 'Student')}
+- College: {user_context.get('college', 'Campus')}
+
+Answer the user's question based on the data above.
+Be friendly, concise, and actionable.
+Keep it under 2 sentences.
+""".strip()
+
         try:
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            response = model.generate_content(
-                contents=prompt,
-                generation_config=types.GenerateContentConfig(temperature=0.7)
+            resp = self._co.chat(
+                model="command-r-plus-08-2024",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=300,
             )
-            return response.text.strip()
+            if hasattr(resp, "message") and resp.message.content:
+                text = resp.message.content[0].text
+            else:
+                text = ""
+            return text.strip() or "LLM_ERROR: Empty response from Cohere"
         except Exception as e:
-            return f"I analyzed your data but couldn't generate a detailed response. Your daily stats are available in the app!"
+            msg = str(e)
+            lower = msg.lower()
+            if "rate" in lower and ("limit" in lower or "429" in lower):
+                return f"LLM_ERROR: COHERE_RATE_LIMIT: {msg}"
+            if "unauthorized" in lower or "401" in lower or "api key" in lower:
+                return f"LLM_ERROR: COHERE_AUTH: {msg}"
+            return f"LLM_ERROR: COHERE: {type(e).__name__}: {msg}"
+
+    def _generate_personalized_from_user_stats(self, stats: Dict[str, Any], query: str) -> str:
+        user = stats.get("user") or {}
+        today = stats.get("today_stats") or {}
+
+        protein = float(today.get("protein_consumed") or 0)
+        calories_in = float(today.get("calories_consumed") or 0)
+        calories_out = float(today.get("calories_burned") or 0)
+
+        weight = user.get("weight")
+        goal_weight = user.get("goal_weight")
+        diet_type = user.get("diet_type")
+
+        # Simple default protein target (can be improved once weight is stored)
+        protein_goal = 60.0
+        remaining_protein = max(0.0, protein_goal - protein)
+
+        q = (query or "").lower()
+
+        if "plan" in q or "how can i" in q or "how to" in q or "give me" in q:
+            if self._co:
+                prompt = f"""
+You are a personalized fitness and nutrition planner.
+User Query: "{query}"
+
+Current Stats Today:
+- Diet Type Preference: {diet_type or 'Any'}
+- Calories Consumed So Far: {calories_in:.0f} kcal
+- Calories Burned So Far: {calories_out:.0f} kcal
+- Protein Consumed So Far: {protein:.0f}g
+
+Generate a short, actionable plan to help the user achieve the goal mentioned in their query.
+Account for their current stats today. Provide specific food ideas with estimated macros, or specific exercises with estimated calorie burn. Keep it concise, friendly, and format using bullet points. Do not include markdown building blocks unless necessary.
+"""
+                try:
+                    resp = self._co.chat(
+                        model="command-r-plus-08-2024",
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.4,
+                        max_tokens=400,
+                    )
+                    if hasattr(resp, "message") and resp.message.content:
+                        return resp.message.content[0].text.strip()
+                except Exception as e:
+                    print("Plan generation error:", e)
+
+        if "protein" in q:
+            return f"Today you've consumed {protein:.0f}g protein. You need about {remaining_protein:.0f}g more to reach ~{protein_goal:.0f}g."
+
+        if "goal" in q and "weight" in q and (weight is not None) and (goal_weight is not None):
+            try:
+                diff = float(weight) - float(goal_weight)
+            except Exception:
+                diff = None
+            if diff is not None:
+                return f"You're at {weight}kg with a goal of {goal_weight}kg (about {diff:.1f}kg to go). Consistency with diet ({diet_type or 'your diet'}) and a daily calorie deficit will get you there."
+
+        if "calorie" in q and "burn" in q:
+            return f"Today you've burned ~{calories_out:.0f} calories and consumed ~{calories_in:.0f}. If you're cutting weight, aim to keep calories consumed below calories burned over time."
+
+        return f"Today: {calories_in:.0f} calories consumed, {calories_out:.0f} burned, {protein:.0f}g protein. What would you like to improve—protein, calories, or activity?"
 
 # ==========================================
 # Main Agent Class
@@ -938,6 +1157,7 @@ class CampusTitanAgent:
     def __init__(self):
         # Initialize all tools
         self.tools = {
+            "user_stats": UserStatsTool(),
             "nutrition": NutritionTool(),
             "activity": ActivityTool(),
             "wellness": WellnessTool(),
@@ -952,32 +1172,66 @@ class CampusTitanAgent:
     def process_query(self, query: str, user_id: str, user_context: Dict = None) -> AgentResponse:
         """
         Main entry point for processing user queries
-        
-        Workflow:
-        1. Classify query using Router Agent
-        2. Execute selected tool(s)
-        3. Generate response using LLM
         """
         print(f"\n🤖 Processing query: {query}")
         
         # Step 1: Route the query
         print("📡 Routing query...")
         routing = self.router.classify_query(query)
-        print(f"   → Primary tool: {routing['primary_tool']}")
-        print(f"   → Confidence: {routing['confidence']}")
+        primary_tool_name = routing["primary_tool"]
+        print(f"   → Primary tool: {primary_tool_name}")
+        print(f"   → Confidence: {routing.get('confidence', 0.5)}")
         
+        # Route to Logging Agent if it's a logging task
+        if primary_tool_name in ["Food Logging", "Activity Logging"]:
+            print(f"   → Forwarding to Logging Agent...")
+            try:
+                from logging_agent import process_logging_query
+                res = process_logging_query(query, user_id, params.get("date") if 'params' in locals() else None)
+                if res.get("success"):
+                    return AgentResponse(
+                        answer=res.get("answer", "Logged successfully!"),
+                        tool_used=primary_tool_name,
+                        confidence=0.9,
+                        data=res.get("data", {}),
+                        sources=["Logging Backend"]
+                    )
+                else:
+                    return AgentResponse(
+                        answer=res.get("error", "Failed to log."),
+                        tool_used="none",
+                        confidence=0.1,
+                        data={},
+                        sources=[]
+                    )
+            except Exception as e:
+                print(f"Logging Agent Error: {e}")
+                return AgentResponse(
+                    answer="Logging Agent Error: " + str(e),
+                    tool_used="none",
+                    confidence=0.1,
+                    data={},
+                    sources=[]
+                )
+        
+        # For querying Database/Analysis, ALWAYS use user_stats first based on the prompt instructions
+        if primary_tool_name in ["Nutrition Analysis", "Workout Recommendation", "Goal Progress Query"]:
+            primary_tool_name = "user_stats"
+            
         # Step 2: Execute tools
         print("🔧 Executing tools...")
         tool_results = []
         
         # Execute primary tool
-        primary_tool_name = routing["primary_tool"]
         if primary_tool_name in self.tools:
             params = {
                 "user_id": user_id,
                 "date": datetime.now().strftime("%Y-%m-%d"),
-                "time_range": routing.get("extracted_params", {}).get("time_range", "day")
+                "time_range": (routing.get("extracted_params") or {}).get("time_range", "day")
             }
+
+            if isinstance(user_context, dict) and user_context.get("user_jwt"):
+                params["user_jwt"] = user_context.get("user_jwt")
             
             # Add user context to params
             if user_context:
@@ -1040,9 +1294,11 @@ def handle_agent_request(query: str, user_id: str, user_context: Dict = None) ->
         }
         
     except Exception as e:
+        import traceback
         return {
             "success": False,
             "error": str(e),
+            "traceback": traceback.format_exc(),
             "answer": "Sorry, I encountered an error. Please try again.",
             "timestamp": datetime.now().isoformat()
         }
