@@ -76,7 +76,7 @@ export default function WellnessScreen({ navigation }) {
 
     // Load Wellness History
     const history = await db.getWellnessHistory(7, user.id);
-    const historyWithScore = history.map((h) => {
+    const historyWithScore = (history || []).map((h) => {
       // Guard against undefined/null/NaN field values before computing scores
       const sleepHrs = Number.isFinite(Number(h.sleepHrs))
         ? Number(h.sleepHrs)
@@ -529,7 +529,7 @@ export default function WellnessScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scrollContent: { paddingTop: Platform.OS === "ios" ? 60 : 40 },
+  scrollContent: { paddingTop: Platform.OS === "ios" ? 60 : 40, paddingBottom: 140 },
   headerTitle: {
     fontSize: FONT_SIZES.xxxl,
     ...FONTS.extraBold,

@@ -1,5 +1,4 @@
-// Campus Analytics Screen - Real Data
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -29,25 +28,72 @@ export default function AnalyticsScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const loadAnalytics = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await analyticsService.getCampusAnalytics();
-      setAnalytics(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
 
-  useFocusEffect(loadAnalytics);
+      const loadAnalytics = async () => {
+        try {
+          setLoading(true);
+          setError(null);
+          const data = await analyticsService.getCampusAnalytics();
+          if (isMounted) {
+            setAnalytics(data);
+          }
+        } catch (err) {
+          if (isMounted) {
+            setError(err.message);
+          }
+        } finally {
+          if (isMounted) {
+            setLoading(false);
+          }
+        }
+      };
+
+      loadAnalytics();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [])
+  );
+
+  // Moved ABOVE early returns so hooks are always called in the same order
+  const processedData = useMemo(() => {
+    if (!analytics) return null;
+    const hostelStats = (analytics.collegeStats || []).map((c) => ({
+      hostel: c.college,
+      avgActivityMinutes: c.avgActivityMinutes || 0,
+      avgCaloriesConsumed: c.avgCaloriesConsumed || 0,
+      avgMoodScore: c.avgMoodScore || "0.0",
+      participationRate: c.participationRate || 0,
+      activeUsers: c.activeUsers || 0,
+      topActivity: c.topActivity || "None",
+    }));
+
+    const departmentStats = (analytics.collegeStats || []).map((c) => {
+      const collegeName = String(c?.college ?? "");
+      return {
+        department:
+          collegeName.length > 22 ? collegeName.slice(0, 22) + "…" : collegeName,
+        avgActivityMinutes: c.avgActivityMinutes || 0,
+        participationRate: c.participationRate || 0,
+        topActivity: c.topActivity || "None",
+      };
+    });
+
+    return {
+      hostelStats,
+      departmentStats,
+      weeklyTrends: analytics.weeklyTrends || []
+    };
+  }, [analytics]);
 
   if (loading) {
     return (
       <View style={styles.container}>
-        <Header title="Campus Analytics" />
+        <Header title="Campus Analytics" onBack={() => navigation.goBack()} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Loading analytics...</Text>
@@ -59,7 +105,7 @@ export default function AnalyticsScreen({ navigation }) {
   if (error || !analytics) {
     return (
       <View style={styles.container}>
-        <Header title="Campus Analytics" />
+        <Header title="Campus Analytics" onBack={() => navigation.goBack()} />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Analytics unavailable</Text>
           <Text style={styles.errorSubtext}>Please check your connection</Text>
@@ -68,37 +114,16 @@ export default function AnalyticsScreen({ navigation }) {
     );
   }
 
-  // Map collegeStats → shape expected by the UI
-  const processedData = useMemo(() => {
-    if (!analytics) return null;
-    const hostelStats = (analytics.collegeStats || []).map((c) => ({
-      hostel: c.college,
-      avgActivityMinutes: c.avgActivityMinutes || 0,
-      avgCaloriesConsumed: c.avgCaloriesConsumed || 0,
-      avgMoodScore: c.avgMoodScore || '0.0',
-      participationRate: c.participationRate || 0,
-      activeUsers: c.activeUsers || 0,
-      topActivity: c.topActivity || 'None',
-    }));
-
-    const departmentStats = (analytics.collegeStats || []).map((c) => ({
-      department:
-        c.college.length > 22 ? c.college.slice(0, 22) + "…" : c.college,
-      avgActivityMinutes: c.avgActivityMinutes,
-      participationRate: c.participationRate,
-      topActivity: c.topActivity,
-    }));
-
-    return { hostelStats, departmentStats, weeklyTrends: analytics.weeklyTrends || [] };
-  }, [analytics]);
 
   if (!processedData) {
     return (
       <View style={styles.container}>
-        <Header title="Campus Analytics" />
+        <Header title="Campus Analytics" onBack={() => navigation.goBack()} />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No data available yet</Text>
-          <Text style={styles.emptySubtext}>Start logging activities to see analytics</Text>
+          <Text style={styles.emptySubtext}>
+            Start logging activities to see analytics
+          </Text>
         </View>
       </View>
     );
@@ -106,8 +131,15 @@ export default function AnalyticsScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Header title="Campus Analytics" subtitle="Anonymized insights" onBack={() => navigation.goBack()} />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+      <Header
+        title="Campus Analytics"
+        subtitle="Anonymized insights"
+        onBack={navigation.canGoBack() ? () => navigation.goBack() : null}
+      />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+      >
         {/* Privacy Notice */}
         <GradientCard gradient={COLORS.gradientCard} style={styles.privacyCard}>
           <Text style={styles.privacyEmoji}>🔒</Text>
@@ -129,7 +161,7 @@ export default function AnalyticsScreen({ navigation }) {
               {processedData.hostelStats.map((h, i) => {
                 const maxMin = Math.max(
                   ...processedData.hostelStats.map((s) => s.avgActivityMinutes),
-                  1,
+                  1
                 );
                 const barH = Math.max((h.avgActivityMinutes / maxMin) * 100, 4);
                 return (
@@ -137,7 +169,7 @@ export default function AnalyticsScreen({ navigation }) {
                     <Text style={styles.barValue}>{h.avgActivityMinutes}</Text>
                     <LinearGradient
                       colors={
-                        COLORS.chartColors[i]
+                        COLORS.chartColors && COLORS.chartColors[i]
                           ? [
                             COLORS.chartColors[i],
                             COLORS.chartColors[i] + "88",
@@ -147,7 +179,7 @@ export default function AnalyticsScreen({ navigation }) {
                       style={[styles.bar, { height: barH }]}
                     />
                     <Text style={styles.barLabel} numberOfLines={1}>
-                      {h.hostel.split(" ")[0]}
+                      {String(h?.hostel ?? "").split(" ")[0]}
                     </Text>
                   </View>
                 );
@@ -163,14 +195,19 @@ export default function AnalyticsScreen({ navigation }) {
                       styles.hostelBadge,
                       {
                         backgroundColor:
-                          (COLORS.chartColors[i] || COLORS.primary) + "22",
+                          ((COLORS.chartColors && COLORS.chartColors[i]) ||
+                            COLORS.primary) + "22",
                       },
                     ]}
                   >
                     <Text
                       style={[
                         styles.hostelBadgeText,
-                        { color: COLORS.chartColors[i] || COLORS.primary },
+                        {
+                          color:
+                            (COLORS.chartColors && COLORS.chartColors[i]) ||
+                            COLORS.primary,
+                        },
                       ]}
                     >
                       {String(i + 1)}
@@ -181,6 +218,7 @@ export default function AnalyticsScreen({ navigation }) {
                   </Text>
                   <Text style={styles.hostelUsers}>{h.activeUsers} active</Text>
                 </View>
+
                 <View style={styles.hostelStats}>
                   <View style={styles.hostelStat}>
                     <Text style={styles.hostelStatValue}>
@@ -188,16 +226,21 @@ export default function AnalyticsScreen({ navigation }) {
                     </Text>
                     <Text style={styles.hostelStatLabel}>Avg Min/Day</Text>
                   </View>
+
                   <View style={styles.hostelStat}>
                     <Text style={styles.hostelStatValue}>
                       {h.avgCaloriesConsumed}
                     </Text>
                     <Text style={styles.hostelStatLabel}>Avg kcal</Text>
                   </View>
+
                   <View style={styles.hostelStat}>
-                    <Text style={styles.hostelStatValue}>{h.avgMoodScore}</Text>
+                    <Text style={styles.hostelStatValue}>
+                      {h.avgMoodScore}
+                    </Text>
                     <Text style={styles.hostelStatLabel}>Avg Mood</Text>
                   </View>
+
                   <View style={styles.hostelStat}>
                     <Text style={styles.hostelStatValue}>
                       {h.participationRate}%
@@ -205,11 +248,12 @@ export default function AnalyticsScreen({ navigation }) {
                     <Text style={styles.hostelStatLabel}>Participation</Text>
                   </View>
                 </View>
+
                 <View style={styles.participationBar}>
                   <Text style={styles.pbLabel}>Participation rate</Text>
                   <ProgressBar
                     progress={h.participationRate}
-                    color={COLORS.chartColors[i] || COLORS.primary}
+                    color={(COLORS.chartColors && COLORS.chartColors[i]) || COLORS.primary}
                   />
                 </View>
               </View>
@@ -232,14 +276,19 @@ export default function AnalyticsScreen({ navigation }) {
                       styles.deptTopActivity,
                       {
                         backgroundColor:
-                          (COLORS.chartColors[i] || COLORS.primary) + "22",
+                          ((COLORS.chartColors && COLORS.chartColors[i]) ||
+                            COLORS.primary) + "22",
                       },
                     ]}
                   >
                     <Text
                       style={[
                         styles.deptTopText,
-                        { color: COLORS.chartColors[i] || COLORS.primary },
+                        {
+                          color:
+                            (COLORS.chartColors && COLORS.chartColors[i]) ||
+                            COLORS.primary,
+                        },
                       ]}
                     >
                       {d.topActivity === "gym"
@@ -255,6 +304,7 @@ export default function AnalyticsScreen({ navigation }) {
                     </Text>
                   </View>
                 </View>
+
                 <View style={styles.deptStats}>
                   <View>
                     <Text style={styles.deptStatValue}>
@@ -269,9 +319,10 @@ export default function AnalyticsScreen({ navigation }) {
                     <Text style={styles.deptStatLabel}>Participation</Text>
                   </View>
                 </View>
+
                 <ProgressBar
                   progress={d.participationRate}
-                  color={COLORS.chartColors[i] || COLORS.primary}
+                  color={(COLORS.chartColors && COLORS.chartColors[i]) || COLORS.primary}
                   style={{ marginTop: SPACING.md }}
                 />
               </View>
@@ -298,9 +349,12 @@ export default function AnalyticsScreen({ navigation }) {
 
             <SectionHeader title="Activity Trend" />
             <View style={styles.trendChart}>
-              {analytics.weeklyTrends.map((d, i) => {
-                const maxAct = Math.max(...analytics.weeklyTrends.map(t => t.totalActivities));
-                const barH = (d.totalActivities / maxAct) * 80;
+              {processedData.weeklyTrends.map((d, i) => {
+                const maxAct = Math.max(
+                  ...processedData.weeklyTrends.map((t) => t.totalActivities),
+                  1
+                );
+                const barH = Math.max((d.totalActivities / maxAct) * 80, 4);
                 return (
                   <View key={i} style={styles.trendBarItem}>
                     <Text style={styles.trendBarValue}>{d.totalActivities}</Text>
@@ -316,8 +370,8 @@ export default function AnalyticsScreen({ navigation }) {
 
             <SectionHeader title="Mood Trend" />
             <View style={styles.trendChart}>
-              {analytics.weeklyTrends.map((d, i) => {
-                const barH = (parseFloat(d.avgMood) / 5) * 80;
+              {processedData.weeklyTrends.map((d, i) => {
+                const barH = Math.max((parseFloat(d.avgMood) / 5) * 80, 4);
                 return (
                   <View key={i} style={styles.trendBarItem}>
                     <Text style={styles.trendBarValue}>{d.avgMood}</Text>
@@ -520,10 +574,12 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xs,
     marginTop: SPACING.sm,
   },
+
+  // ── View States ──
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: SPACING.xl,
   },
   loadingText: {
@@ -534,40 +590,40 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: SPACING.xl,
   },
   errorText: {
     fontSize: FONT_SIZES.lg,
     color: COLORS.text,
     ...FONTS.semiBold,
-    textAlign: 'center',
+    textAlign: "center",
   },
   errorSubtext: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.textSecondary,
     marginTop: SPACING.sm,
     ...FONTS.medium,
-    textAlign: 'center',
+    textAlign: "center",
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: SPACING.xl,
   },
   emptyText: {
     fontSize: FONT_SIZES.lg,
     color: COLORS.text,
     ...FONTS.semiBold,
-    textAlign: 'center',
+    textAlign: "center",
   },
   emptySubtext: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.textSecondary,
     marginTop: SPACING.sm,
     ...FONTS.medium,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });

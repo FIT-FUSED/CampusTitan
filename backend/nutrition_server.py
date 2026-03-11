@@ -1,3 +1,4 @@
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
@@ -37,7 +38,6 @@ def analyze_nutrition():
     try:
         print("Received nutrition analysis request")
 
-        # Check if image was uploaded
         if 'image' not in request.files:
             return jsonify({'error': 'No image file provided'}), 400
 
@@ -48,27 +48,14 @@ def analyze_nutrition():
         if image_file.filename == '':
             return jsonify({'error': 'No image selected'}), 400
 
-        # Save image temporarily
         filename = secure_filename(image_file.filename)
         temp_image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         image_file.save(temp_image_path)
         print(f"Saved image to: {temp_image_path}")
 
-        # Check if we have nutrition_score and API keys
         gemini_key = os.getenv('GEMINI_API_KEY')
         usda_key = os.getenv('USDA_API_KEY')
 
-        # Debug: Show what keys are loaded (first 10 chars)
-        print(f"=== API KEY DEBUG ===")
-        print(f"GEMINI_API_KEY env var: {'set' if gemini_key else 'NOT SET'}")
-        if gemini_key:
-            print(f"GEMINI key prefix: {gemini_key[:15]}...")
-        print(f"USDA_API_KEY env var: {'set' if usda_key else 'NOT SET'}")
-        print(f"======================")
-        print(f"USDA key available: {bool(usda_key)}")
-        print(f"Nutrition score available: {nutrition_score is not None}")
-
-        # Only use nutrition_score.py - no fallbacks
         if not nutrition_score:
             return jsonify({'error': 'nutrition_score.py not available'}), 500
 
@@ -87,7 +74,6 @@ def analyze_nutrition():
                 usda_key
             )
 
-            # Clean up temp file
             if os.path.exists(temp_image_path):
                 os.remove(temp_image_path)
 
@@ -102,7 +88,6 @@ def analyze_nutrition():
             print(f"nutrition_score.py error: {e}")
             import traceback
             traceback.print_exc()
-            # Clean up temp file
             if os.path.exists(temp_image_path):
                 os.remove(temp_image_path)
             return jsonify({'error': f'AI analysis failed: {str(e)}'}), 500
@@ -113,71 +98,238 @@ def analyze_nutrition():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-def get_fallback_data(context):
-    """Get fallback nutrition data based on context"""
-    context_lower = context.lower()
 
-    if context_lower and 'rice' in context_lower:
-        return {
-            'food_name': 'Cooked White Rice',
-            'Caloric Value': 130,
-            'Protein( in g)': 2.7,
-            'Carbohydrates( in g)': 28,
-            'Fat( in g)': 0.3,
-            'Dietary Fiber( in g)': 0.4,
-            'Nutrition Density': 25.5,
-        }
+# ============================================
+# COHERE - Food Nutrition Analysis (Text-based)
+# ============================================
 
-    if context_lower and ('roti' in context_lower or 'chapati' in context_lower):
-        return {
-            'food_name': 'Chapati (Roti)',
-            'Caloric Value': 85,
-            'Protein( in g)': 2.5,
-            'Carbohydrates( in g)': 17,
-            'Fat( in g)': 0.8,
-            'Dietary Fiber( in g)': 2.0,
-            'Nutrition Density': 45.2,
-        }
+def call_cohere_for_nutrition(food_name, serving_info):
+    """Call Cohere API to get nutrition data for a food item"""
+    cohere_key = os.getenv('EXPO_PUBLIC_COHERE_API_KEY') or os.getenv('COHERE_API_KEY')
+    
+    if not cohere_key:
+        print("⚠️ Cohere API key not found")
+        return None
+    
+    try:
+        prompt = f"""You are a nutrition expert. Provide nutritional information for this food item.
+Food: {food_name}
+Serving: {serving_info if serving_info else 'standard serving'}
 
-    if context_lower and ('apple' in context_lower or 'fruit' in context_lower):
-        return {
-            'food_name': 'Apple',
-            'Caloric Value': 52,
-            'Protein( in g)': 0.3,
-            'Carbohydrates( in g)': 14,
-            'Fat( in g)': 0.2,
-            'Dietary Fiber( in g)': 2.4,
-            'Nutrition Density': 85.3,
-        }
+Based on the serving info, estimate the portion. Then provide nutritional values per serving.
 
-    if context_lower and 'banana' in context_lower:
-        return {
-            'food_name': 'Banana',
-            'Caloric Value': 89,
-            'Protein( in g)': 1.1,
-            'Carbohydrates( in g)': 23,
-            'Fat( in g)': 0.3,
-            'Dietary Fiber( in g)': 2.6,
-            'Nutrition Density': 78.5,
-        }
+Respond ONLY with a JSON object (no other text):
+{{
+    "food_name": "generic food name",
+    "portion_g": estimated weight in grams,
+    "Caloric Value": calories per serving,
+    "Protein( in g)": protein in grams,
+    "Carbohydrates( in g)": carbs in grams,
+    "Fat( in g)": fat in grams,
+    "Dietary Fiber( in g)": fiber in grams
+}}"""
+        
+        response = http_requests.post(
+            "https://api.cohere.ai/v1/chat",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {cohere_key}"
+            },
+            json={
+                "model": "command-r-08-2024",
+                "message": prompt,
+                "max_tokens": 300,
+                "temperature": 0.3
+            },
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            text = result.get('text', '')
+            if not text:
+                text = result.get('message', {}).get('content', '')
+            
+            if text:
+                text = text.strip()
+                if text.startswith("```json"):
+                    text = text[7:]
+                elif text.startswith("```"):
+                    text = text[3:]
+                if text.endswith("```"):
+                    text = text[:-3]
+                
+                nutrition_data = json.loads(text.strip())
+                print(f"✓ Cohere analysis successful: {nutrition_data.get('food_name', 'Unknown')}")
+                return nutrition_data
+        else:
+            print(f"⚠️ Cohere API error: {response.status_code} - {response.text[:200]}")
+            
+    except Exception as e:
+        print(f"✗ Cohere API call failed: {e}")
+    
+    return None
 
-    # Default mixed meal
-    return {
-        'food_name': 'Mixed Meal',
-        'Caloric Value': 250,
-        'Protein( in g)': 15,
-        'Carbohydrates( in g)': 30,
-        'Fat( in g)': 10,
-        'Dietary Fiber( in g)': 5,
-        'Nutrition Density': 65.5,
-    }
 
-# ─── Ollama LLaMA Health Summary (using context_engine.py pipeline) ───
+@app.route('/api/nutrition/analyze-text', methods=['POST'])
+def analyze_nutrition_text():
+    """
+    Analyze food from text context (food name + serving size).
+    Uses Cohere API for nutrition data.
+    """
+    try:
+        print("Received text-based nutrition analysis request")
+        
+        data = request.get_json()
+        food_name = data.get('food_name', '').strip()
+        serving_info = data.get('serving_info', '').strip()
+        
+        if not food_name:
+            return jsonify({'error': 'Food name is required'}), 400
+            
+        print(f"Context: {food_name} with {serving_info}")
+        
+        # Use Cohere for text-based nutrition analysis
+        print("Using Cohere for text-based nutrition analysis")
+        result = call_cohere_for_nutrition(food_name, serving_info)
+        
+        if result:
+            return jsonify(result)
+        
+        # If Cohere fails, return error
+        return jsonify({
+            'error': 'Unable to analyze food. Please try again.',
+            'food_name': food_name,
+            'Caloric Value': 0,
+            'Protein( in g)': 0,
+            'Carbohydrates( in g)': 0,
+            'Fat( in g)': 0,
+            'Dietary Fiber( in g)': 0,
+        })
+        
+    except Exception as e:
+        print(f"✗ Backend text analysis error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================
+# GEMINI - Mess Menu Analysis (Image-based)
+# ============================================
+
+@app.route('/api/nutrition/analyze-mess-menu', methods=['POST'])
+def analyze_mess_menu():
+    """
+    Analyze mess menu image and extract food items.
+    Uses Gemini API for image analysis.
+    Returns structured menu data with days and meal times.
+    """
+    try:
+        print("Received mess menu analysis request")
+        
+        if 'image' not in request.files:
+            return jsonify({'error': 'No image file provided'}), 400
+            
+        image_file = request.files['image']
+        
+        if image_file.filename == '':
+            return jsonify({'error': 'No image selected'}), 400
+            
+        filename = secure_filename(image_file.filename)
+        temp_image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        image_file.save(temp_image_path)
+        print(f"Saved mess menu image to: {temp_image_path}")
+        
+        gemini_key = os.getenv('GEMINI_API_KEY')
+        
+        if gemini_key:
+            try:
+                from PIL import Image
+                import google.generativeai as genai
+                
+                genai.configure(api_key=gemini_key)
+                
+                image = Image.open(temp_image_path)
+                model = genai.GenerativeModel('gemini-2.0-flash')
+                
+                prompt = """
+                Analyze this mess menu image and extract all food items.
+                The menu can be in English, Hindi, or both languages.
+                
+                Common Hindi day names to recognize:
+                - सोमवार = Monday
+                - मंगलवार = Tuesday
+                - बुधवार = Wednesday
+                - गुरुवार = Thursday
+                - शुक्रवार = Friday
+                - शनिवार = Saturday
+                - रविवार = Sunday
+                
+                Common Hindi meal names:
+                - नाश्ता = Breakfast
+                - दोपहर का भोजन = Lunch
+                - रात का खाना = Dinner
+                - चाय = Snack/Tea
+                
+                Translate Hindi food items to English for the response.
+                
+                Organize the response by day of week (Monday to Sunday) and meal time (Breakfast, Lunch, Dinner).
+                
+                Return a JSON object with this structure:
+                {
+                    "menu": {
+                        "Monday": {"Breakfast": ["food1", "food2"], "Lunch": ["food3"], "Dinner": ["food4", "food5"]},
+                        "Tuesday": {...},
+                        ...
+                    }
+                }
+                
+                If a meal is not specified or the image is unclear, use an empty array for that meal.
+                Only include days that are clearly visible in the menu.
+                
+                Respond ONLY with the JSON object, no other text.
+                """
+                
+                response = model.generate_content([image, prompt])
+                response_text = response.text.strip()
+                
+                if response_text.startswith("```json"):
+                    response_text = response_text[7:]
+                if response_text.startswith("```"):
+                    response_text = response_text[3:]
+                if response_text.endswith("```"):
+                    response_text = response_text[:-3]
+                
+                result = json.loads(response_text.strip())
+                print("✓ Mess menu analysis successful")
+                
+                if os.path.exists(temp_image_path):
+                    os.remove(temp_image_path)
+                    
+                return jsonify(result)
+                
+            except Exception as e:
+                print(f"✗ Mess menu analysis error: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        if os.path.exists(temp_image_path):
+            os.remove(temp_image_path)
+            
+        return jsonify({'error': 'Could not analyze mess menu. Please try again.'}), 500
+        
+    except Exception as e:
+        print(f"✗ Backend mess menu error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================
+# Health Summary (Ollama + Gemini)
+# ============================================
+
 OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://localhost:11434')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'my-llama:latest')
 print(f"Ollama Model Configured: {OLLAMA_MODEL}")
 
-# Import the existing context engine and EMA tracker
 try:
     from context_engine import compress_historical_context, build_ollama_prompt, calculate_moving_averages
     from engine import EMATracker
@@ -188,7 +340,6 @@ except ImportError as e:
     ema_tracker = None
 
 def _generate_arbitrary_activity():
-    """Generate realistic arbitrary activity data since activity tracking is not fully implemented."""
     activities = [
         {'type': 'walking', 'duration': random.randint(15, 45), 'calories_burned': random.randint(80, 200)},
         {'type': 'gym', 'duration': random.randint(30, 60), 'calories_burned': random.randint(150, 350)},
@@ -201,7 +352,6 @@ def _generate_arbitrary_activity():
     return random.sample(activities, min(count, len(activities)))
 
 def _generate_arbitrary_mood():
-    """Generate realistic arbitrary mood/mental wellness data."""
     moods_map = {'Great': 9, 'Good': 7, 'Okay': 5, 'Low': 3, 'Bad': 1}
     weights = [0.15, 0.35, 0.30, 0.15, 0.05]
     mood_label = random.choices(list(moods_map.keys()), weights=weights, k=1)[0]
@@ -214,9 +364,7 @@ def _generate_arbitrary_mood():
     }
 
 def _generate_mock_history(today_data):
-    """Generate 7-day mock historical data for the context engine based on today's real data."""
     history = []
-    # Use today's values as a baseline and create slight variations for past 7 days
     base_mental = today_data.get('mental_score', 60)
     base_nutrition = today_data.get('nutrition_density', 55.0)
     base_sleep = today_data.get('sleep_hours', 7.0)
@@ -231,32 +379,27 @@ def _generate_mock_history(today_data):
     return history
 
 def _call_ollama(prompt, timeout=180):
-    """Send structured prompt to the local Ollama LLaMA model."""
     try:
         print(f"  → Calling Ollama at {OLLAMA_URL}/api/generate with model={OLLAMA_MODEL}")
         
-        # Ultra conservative settings for 8GB RAM with 4.6GB model
-        # Truncate prompt to prevent OOM
-        max_prompt_len = 400  # Extremely conservative for 8GB RAM
+        max_prompt_len = 400
         if len(prompt) > max_prompt_len:
             prompt = prompt[-max_prompt_len:]
-            print(f"  → Prompt truncated to {max_prompt_len} chars for memory safety")
         
-        # Minimal payload to reduce memory pressure
         payload = {
             'model': OLLAMA_MODEL,
             'prompt': prompt,
             'stream': False,
             'options': {
-                'num_predict': 80,       # Ultra conservative output
+                'num_predict': 80,
                 'temperature': 0.5,
-                'num_ctx': 256,          # Tiny context window
-                'num_batch': 8,          # Small batch size
+                'num_ctx': 256,
+                'num_batch': 8,
                 'repeat_penalty': 1.1,
             },
         }
         
-        for attempt in range(2):  # Max 2 attempts
+        for attempt in range(2):
             try:
                 resp = http_requests.post(
                     f'{OLLAMA_URL}/api/generate',
@@ -273,23 +416,21 @@ def _call_ollama(prompt, timeout=180):
                         time.sleep(3)
                         continue
                     else:
-                        raise Exception('Ollama model runner crashed twice. Try reducing model size or freeing RAM.')
+                        raise Exception('Ollama model runner crashed twice.')
                 raise
     except http_requests.exceptions.ConnectionError:
-        raise Exception(f'Cannot connect to Ollama at {OLLAMA_URL}. Is it running?')
+        raise Exception(f'Cannot connect to Ollama at {OLLAMA_URL}.')
     except http_requests.exceptions.Timeout:
-        raise Exception('Ollama request timed out. The model might be loading.')
+        raise Exception('Ollama request timed out.')
     except Exception as e:
         raise Exception(f'Ollama error: {str(e)} (model: {OLLAMA_MODEL})')
 
 import threading
 import uuid
 
-# In-memory store for health summary jobs
 _health_jobs = {}
 
 def _run_health_pipeline(job_id, data, gemini_key):
-    """Run the full Gemini → LLaMA pipeline in a background thread."""
     try:
         user_profile = data.get('user', {})
         food_logs = data.get('foodLogs', [])
@@ -301,7 +442,6 @@ def _run_health_pipeline(job_id, data, gemini_key):
         if not mood_data:
             mood_data = _generate_arbitrary_mood()
 
-        # Step 1: Today's nutrition stats
         total_cal = sum(f.get('calories', 0) for f in food_logs)
         total_protein = sum(f.get('protein', 0) for f in food_logs)
         total_carbs = sum(f.get('carbs', 0) for f in food_logs)
@@ -312,7 +452,6 @@ def _run_health_pipeline(job_id, data, gemini_key):
 
         total_active_min = sum(a.get('duration', 0) for a in activities)
         total_burned = sum(a.get('calories_burned', a.get('caloriesBurned', 0)) for a in activities)
-        exercise_steps = total_active_min * 100
 
         mood_score_map = {'Great': 9, 'Good': 7, 'Okay': 5, 'Low': 3, 'Bad': 1}
         mood_label = mood_data.get('mood', 'Okay')
@@ -325,17 +464,15 @@ def _run_health_pipeline(job_id, data, gemini_key):
                 ((total_protein * 4 + total_fiber * 7) / max(total_cal, 1)) * 100, 1
             ))
 
-        # Step 2: EMA
         daily_score = 50.0
         new_ema = 50.0
         if ema_tracker:
             daily_score = ema_tracker.normalize_metrics(
-                int(total_cal), float(sleep_hours), int(mental_score_raw), int(exercise_steps)
+                int(total_cal), float(sleep_hours), int(mental_score_raw), int(total_active_min * 100)
             )
             new_ema = ema_tracker.calculate_new_ema(None, daily_score)
             print(f"  [{job_id[:8]}] EMA daily_score={round(daily_score,1)}, new_ema={new_ema}")
 
-        # Step 3: Gemini context compression (with timeout)
         history_data = _generate_mock_history({
             'mental_score': int(mental_score_raw * 10),
             'nutrition_density': nutrition_density,
@@ -363,7 +500,6 @@ def _run_health_pipeline(job_id, data, gemini_key):
                 f"{averages['avg_sleep']} hours per night."
             )
 
-        # Step 4: Build structured prompt
         current_meal = {
             'dish_name': ', '.join(meal_names[:3]) if meal_names else 'No meals logged',
             'calories': round(total_cal, 1),
@@ -375,7 +511,6 @@ def _run_health_pipeline(job_id, data, gemini_key):
         structured_prompt = build_ollama_prompt(trend_summary, averages, current_meal, current_mental)
         print(f"  [{job_id[:8]}] Structured prompt assembled ({len(structured_prompt)} chars)")
 
-        # Step 5: Call Ollama
         print(f"  [{job_id[:8]}] Sending to Ollama '{OLLAMA_MODEL}'...")
         ai_response = _call_ollama(structured_prompt)
         print(f"  [{job_id[:8]}] Ollama response received ({len(ai_response)} chars)")
@@ -411,7 +546,6 @@ def _run_health_pipeline(job_id, data, gemini_key):
 
 @app.route('/api/health-summary', methods=['POST'])
 def health_summary_start():
-    """Start health summary generation in background, return job_id immediately."""
     data = request.get_json() or {}
     gemini_key = os.getenv('GEMINI_API_KEY')
     job_id = str(uuid.uuid4())
@@ -454,23 +588,16 @@ def health_summary_sync():
 
     return jsonify({'error': 'Health summary timed out. Try again.'}), 504
 
-@app.route('/api/health/summary/job', methods=['POST'])
-def health_summary_job_alias():
-    return health_summary_start()
-
 @app.route('/api/health-summary/<job_id>', methods=['GET'])
 def health_summary_poll(job_id):
-    """Poll for health summary result."""
     job = _health_jobs.get(job_id)
     if not job:
         return jsonify({'error': 'Job not found'}), 404
     if job['status'] == 'processing':
         return jsonify({'status': 'processing'})
     if job['status'] == 'error':
-        # Clean up
         del _health_jobs[job_id]
         return jsonify({'status': 'error', 'error': job['error']}), 500
-    # Done — return result and clean up
     result = job['result']
     del _health_jobs[job_id]
     return jsonify({'status': 'done', **result})
@@ -486,7 +613,5 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
     print(f"Starting nutrition server on port {port}")
     print(f"Nutrition score available: {nutrition_score is not None}")
-    print("Registered Routes:")
-    print(app.url_map)
-    # use_reloader=False to prevent killing background threads for health summary jobs
     app.run(debug=True, host='0.0.0.0', port=port, threaded=True, use_reloader=False)
+

@@ -12,6 +12,20 @@ class Database {
         if (error) { console.error(error); return []; }
         return data;
     }
+
+    // Admin: list all non-admin users via SECURITY DEFINER RPC (bypasses RLS)
+    async getAdminUsers() {
+        const { data, error } = await supabase.rpc('admin_list_users');
+        if (error) {
+            console.error('admin_list_users RPC error:', error);
+            return [];
+        }
+        return (data || []).map(u => ({
+            ...u,
+            activityLevel: u.activity_level,
+            fitnessGoal: u.fitness_goal,
+        }));
+    }
     async addUser(user) { return null; } // Handled by auth.js register
     async getUserByEmail(email) {
         const { data, error } = await supabase.from('users').select('*').eq('email', email).single();
@@ -474,8 +488,14 @@ class Database {
         try {
             // Get current user if userId not provided
             if (!userId) {
-                const { data: { user } } = await supabase.auth.getUser();
-                userId = user?.id;
+                const { data: authData } = await supabase.auth.getUser();
+                userId = authData?.user?.id;
+            }
+
+            // If still no userId (e.g. mock admin or background service without session)
+            if (!userId) {
+                console.warn('🧠 [Wellness] No userId available for getWellnessHistory');
+                return [];
             }
 
             // Get wellness logs from database filtered by user with flexible column selection
@@ -483,41 +503,50 @@ class Database {
                 .from('user_wellness_data')
                 .select('*')
                 .eq('user_id', userId)
-                .order('created_at', { ascending: false });
+                .order('date', { ascending: false })
+                .limit(days);
 
             if (error) {
                 console.error('getWellnessHistory error:', error);
                 return [];
             }
 
+            if (!data || data.length === 0) return [];
+
             // Get activities for the user to calculate steps
             const { data: activities } = await supabase
                 .from('activities')
-                .select('*')
+                .select('steps, duration, date, created_at')
                 .eq('user_id', userId)
-                .order('date', { ascending: false });
+                .order('date', { ascending: false })
+                .limit(50); // Small sanity limit
 
             // Get mood logs for screen time estimates
             const { data: moodLogs } = await supabase
                 .from('mood_logs')
-                .select('*')
+                .select('productivity, screen_time, date, created_at')
                 .eq('user_id', userId)
-                .order('date', { ascending: false });
+                .order('date', { ascending: false })
+                .limit(50);
 
             // Create a map of activities by date
             const activitiesByDate = {};
             (activities || []).forEach(act => {
                 const dateKey = act.date || act.created_at?.split('T')[0];
-                if (!activitiesByDate[dateKey]) activitiesByDate[dateKey] = { steps: 0, duration: 0 };
-                activitiesByDate[dateKey].steps += act.steps || 0;
-                activitiesByDate[dateKey].duration += act.duration || 0;
+                if (dateKey) {
+                    if (!activitiesByDate[dateKey]) activitiesByDate[dateKey] = { steps: 0, duration: 0 };
+                    activitiesByDate[dateKey].steps += (act.steps || 0);
+                    activitiesByDate[dateKey].duration += (act.duration || 0);
+                }
             });
 
             // Create a map of mood by date (for screen time estimates)
             const moodByDate = {};
             (moodLogs || []).forEach(mood => {
                 const dateKey = mood.date || mood.created_at?.split('T')[0];
-                moodByDate[dateKey] = mood;
+                if (dateKey) {
+                    moodByDate[dateKey] = mood;
+                }
             });
 
             // Normalize data for frontend consumption and AI service
@@ -530,14 +559,14 @@ class Database {
                     ...record,
                     // Map possible column variations to standard names
                     date: dateKey,
-                    sleepHrs: record.sleepHrs || record.sleep_hrs || 0,
-                    walkedKm: record.walkedKm || record.walked_km || 0,
-                    stressLevel: record.stressLevel || record.stress_level || 5,
-                    productivity: record.productivity || dayMood.productivity || 50,
+                    sleepHrs: record.sleepHrs ?? record.sleep_hrs ?? 0,
+                    walkedKm: record.walkedKm ?? record.walked_km ?? 0,
+                    stressLevel: record.stressLevel ?? record.stress_level ?? 5,
+                    productivity: record.productivity ?? dayMood.productivity ?? 50,
                     // Convert walked_km to approximate steps (1 km ≈ 1250 steps)
-                    steps: Math.round((dayActivities.steps || record.walked_km * 1250 || 0)),
-                    // Estimate screen time from mood if not available (using typical student values)
-                    screenTimeHrs: dayMood.screen_time || 6, // Default 6 hours for students
+                    steps: Math.round(dayActivities.steps || (record.walkedKm ?? record.walked_km ?? 0) * 1250 || 0),
+                    // Estimate screen time from mood if not available
+                    screenTimeHrs: record.screenTimeHrs ?? record.screen_time_hours ?? dayMood.screen_time ?? 6,
                 };
             });
 

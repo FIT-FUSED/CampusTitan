@@ -1,39 +1,61 @@
 // Nutrition Screen
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, Modal, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, Modal, RefreshControl, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS, MEAL_TYPES } from '../../theme';
-import { GradientCard, SectionHeader, AnimatedButton, ProgressBar, Chip } from '../../components/common';
+import { GradientCard, SectionHeader, AnimatedButton, ProgressBar } from '../../components/common';
 import { useAuth } from '../../services/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import db from '../../services/database';
 import nutritionAnalysis from '../../services/nutritionAnalysis';
 import { format, subDays } from 'date-fns';
+import { calculateNutritionGoals, getDefaultGoals, calculateBMI, ACTIVITY_LEVELS, FITNESS_GOALS } from '../../utils/nutritionCalculator';
 
 const { width } = Dimensions.get('window');
 
 export default function NutritionScreen({ navigation }) {
-    const { user } = useAuth();
+    const { user, updateProfile } = useAuth();
     const [foodLogs, setFoodLogs] = useState([]);
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [refreshing, setRefreshing] = useState(false);
     const [selectedFood, setSelectedFood] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
+    const [goalsModalVisible, setGoalsModalVisible] = useState(false);
+    const [nutritionGoals, setNutritionGoals] = useState(getDefaultGoals());
+    const [editedGoals, setEditedGoals] = useState(null);
+    const [savingGoals, setSavingGoals] = useState(false);
+
+    useEffect(() => {
+        if (user) {
+            if (user.calorie_goal) {
+                setNutritionGoals({
+                    calories: user.calorie_goal,
+                    protein: user.protein_goal,
+                    carbs: user.carbs_goal,
+                    fat: user.fat_goal,
+                    activityLevel: user.activity_level || 'moderate',
+                    fitnessGoal: user.fitness_goal || 'maintain',
+                });
+            } else if (user.height && user.weight && user.age && user.gender) {
+                const goals = calculateNutritionGoals({
+                    weight: user.weight, height: user.height, age: user.age, gender: user.gender,
+                    activityLevel: 'moderate', fitnessGoal: 'maintain',
+                });
+                setNutritionGoals(goals);
+            }
+        }
+    }, [user]);
 
     const loadData = useCallback(async () => {
         if (!user) return;
-        console.log('[NutritionScreen] Loading food logs for user:', user.id);
         const logs = await db.getFoodLogs(user.id);
-        console.log('[NutritionScreen] Loaded logs:', logs);
         setFoodLogs(logs);
     }, [user]);
 
     useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-    // Helper to extract just the date part (YYYY-MM-DD) from any date format
     const extractDate = (dateValue) => {
         if (!dateValue) return '';
-        // If it's a full ISO string like "2026-03-09T19:02:18.260958+00:00", extract the date part
         if (typeof dateValue === 'string' && dateValue.includes('T')) {
             return dateValue.split('T')[0];
         }
@@ -41,10 +63,6 @@ export default function NutritionScreen({ navigation }) {
     };
 
     const dayLogs = foodLogs.filter(l => extractDate(l.date) === selectedDate);
-    console.log('[NutritionScreen] Selected date:', selectedDate);
-    console.log('[NutritionScreen] Day logs dates:', foodLogs.map(l => extractDate(l.date)));
-    console.log('[NutritionScreen] Day logs:', dayLogs);
-
     const totals = dayLogs.reduce((acc, l) => ({
         calories: acc.calories + (l.calories || 0),
         protein: acc.protein + (l.protein || 0),
@@ -52,30 +70,26 @@ export default function NutritionScreen({ navigation }) {
         fat: acc.fat + (l.fat || 0),
     }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
 
-    console.log('[NutritionScreen] Totals:', totals);
+    const calorieGoal = nutritionGoals.calories || 2000;
+    const proteinGoal = nutritionGoals.protein || 60;
+    const carbGoal = nutritionGoals.carbs || 250;
+    const fatGoal = nutritionGoals.fat || 65;
 
-    const calorieGoal = 2000;
-    const proteinGoal = 60;
-    const carbGoal = 250;
-    const fatGoal = 65;
+    const bmiInfo = user?.weight && user?.height ? calculateBMI(user.weight, user.height) : null;
 
-    // Last 7 days calorie data
     const weekData = Array.from({ length: 7 }, (_, i) => {
         const date = format(subDays(new Date(), 6 - i), 'yyyy-MM-dd');
         const dayTotal = foodLogs.filter(l => extractDate(l.date) === date).reduce((s, l) => s + (l.calories || 0), 0);
         return { date, day: format(subDays(new Date(), 6 - i), 'EEE'), calories: dayTotal };
     });
 
-    // Date selector
     const dates = Array.from({ length: 7 }, (_, i) => {
         const d = subDays(new Date(), 6 - i);
         return { date: format(d, 'yyyy-MM-dd'), day: format(d, 'EEE'), num: format(d, 'dd') };
     });
 
     function getMealsByType(type) {
-        const meals = dayLogs.filter(l => l.mealType === type);
-        console.log(`[NutritionScreen] Meals for ${type}:`, meals);
-        return meals;
+        return dayLogs.filter(l => l.mealType === type);
     }
 
     const handleFoodClick = (food) => {
@@ -89,45 +103,124 @@ export default function NutritionScreen({ navigation }) {
         setRefreshing(false);
     }, [loadData]);
 
+    // Handle fitness goal change - auto recalculate
+    const handleFitnessGoalChange = (fitnessGoal) => {
+        if (!user || !user.height || !user.weight || !user.age || !user.gender) {
+            setEditedGoals(prev => ({ ...prev, fitnessGoal, useCustom: false }));
+            return;
+        }
+        const newGoals = calculateNutritionGoals({
+            weight: user.weight, height: user.height, age: user.age, gender: user.gender,
+            activityLevel: editedGoals?.activityLevel || 'moderate', fitnessGoal,
+        });
+        setEditedGoals({ ...newGoals, fitnessGoal, useCustom: false });
+    };
+
+    // Handle activity level change - auto recalculate
+    const handleActivityLevelChange = (activityLevel) => {
+        if (!user || !user.height || !user.weight || !user.age || !user.gender) {
+            setEditedGoals(prev => ({ ...prev, activityLevel, useCustom: false }));
+            return;
+        }
+        const newGoals = calculateNutritionGoals({
+            weight: user.weight, height: user.height, age: user.age, gender: user.gender,
+            activityLevel, fitnessGoal: editedGoals?.fitnessGoal || 'maintain',
+        });
+        setEditedGoals({ ...newGoals, activityLevel, useCustom: false });
+    };
+
+    // Handle custom goal change
+    const handleCustomGoalChange = (field, value) => {
+        setEditedGoals(prev => ({ ...prev, [field]: value, useCustom: true }));
+    };
+
+    // Toggle between custom and calculated
+    const handleToggleCustom = () => {
+        if (editedGoals?.useCustom) {
+            if (user && user.height && user.weight && user.age && user.gender) {
+                const newGoals = calculateNutritionGoals({
+                    weight: user.weight, height: user.height, age: user.age, gender: user.gender,
+                    activityLevel: editedGoals?.activityLevel || 'moderate', fitnessGoal: editedGoals?.fitnessGoal || 'maintain',
+                });
+                setEditedGoals({ ...newGoals, useCustom: false });
+            }
+        } else {
+            setEditedGoals(prev => ({ ...prev, useCustom: true }));
+        }
+    };
+
+    const handleSaveGoals = async () => {
+        if (!user || !editedGoals) return;
+        setSavingGoals(true);
+        try {
+            const updates = {
+                calorie_goal: parseInt(editedGoals.calories) || 2000,
+                protein_goal: parseInt(editedGoals.protein) || 60,
+                carbs_goal: parseInt(editedGoals.carbs) || 250,
+                fat_goal: parseInt(editedGoals.fat) || 65,
+                activity_level: editedGoals.activityLevel || 'moderate',
+                fitness_goal: editedGoals.fitnessGoal || 'maintain',
+            };
+            await updateProfile(user.id, updates);
+            setNutritionGoals({
+                ...editedGoals,
+                calories: parseInt(editedGoals.calories) || 2000,
+                protein: parseInt(editedGoals.protein) || 60,
+                carbs: parseInt(editedGoals.carbs) || 250,
+                fat: parseInt(editedGoals.fat) || 65,
+            });
+            setGoalsModalVisible(false);
+        } catch (error) { console.error('Error saving goals:', error); }
+        setSavingGoals(false);
+    };
+
+    const handleReset = () => {
+        if (user && user.height && user.weight && user.age && user.gender) {
+            const newGoals = calculateNutritionGoals({
+                weight: user.weight, height: user.height, age: user.age, gender: user.gender,
+                activityLevel: 'moderate', fitnessGoal: 'maintain',
+            });
+            setEditedGoals({ ...newGoals, useCustom: false });
+        }
+    };
+
     return (
         <View style={styles.container}>
-            <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
-            >
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}>
                 <View style={styles.header}>
                     <Text style={styles.headerTitle}>Nutrition</Text>
                     <View style={{ flexDirection: 'row', gap: SPACING.sm }}>
-                        <TouchableOpacity
-                            style={[styles.logButton, { backgroundColor: COLORS.surfaceElevated }]}
-                            onPress={() => navigation.navigate('FoodScanner')}
-                        >
+
+                        <TouchableOpacity style={[styles.logButton, { backgroundColor: COLORS.surfaceElevated }]} onPress={() => navigation.navigate('FoodScanner')}>
                             <Text style={{ fontSize: 18 }}>📷</Text>
                         </TouchableOpacity>
-                        <AnimatedButton
-                            title="+ Log Food"
-                            onPress={() => navigation.navigate('FoodLog')}
-                            style={styles.logButton}
-                        />
+                        <TouchableOpacity style={[styles.logButton, { backgroundColor: COLORS.primary + '20' }]} onPress={() => { setEditedGoals({ ...nutritionGoals, useCustom: false }); setGoalsModalVisible(true); }}>
+                            <Text style={{ fontSize: 16 }}>⚙️</Text>
+                        </TouchableOpacity>
+                        <AnimatedButton title="+ Log Food" onPress={() => navigation.navigate('FoodLog')} style={styles.logButton} />
                     </View>
                 </View>
 
-                {/* Date Selector */}
+                {bmiInfo && (
+                    <View style={styles.bmiCard}>
+                        <Text style={styles.bmiLabel}>Your BMI</Text>
+                        <View style={styles.bmiRow}>
+                            <Text style={styles.bmiValue}>{bmiInfo.value}</Text>
+                            <Text style={styles.bmiCategory}>{bmiInfo.category}</Text>
+                        </View>
+                        <Text style={styles.goalInfo}>Daily Goal: {calorieGoal} kcal • {proteinGoal}g P • {carbGoal}g C • {fatGoal}g F</Text>
+                    </View>
+                )}
+
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateSelector} contentContainerStyle={{ paddingHorizontal: SPACING.lg }}>
                     {dates.map((d) => (
-                        <TouchableOpacity
-                            key={d.date}
-                            style={[styles.dateItem, selectedDate === d.date && styles.dateItemActive]}
-                            onPress={() => setSelectedDate(d.date)}
-                        >
+                        <TouchableOpacity key={d.date} style={[styles.dateItem, selectedDate === d.date && styles.dateItemActive]} onPress={() => setSelectedDate(d.date)}>
                             <Text style={[styles.dateDay, selectedDate === d.date && styles.dateDayActive]}>{d.day}</Text>
                             <Text style={[styles.dateNum, selectedDate === d.date && styles.dateNumActive]}>{d.num}</Text>
                         </TouchableOpacity>
                     ))}
                 </ScrollView>
 
-                {/* Calorie Overview */}
                 <GradientCard gradient={COLORS.gradientCard} style={styles.calorieCard}>
                     <View style={styles.calorieHeader}>
                         <View>
@@ -137,14 +230,11 @@ export default function NutritionScreen({ navigation }) {
                                 <Text style={styles.calorieGoal}>/ {calorieGoal} kcal</Text>
                             </View>
                         </View>
-                        <View style={styles.calorieRing}>
-                            <Text style={styles.caloriePercent}>{Math.round((totals.calories / calorieGoal) * 100)}%</Text>
-                        </View>
+                        <View style={styles.calorieRing}><Text style={styles.caloriePercent}>{Math.round((totals.calories / calorieGoal) * 100)}%</Text></View>
                     </View>
                     <ProgressBar progress={(totals.calories / calorieGoal) * 100} color={COLORS.coral} style={{ marginTop: SPACING.md }} />
                 </GradientCard>
 
-                {/* Macros */}
                 <SectionHeader title="Macro Breakdown" />
                 <View style={styles.macroGrid}>
                     {[
@@ -161,7 +251,6 @@ export default function NutritionScreen({ navigation }) {
                     ))}
                 </View>
 
-                {/* Meals grouped by type */}
                 {MEAL_TYPES.map((meal) => {
                     const meals = getMealsByType(meal.id);
                     const mealCalories = meals.reduce((s, m) => s + (m.calories || 0), 0);
@@ -169,49 +258,22 @@ export default function NutritionScreen({ navigation }) {
                         <View key={meal.id} style={styles.mealSection}>
                             <View style={styles.mealHeader}>
                                 <View style={styles.mealHeaderLeft}>
-                                    <Text style={styles.mealEmoji}>
-                                        {meal.id === 'breakfast' ? '🌅' : meal.id === 'lunch' ? '☀️' : meal.id === 'snack' ? '🍪' : '🌙'}
-                                    </Text>
-                                    <View>
-                                        <Text style={styles.mealTitle}>{meal.label}</Text>
-                                        <Text style={styles.mealTime}>{meal.time}</Text>
-                                    </View>
+                                    <Text style={styles.mealEmoji}>{meal.id === 'breakfast' ? '🌅' : meal.id === 'lunch' ? '☀️' : meal.id === 'snack' ? '🍪' : '🌙'}</Text>
+                                    <View><Text style={styles.mealTitle}>{meal.label}</Text><Text style={styles.mealTime}>{meal.time}</Text></View>
                                 </View>
                                 <Text style={styles.mealCalories}>{Math.round(mealCalories)} kcal</Text>
                             </View>
-                            {meals.length === 0 ? (
-                                <Text style={styles.mealEmpty}>No items logged</Text>
-                            ) : (
-                                meals.map((item, i) => (
-                                    <TouchableOpacity
-                                        key={i}
-                                        style={styles.foodItem}
-                                        onPress={() => handleFoodClick(item)}
-                                        activeOpacity={0.7}
-                                    >
-                                        <View style={[styles.vegDot, { backgroundColor: item.isVeg ? COLORS.success : COLORS.error }]} />
-                                        <View style={styles.foodInfo}>
-                                            <Text style={styles.foodName}>{item.foodName}</Text>
-                                            {item.nutrition_score && (
-                                                <View style={styles.nutritionScore}>
-                                                    <Text style={[styles.gradeText, { color: nutritionAnalysis.getGradeColor(item.nutrition_grade) }]}>
-                                                        Grade: {item.nutrition_grade}
-                                                    </Text>
-                                                    <Text style={styles.scoreText}>
-                                                        Score: {Math.round(item.nutrition_score)}
-                                                    </Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                        <Text style={styles.foodCalories}>{item.calories} kcal</Text>
-                                    </TouchableOpacity>
-                                ))
-                            )}
+                            {meals.length === 0 ? <Text style={styles.mealEmpty}>No items logged</Text> : meals.map((item, i) => (
+                                <TouchableOpacity key={i} style={styles.foodItem} onPress={() => handleFoodClick(item)} activeOpacity={0.7}>
+                                    <View style={[styles.vegDot, { backgroundColor: item.isVeg ? COLORS.success : COLORS.error }]} />
+                                    <Text style={styles.foodName}>{item.foodName}</Text>
+                                    <Text style={styles.foodCalories}>{item.calories} kcal</Text>
+                                </TouchableOpacity>
+                            ))}
                         </View>
                     );
                 })}
 
-                {/* Weekly Trend */}
                 <SectionHeader title="Weekly Calorie Trend" />
                 <View style={styles.weekChart}>
                     {weekData.map((d, i) => {
@@ -221,16 +283,12 @@ export default function NutritionScreen({ navigation }) {
                         return (
                             <TouchableOpacity key={i} style={styles.weekBar} onPress={() => setSelectedDate(d.date)}>
                                 <Text style={styles.weekCalValue}>{d.calories > 0 ? Math.round(d.calories) : '-'}</Text>
-                                <LinearGradient
-                                    colors={isToday ? COLORS.gradientPrimary : [COLORS.surfaceElevated, COLORS.surfaceElevated]}
-                                    style={[styles.weekBarFill, { height: barH }]}
-                                />
+                                <LinearGradient colors={isToday ? COLORS.gradientPrimary : [COLORS.surfaceElevated, COLORS.surfaceElevated]} style={[styles.weekBarFill, { height: barH }]} />
                                 <Text style={[styles.weekDay, isToday && { color: COLORS.primary }]}>{d.day}</Text>
                             </TouchableOpacity>
                         );
                     })}
                 </View>
-
                 <View style={{ height: 100 }} />
             </ScrollView>
 
@@ -245,44 +303,95 @@ export default function NutritionScreen({ navigation }) {
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>{selectedFood?.foodName}</Text>
-                            <TouchableOpacity
-                                style={styles.closeButton}
-                                onPress={() => setModalVisible(false)}
-                            >
-                                <Text style={styles.closeButtonText}>✕</Text>
-                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}><Text style={styles.closeButtonText}>✕</Text></TouchableOpacity>
                         </View>
 
                         <View style={styles.modalBody}>
                             <View style={styles.nutritionGrid}>
-                                <View style={styles.nutritionItem}>
-                                    <Text style={styles.nutritionLabel}>Calories</Text>
-                                    <Text style={styles.nutritionValue}>{selectedFood?.calories || 0} kcal</Text>
-                                </View>
-                                <View style={styles.nutritionItem}>
-                                    <Text style={styles.nutritionLabel}>Protein</Text>
-                                    <Text style={styles.nutritionValue}>{selectedFood?.protein || 0}g</Text>
-                                </View>
-                                <View style={styles.nutritionItem}>
-                                    <Text style={styles.nutritionLabel}>Carbs</Text>
-                                    <Text style={styles.nutritionValue}>{selectedFood?.carbs || 0}g</Text>
-                                </View>
-                                <View style={styles.nutritionItem}>
-                                    <Text style={styles.nutritionLabel}>Fat</Text>
-                                    <Text style={styles.nutritionValue}>{selectedFood?.fat || 0}g</Text>
+                                <View style={styles.nutritionItem}><Text style={styles.nutritionLabel}>Calories</Text><Text style={styles.nutritionValue}>{selectedFood?.calories || 0} kcal</Text></View>
+                                <View style={styles.nutritionItem}><Text style={styles.nutritionLabel}>Protein</Text><Text style={styles.nutritionValue}>{selectedFood?.protein || 0}g</Text></View>
+                                <View style={styles.nutritionItem}><Text style={styles.nutritionLabel}>Carbs</Text><Text style={styles.nutritionValue}>{selectedFood?.carbs || 0}g</Text></View>
+                                <View style={styles.nutritionItem}><Text style={styles.nutritionLabel}>Fat</Text><Text style={styles.nutritionValue}>{selectedFood?.fat || 0}g</Text></View>
+                            </View>
+                            <View style={styles.mealInfo}><Text style={styles.mealInfoLabel}>Meal Type</Text><Text style={styles.mealInfoValue}>{selectedFood?.mealType || 'Unknown'}</Text></View>
+                            <View style={styles.mealInfo}><Text style={styles.mealInfoLabel}>Date</Text><Text style={styles.mealInfoValue}>{selectedFood?.date || 'Unknown'}</Text></View>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal animationType="slide" transparent={true} visible={goalsModalVisible} onRequestClose={() => setGoalsModalVisible(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { maxHeight: '85%' }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Edit Nutrition Goals</Text>
+                            <TouchableOpacity style={styles.closeButton} onPress={() => setGoalsModalVisible(false)}><Text style={styles.closeButtonText}>✕</Text></TouchableOpacity>
+                        </View>
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <Text style={styles.goalSectionLabel}>Fitness Goal</Text>
+                            <View style={styles.goalChipRow}>
+                                {Object.entries(FITNESS_GOALS).map(([key, goal]) => (
+                                    <TouchableOpacity key={key} style={[styles.goalChip, editedGoals?.fitnessGoal === key && styles.goalChipActive]} onPress={() => handleFitnessGoalChange(key)}>
+                                        <Text style={[styles.goalChipText, editedGoals?.fitnessGoal === key && styles.goalChipTextActive]}>{goal.label}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <Text style={styles.goalSectionLabel}>Activity Level</Text>
+                            <View style={styles.goalChipRow}>
+                                {Object.entries(ACTIVITY_LEVELS).map(([key, level]) => (
+                                    <TouchableOpacity key={key} style={[styles.goalChip, editedGoals?.activityLevel === key && styles.goalChipActive]} onPress={() => handleActivityLevelChange(key)}>
+                                        <Text style={[styles.goalChipText, editedGoals?.activityLevel === key && styles.goalChipTextActive]}>{level.label}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <View style={styles.calculatedGoalsBox}>
+                                <Text style={styles.calculatedGoalsTitle}>Your Daily Goals</Text>
+                                <View style={styles.calculatedGoalsRow}>
+                                    <View style={styles.calculatedGoalItem}><Text style={styles.calculatedGoalValue}>{editedGoals?.calories || '-'}</Text><Text style={styles.calculatedGoalLabel}>Calories</Text></View>
+                                    <View style={styles.calculatedGoalItem}><Text style={styles.calculatedGoalValue}>{editedGoals?.protein || '-'}</Text><Text style={styles.calculatedGoalLabel}>Protein</Text></View>
+                                    <View style={styles.calculatedGoalItem}><Text style={styles.calculatedGoalValue}>{editedGoals?.carbs || '-'}</Text><Text style={styles.calculatedGoalLabel}>Carbs</Text></View>
+                                    <View style={styles.calculatedGoalItem}><Text style={styles.calculatedGoalValue}>{editedGoals?.fat || '-'}</Text><Text style={styles.calculatedGoalLabel}>Fat</Text></View>
                                 </View>
                             </View>
+
+                            <TouchableOpacity style={styles.customToggle} onPress={handleToggleCustom}>
+                                <View style={[styles.customToggleDot, editedGoals?.useCustom && styles.customToggleDotActive]}>
+                                    {editedGoals?.useCustom && <Text style={styles.customToggleCheck}>✓</Text>}
+                                </View>
+                                <Text style={styles.customToggleText}>{editedGoals?.useCustom ? 'Using custom goals' : 'Use custom goals'}</Text>
+                            </TouchableOpacity>
+
+                            <View style={[styles.customGoalsSection, !editedGoals?.useCustom && styles.customGoalsDisabled]}>
+                                <Text style={[styles.goalSectionLabel, !editedGoals?.useCustom && styles.textDisabled]}>Custom Goals</Text>
+                                <View style={styles.goalInputRow}><Text style={[styles.goalInputLabel, !editedGoals?.useCustom && styles.textDisabled]}>Calories</Text><TextInput style={[styles.goalInput, !editedGoals?.useCustom && styles.inputDisabled]} value={editedGoals?.calories?.toString() || ''} onChangeText={(text) => handleCustomGoalChange('calories', text)} keyboardType="numeric" editable={editedGoals?.useCustom} /></View>
+                                <View style={styles.goalInputRow}><Text style={[styles.goalInputLabel, !editedGoals?.useCustom && styles.textDisabled]}>Protein (g)</Text><TextInput style={[styles.goalInput, !editedGoals?.useCustom && styles.inputDisabled]} value={editedGoals?.protein?.toString() || ''} onChangeText={(text) => handleCustomGoalChange('protein', text)} keyboardType="numeric" editable={editedGoals?.useCustom} /></View>
+                                <View style={styles.goalInputRow}><Text style={[styles.goalInputLabel, !editedGoals?.useCustom && styles.textDisabled]}>Carbs (g)</Text><TextInput style={[styles.goalInput, !editedGoals?.useCustom && styles.inputDisabled]} value={editedGoals?.carbs?.toString() || ''} onChangeText={(text) => handleCustomGoalChange('carbs', text)} keyboardType="numeric" editable={editedGoals?.useCustom} /></View>
+                                <View style={styles.goalInputRow}><Text style={[styles.goalInputLabel, !editedGoals?.useCustom && styles.textDisabled]}>Fat (g)</Text><TextInput style={[styles.goalInput, !editedGoals?.useCustom && styles.inputDisabled]} value={editedGoals?.fat?.toString() || ''} onChangeText={(text) => handleCustomGoalChange('fat', text)} keyboardType="numeric" editable={editedGoals?.useCustom} /></View>
 
                             <View style={styles.mealInfo}>
                                 <Text style={styles.mealInfoLabel}>Meal Type</Text>
                                 <Text style={styles.mealInfoValue}>{selectedFood?.mealType || 'Unknown'}</Text>
                             </View>
 
+                            {user?.height && user?.weight && user?.age && (
+                                <View style={styles.bodyMetricsBox}>
+                                    <Text style={styles.bodyMetricsTitle}>Your Body Metrics</Text>
+                                    <Text style={styles.bodyMetricsText}>Height: {user.height}cm • Weight: {user.weight}kg • Age: {user.age}</Text>
+                                    <Text style={styles.bodyMetricsHint}>Goals calculated using Mifflin-St Jeor equation</Text>
+                                </View>
+                            )}
+
+                            <View style={styles.goalButtons}>
+                                <TouchableOpacity style={styles.recalcButton} onPress={handleReset}><Text style={styles.recalcButtonText}>Reset</Text></TouchableOpacity>
+                                <AnimatedButton title={savingGoals ? "Saving..." : "Save Goals"} onPress={handleSaveGoals} disabled={savingGoals} style={{ flex: 1 }} />
+
                             <View style={styles.mealInfo}>
                                 <Text style={styles.mealInfoLabel}>Date</Text>
                                 <Text style={styles.mealInfoValue}>{selectedFood?.date || 'Unknown'}</Text>
                             </View>
-                        </View>
+                        </ScrollView>
                     </View>
                 </View>
             </Modal>
@@ -292,20 +401,12 @@ export default function NutritionScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background },
-    scrollContent: { paddingTop: Platform.OS === 'ios' ? 60 : 40 },
-    header: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingHorizontal: SPACING.lg, marginBottom: SPACING.md,
-    },
+    scrollContent: { paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingBottom: 140 },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, marginBottom: SPACING.md },
     headerTitle: { fontSize: FONT_SIZES.xxl, ...FONTS.bold, color: COLORS.text },
     logButton: { paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg },
     dateSelector: { marginBottom: SPACING.lg },
-    dateItem: {
-        alignItems: 'center', paddingVertical: SPACING.sm, paddingHorizontal: SPACING.md,
-        borderRadius: BORDER_RADIUS.md, marginRight: SPACING.sm,
-        backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.glassBorder,
-        minWidth: 48,
-    },
+    dateItem: { alignItems: 'center', paddingVertical: SPACING.sm, paddingHorizontal: SPACING.md, borderRadius: BORDER_RADIUS.md, marginRight: SPACING.sm, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.glassBorder, minWidth: 48 },
     dateItemActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
     dateDay: { color: COLORS.textMuted, fontSize: FONT_SIZES.xs, ...FONTS.medium },
     dateDayActive: { color: COLORS.text },
@@ -317,18 +418,10 @@ const styles = StyleSheet.create({
     calorieValueRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: SPACING.xs },
     calorieValue: { color: COLORS.text, fontSize: FONT_SIZES.hero, ...FONTS.bold },
     calorieGoal: { color: COLORS.textMuted, fontSize: FONT_SIZES.md, marginLeft: SPACING.sm },
-    calorieRing: {
-        width: 56, height: 56, borderRadius: 28, borderWidth: 3, borderColor: COLORS.coral,
-        alignItems: 'center', justifyContent: 'center',
-    },
+    calorieRing: { width: 56, height: 56, borderRadius: 28, borderWidth: 3, borderColor: COLORS.coral, alignItems: 'center', justifyContent: 'center' },
     caloriePercent: { color: COLORS.coral, fontSize: FONT_SIZES.sm, ...FONTS.bold },
-    macroGrid: {
-        flexDirection: 'row', paddingHorizontal: SPACING.lg, gap: SPACING.md,
-    },
-    macroCard: {
-        flex: 1, backgroundColor: COLORS.surface, padding: SPACING.md,
-        borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: COLORS.glassBorder,
-    },
+    macroGrid: { flexDirection: 'row', paddingHorizontal: SPACING.lg, gap: SPACING.md },
+    macroCard: { flex: 1, backgroundColor: COLORS.surface, padding: SPACING.md, borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: COLORS.glassBorder, ...SHADOWS.small },
     macroLabel: { color: COLORS.textSecondary, fontSize: FONT_SIZES.xs, ...FONTS.medium },
     macroValue: { fontSize: FONT_SIZES.xl, ...FONTS.bold, marginTop: SPACING.xs },
     macroGoal: { color: COLORS.textMuted, fontSize: FONT_SIZES.xs, marginTop: SPACING.xs },
@@ -344,10 +437,7 @@ const styles = StyleSheet.create({
     mealTime: { color: COLORS.textMuted, fontSize: FONT_SIZES.xs },
     mealCalories: { color: COLORS.coral, fontSize: FONT_SIZES.md, ...FONTS.bold },
     mealEmpty: { color: COLORS.textMuted, fontSize: FONT_SIZES.sm, fontStyle: 'italic' },
-    foodItem: {
-        flexDirection: 'row', alignItems: 'center',
-        paddingVertical: SPACING.sm, borderTopWidth: 1, borderTopColor: COLORS.glassBorder,
-    },
+    foodItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: SPACING.sm, borderTopWidth: 1, borderTopColor: COLORS.glassBorder },
     vegDot: { width: 8, height: 8, borderRadius: 4, marginRight: SPACING.md },
     foodInfo: { flex: 1 },
     foodName: { color: COLORS.text, fontSize: FONT_SIZES.md },
@@ -378,84 +468,56 @@ const styles = StyleSheet.create({
     weekCalValue: { color: COLORS.textMuted, fontSize: 9, marginBottom: 4 },
     weekBarFill: { width: 28, borderRadius: BORDER_RADIUS.sm },
     weekDay: { color: COLORS.textMuted, fontSize: FONT_SIZES.xs, marginTop: SPACING.sm },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modalContent: {
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.lg,
-        margin: SPACING.lg,
-        width: width * 0.9,
-        maxWidth: 400,
-        ...SHADOWS.large,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: SPACING.lg,
-    },
-    modalTitle: {
-        fontSize: FONT_SIZES.lg,
-        ...FONTS.bold,
-        color: COLORS.text,
-        flex: 1,
-    },
-    closeButton: {
-        padding: SPACING.sm,
-        borderRadius: BORDER_RADIUS.round,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-    },
-    closeButtonText: {
-        fontSize: FONT_SIZES.lg,
-        color: COLORS.textSecondary,
-    },
-    modalBody: {
-        gap: SPACING.lg,
-    },
-    nutritionGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: SPACING.md,
-        marginBottom: SPACING.lg,
-    },
-    nutritionItem: {
-        width: '48%',
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        padding: SPACING.md,
-        borderRadius: BORDER_RADIUS.md,
-        alignItems: 'center',
-    },
-    nutritionLabel: {
-        fontSize: FONT_SIZES.sm,
-        ...FONTS.medium,
-        color: COLORS.textSecondary,
-        marginBottom: SPACING.xs,
-    },
-    nutritionValue: {
-        fontSize: FONT_SIZES.md,
-        ...FONTS.bold,
-        color: COLORS.text,
-    },
-    mealInfo: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        padding: SPACING.md,
-        borderRadius: BORDER_RADIUS.md,
-    },
-    mealInfoLabel: {
-        fontSize: FONT_SIZES.sm,
-        ...FONTS.medium,
-        color: COLORS.textSecondary,
-    },
-    mealInfoValue: {
-        fontSize: FONT_SIZES.sm,
-        ...FONTS.semiBold,
-        color: COLORS.text,
-    },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' },
+    modalContent: { backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.xl, padding: SPACING.lg, margin: SPACING.lg, width: width * 0.9, maxWidth: 400, ...SHADOWS.large },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.lg },
+    modalTitle: { fontSize: FONT_SIZES.lg, ...FONTS.bold, color: COLORS.text, flex: 1 },
+    closeButton: { padding: SPACING.sm, borderRadius: BORDER_RADIUS.round, backgroundColor: 'rgba(255,255,255,0.1)' },
+    closeButtonText: { fontSize: FONT_SIZES.lg, color: COLORS.textSecondary },
+    modalBody: { gap: SPACING.lg },
+    nutritionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md, marginBottom: SPACING.lg },
+    nutritionItem: { width: '48%', backgroundColor: 'rgba(255,255,255,0.05)', padding: SPACING.md, borderRadius: BORDER_RADIUS.md, alignItems: 'center' },
+    nutritionLabel: { fontSize: FONT_SIZES.sm, ...FONTS.medium, color: COLORS.textSecondary, marginBottom: SPACING.xs },
+    nutritionValue: { fontSize: FONT_SIZES.md, ...FONTS.bold, color: COLORS.text },
+    mealInfo: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.05)', padding: SPACING.md, borderRadius: BORDER_RADIUS.md },
+    mealInfoLabel: { fontSize: FONT_SIZES.sm, ...FONTS.medium, color: COLORS.textSecondary },
+    mealInfoValue: { fontSize: FONT_SIZES.sm, ...FONTS.semiBold, color: COLORS.text },
+    bmiCard: { marginHorizontal: SPACING.lg, marginBottom: SPACING.md, backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.primary + '40', padding: SPACING.md },
+    bmiLabel: { fontSize: FONT_SIZES.xs, ...FONTS.medium, color: COLORS.textSecondary },
+    bmiRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: SPACING.xs },
+    bmiValue: { fontSize: FONT_SIZES.xxl, ...FONTS.bold, color: COLORS.primary },
+    bmiCategory: { fontSize: FONT_SIZES.md, ...FONTS.medium, color: COLORS.textSecondary, marginLeft: SPACING.md },
+    goalInfo: { fontSize: FONT_SIZES.xs, color: COLORS.textMuted, marginTop: SPACING.sm },
+    goalSectionLabel: { fontSize: FONT_SIZES.sm, ...FONTS.semiBold, color: COLORS.text, marginTop: SPACING.lg, marginBottom: SPACING.sm },
+    goalChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
+    goalChip: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: BORDER_RADIUS.round, borderWidth: 1, borderColor: COLORS.glassBorder, backgroundColor: COLORS.surface },
+    goalChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+    goalChipText: { fontSize: FONT_SIZES.sm, ...FONTS.medium, color: COLORS.textSecondary },
+    goalChipTextActive: { color: COLORS.textInverse },
+    calculatedGoalsBox: { marginTop: SPACING.lg, padding: SPACING.md, backgroundColor: COLORS.primary + '15', borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: COLORS.primary + '30' },
+    calculatedGoalsTitle: { fontSize: FONT_SIZES.sm, ...FONTS.bold, color: COLORS.primary },
+    calculatedGoalsRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: SPACING.md },
+    calculatedGoalItem: { alignItems: 'center' },
+    calculatedGoalValue: { fontSize: FONT_SIZES.lg, ...FONTS.bold, color: COLORS.text },
+    calculatedGoalLabel: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary },
+    customToggle: { flexDirection: 'row', alignItems: 'center', marginTop: SPACING.lg, padding: SPACING.sm },
+    customToggleDot: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: COLORS.glassBorder, marginRight: SPACING.sm, alignItems: 'center', justifyContent: 'center' },
+    customToggleDotActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+    customToggleCheck: { color: COLORS.textInverse, fontSize: 14, ...FONTS.bold },
+    customToggleText: { fontSize: FONT_SIZES.sm, ...FONTS.medium, color: COLORS.text },
+    customGoalsSection: { marginTop: SPACING.md },
+    customGoalsDisabled: { opacity: 0.5 },
+    textDisabled: { color: COLORS.textMuted },
+    goalInputRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
+    goalInputLabel: { fontSize: FONT_SIZES.sm, ...FONTS.medium, color: COLORS.textSecondary },
+    goalInput: { backgroundColor: COLORS.surfaceLight, borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: COLORS.glassBorder, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, width: 100, textAlign: 'right', color: COLORS.text, fontSize: FONT_SIZES.md },
+    inputDisabled: { backgroundColor: COLORS.surface, color: COLORS.textMuted },
+    bodyMetricsBox: { marginTop: SPACING.lg, padding: SPACING.md, backgroundColor: COLORS.primary + '10', borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: COLORS.primary + '30' },
+    bodyMetricsTitle: { fontSize: FONT_SIZES.sm, ...FONTS.bold, color: COLORS.primary },
+    bodyMetricsText: { fontSize: FONT_SIZES.sm, color: COLORS.text, marginTop: SPACING.xs },
+    bodyMetricsHint: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: SPACING.xs },
+    goalButtons: { flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.xl, marginBottom: SPACING.lg },
+    recalcButton: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: COLORS.glassBorder },
+    recalcButtonText: { fontSize: FONT_SIZES.sm, ...FONTS.medium, color: COLORS.textSecondary },
 });
+

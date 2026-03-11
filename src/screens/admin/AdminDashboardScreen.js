@@ -1,4 +1,4 @@
-// Admin Dashboard
+// Admin Dashboard — All data sourced from Supabase RPCs (no hardcoded values)
 import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
@@ -10,7 +10,9 @@ import {
   Alert,
   TextInput,
   RefreshControl,
+  ActivityIndicator,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS } from "../../theme";
 import {
   Header,
@@ -25,15 +27,11 @@ import {
 import { useAuth } from "../../services/AuthContext";
 import { useFocusEffect } from "@react-navigation/native";
 import db from "../../services/database";
-import analyticsService from "../../services/AnalyticsService";
 import AICampusAlerts from "../../components/AICampusAlerts";
 
 export default function AdminDashboardScreen({ navigation }) {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
   const [users, setUsers] = useState([]);
-  const [allFoodLogs, setAllFoodLogs] = useState([]);
-  const [allActivities, setAllActivities] = useState([]);
-  const [allMoodLogs, setAllMoodLogs] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [envTemp, setEnvTemp] = useState("");
@@ -43,18 +41,24 @@ export default function AdminDashboardScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
-    const u = await db.getUsers();
-    setUsers(u.filter((usr) => usr.role !== "admin"));
-    // Do NOT fetch raw logs; use aggregates via RPCs instead
-    
-    // Load real analytics via RPCs
     try {
+      // Fetch users via the admin RPC (bypasses RLS)
+      const adminUsers = await db.getAdminUsers();
+      setUsers(adminUsers);
+
+      // Load real analytics via RPCs
       const { data: campusOverview, error: errOverview } = await db.supabase.rpc('get_campus_overview');
       const { data: weeklyTrends, error: errTrends } = await db.supabase.rpc('get_weekly_trends');
-      if (errOverview || errTrends) throw errOverview || errTrends;
-      setAnalytics({ collegeStats: campusOverview || [], weeklyTrends: weeklyTrends || [] });
+
+      if (errOverview) console.error('Campus overview error:', errOverview);
+      if (errTrends) console.error('Weekly trends error:', errTrends);
+
+      setAnalytics({
+        collegeStats: campusOverview || [],
+        weeklyTrends: weeklyTrends || [],
+      });
     } catch (error) {
-      console.error('Analytics load error:', error);
+      console.error('Admin dashboard load error:', error);
       setAnalytics({ collegeStats: [], weeklyTrends: [] });
     } finally {
       setLoading(false);
@@ -66,6 +70,87 @@ export default function AdminDashboardScreen({ navigation }) {
       loadData();
     }, [loadData]),
   );
+
+  // ── Derived stats from get_campus_overview (real DB aggregates) ──
+  const campusStats = useMemo(() => {
+    const stats = analytics?.collegeStats || [];
+    const totalUsers = stats.reduce((sum, r) => sum + (Number(r.total_users) || 0), 0);
+    const totalActivities = stats.reduce((sum, r) => sum + (Number(r.total_activities) || 0), 0);
+    const totalFoodLogs = stats.reduce((sum, r) => sum + (Number(r.total_food_logs) || 0), 0);
+    const totalMoodLogs = stats.reduce((sum, r) => sum + (Number(r.total_mood_logs) || 0), 0);
+    return { totalUsers, totalActivities, totalFoodLogs, totalMoodLogs };
+  }, [analytics]);
+
+  // ── Campus signals derived from real data ──
+  const campusSignals = useMemo(() => {
+    const stats = analytics?.collegeStats || [];
+    if (stats.length === 0) return [];
+
+    const signals = [];
+
+    // Signal 1: College with lowest average mood
+    const withMood = stats.filter((s) => s.avg_mood_per_user != null && Number(s.avg_mood_per_user) > 0);
+    if (withMood.length > 0) {
+      const lowest = withMood.reduce((min, s) =>
+        Number(s.avg_mood_per_user) < Number(min.avg_mood_per_user) ? s : min
+      );
+      const moodVal = Number(lowest.avg_mood_per_user);
+      signals.push({
+        title: `${lowest.college} — Low Mood Alert`,
+        progress: Math.round(((5 - moodVal) / 5) * 100), // invert: lower mood = higher bar
+        color: moodVal < 2.5 ? COLORS.error : COLORS.warning,
+        subtitle: `Average mood score is ${moodVal.toFixed(1)}/5 — consider wellness interventions.`,
+      });
+    }
+
+    // Signal 2: College with lowest avg nutrition (calories)
+    const withCalories = stats.filter((s) => s.avg_calories_per_user != null && Number(s.avg_calories_per_user) > 0);
+    if (withCalories.length > 0) {
+      const lowest = withCalories.reduce((min, s) =>
+        Number(s.avg_calories_per_user) < Number(min.avg_calories_per_user) ? s : min
+      );
+      const cal = Math.round(Number(lowest.avg_calories_per_user));
+      signals.push({
+        title: `${lowest.college} — Nutrition Warning`,
+        progress: Math.min(Math.round((cal / 2000) * 100), 100),
+        color: cal < 1500 ? COLORS.error : COLORS.accent,
+        subtitle: `Average calorie intake is ${cal} kcal/day — may be below recommended levels.`,
+      });
+    }
+
+    // Signal 3: College with highest activity load
+    const withActivity = stats.filter((s) => s.avg_duration_per_user != null && Number(s.avg_duration_per_user) > 0);
+    if (withActivity.length > 0) {
+      const highest = withActivity.reduce((max, s) =>
+        Number(s.avg_duration_per_user) > Number(max.avg_duration_per_user) ? s : max
+      );
+      const dur = Math.round(Number(highest.avg_duration_per_user));
+      signals.push({
+        title: `${highest.college} — High Activity`,
+        progress: Math.min(Math.round((dur / 120) * 100), 100),
+        color: COLORS.primary,
+        subtitle: `Avg ${dur} min/day — ensure facility capacity can handle peak usage.`,
+      });
+    }
+
+    return signals;
+  }, [analytics]);
+
+  // ── Hostel participation rates from real data ──
+  const hostelParticipation = useMemo(() => {
+    const stats = analytics?.collegeStats || [];
+    return stats.map((s) => {
+      const totalUsers = Number(s.total_users) || 0;
+      const totalActivities = Number(s.total_activities) || 0;
+      // Participation = users with at least 1 activity / total users
+      // Approximation: (totalActivities / totalUsers) capped at 100
+      const rate = totalUsers > 0 ? Math.min(Math.round((totalActivities / totalUsers) * 100), 100) : 0;
+      return {
+        college: String(s.college || "Unknown"),
+        participationRate: rate,
+      };
+    });
+  }, [analytics]);
 
   if (!isAdmin) {
     return (
@@ -85,11 +170,6 @@ export default function AdminDashboardScreen({ navigation }) {
       u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.email?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
-
-  // Aggregated counts from analytics instead of raw logs
-  const totalActivities = analytics?.weeklyTrends?.reduce((sum, d) => sum + (d.total_steps || 0), 0) ?? 0;
-  const totalFoodLogs = analytics?.weeklyTrends?.reduce((sum, d) => sum + (d.total_calories || 0), 0) ?? 0;
-  const totalMoodLogs = analytics?.weeklyTrends?.filter(d => d.avg_mood != null).length ?? 0;
 
   async function handleAddEnvData() {
     if (!envTemp && !envAqi) {
@@ -129,7 +209,31 @@ export default function AdminDashboardScreen({ navigation }) {
       <Header
         title="Admin Dashboard"
         subtitle="Campus Overview"
-        onBack={() => navigation.goBack()}
+        onBack={navigation.canGoBack() ? () => navigation.goBack() : null}
+        rightAction={
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              Alert.alert(
+                "Logout",
+                "Are you sure you want to logout from Admin?",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Logout",
+                    style: "destructive",
+                    onPress: async () => {
+                      await logout();
+                    },
+                  },
+                ]
+              );
+            }}
+            style={styles.logoutButton}
+          >
+            <Ionicons name="power" size={24} color={COLORS.error} />
+          </TouchableOpacity>
+        }
       />
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -157,36 +261,45 @@ export default function AdminDashboardScreen({ navigation }) {
         {/* AI Campus Alerts */}
         <AICampusAlerts analytics={analytics} />
 
-        {/* Campus Stats */}
+        {/* Campus Stats — all from get_campus_overview aggregates */}
         <SectionHeader title="Campus Overview" />
-        <View style={styles.statsGrid}>
-          <StatCard
-            title="Total Users"
-            value={users.length}
-            icon="👥"
-            color={COLORS.primary}
-          />
-          <StatCard
-            title="Activities"
-            value={totalActivities}
-            icon="🏃"
-            color={COLORS.accent}
-          />
-        </View>
-        <View style={[styles.statsGrid, { marginTop: SPACING.md }]}>
-          <StatCard
-            title="Food Logs"
-            value={totalFoodLogs}
-            icon="🍽️"
-            color={COLORS.coral}
-          />
-          <StatCard
-            title="Mood Logs"
-            value={totalMoodLogs}
-            icon="😊"
-            color={COLORS.orange}
-          />
-        </View>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+            <Text style={styles.loadingText}>Loading stats...</Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.statsGrid}>
+              <StatCard
+                title="Total Users"
+                value={campusStats.totalUsers}
+                icon="👥"
+                color={COLORS.primary}
+              />
+              <StatCard
+                title="Activities"
+                value={campusStats.totalActivities}
+                icon="🏃"
+                color={COLORS.accent}
+              />
+            </View>
+            <View style={[styles.statsGrid, { marginTop: SPACING.md }]}>
+              <StatCard
+                title="Food Logs"
+                value={campusStats.totalFoodLogs}
+                icon="🍽️"
+                color={COLORS.coral}
+              />
+              <StatCard
+                title="Mood Logs"
+                value={campusStats.totalMoodLogs}
+                icon="😊"
+                color={COLORS.violet}
+              />
+            </View>
+          </>
+        )}
 
         {/* User Management */}
         <SectionHeader title="User Management" />
@@ -200,17 +313,24 @@ export default function AdminDashboardScreen({ navigation }) {
             onChangeText={setSearchQuery}
           />
         </View>
+        {filteredUsers.length === 0 && !loading && (
+          <View style={styles.emptyUsers}>
+            <Text style={styles.emptyUsersText}>
+              No users found. Run the admin_list_users migration in Supabase SQL Editor.
+            </Text>
+          </View>
+        )}
         {filteredUsers.map((u, i) => (
           <View key={u.id || i} style={styles.userCard}>
             <Avatar
               name={u.name}
-              color={u.avatarColor || COLORS.primary}
+              color={u.avatarColor || u.avatar_color || COLORS.primary}
               size={40}
             />
             <View style={styles.userInfo}>
               <Text style={styles.userName}>{u.name}</Text>
               <Text style={styles.userMeta}>
-                {u.email} · {u.hostel} · {u.year}
+                {u.email} · {u.college || u.hostel} · {u.year}
               </Text>
             </View>
             <View
@@ -218,7 +338,7 @@ export default function AdminDashboardScreen({ navigation }) {
                 styles.levelBadge,
                 {
                   backgroundColor:
-                    u.fitnessLevel === "intermediate"
+                    (u.activityLevel || u.activity_level || "moderate") === "moderate"
                       ? COLORS.primary + "22"
                       : COLORS.accent + "22",
                 },
@@ -229,55 +349,43 @@ export default function AdminDashboardScreen({ navigation }) {
                   styles.levelText,
                   {
                     color:
-                      u.fitnessLevel === "intermediate"
+                      (u.activityLevel || u.activity_level || "moderate") === "moderate"
                         ? COLORS.primary
                         : COLORS.accent,
                   },
                 ]}
               >
-                {u.fitnessLevel}
+                {u.activityLevel || u.activity_level || "—"}
               </Text>
             </View>
           </View>
         ))}
 
-        {/* Critical Campus Signals */}
+        {/* Critical Campus Signals — derived from real analytics */}
         <SectionHeader title="Critical Campus Signals" />
-        <View style={styles.participationCard}>
-          <Text style={styles.signalTitle}>MSE Dept Stress Alert (2nd Year)</Text>
-          <ProgressBar
-            progress={88}
-            color={COLORS.error}
-            style={{ marginTop: SPACING.sm }}
-          />
-          <Text style={styles.signalSubtitle}>
-            Stress scores significantly above normal baseline for 2nd-year MSE students.
-          </Text>
-        </View>
-
-        <View style={styles.participationCard}>
-          <Text style={styles.signalTitle}>Hostel 4 Nutrition Warning</Text>
-          <ProgressBar
-            progress={38}
-            color={COLORS.orange}
-            style={{ marginTop: SPACING.sm }}
-          />
-          <Text style={styles.signalSubtitle}>
-            Average daily protein intake is well below target for Hostel 4 residents.
-          </Text>
-        </View>
-
-        <View style={styles.participationCard}>
-          <Text style={styles.signalTitle}>Facility Load Heatmap (Gym)</Text>
-          <ProgressBar
-            progress={95}
-            color={COLORS.primary}
-            style={{ marginTop: SPACING.sm }}
-          />
-          <Text style={styles.signalSubtitle}>
-            Evening slots are at peak capacity; consider extending timings or opening overflow areas.
-          </Text>
-        </View>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          </View>
+        ) : campusSignals.length === 0 ? (
+          <View style={styles.participationCard}>
+            <Text style={styles.signalSubtitle}>
+              No campus signals yet — data will appear as users log activities, food, and mood.
+            </Text>
+          </View>
+        ) : (
+          campusSignals.map((signal, i) => (
+            <View key={i} style={[styles.participationCard, i > 0 && { marginTop: SPACING.md }]}>
+              <Text style={styles.signalTitle}>{signal.title}</Text>
+              <ProgressBar
+                progress={signal.progress}
+                color={signal.color}
+                style={{ marginTop: SPACING.sm }}
+              />
+              <Text style={styles.signalSubtitle}>{signal.subtitle}</Text>
+            </View>
+          ))
+        )}
 
         {/* Add Environmental Data */}
         <SectionHeader title="Add Environmental Data" />
@@ -310,17 +418,25 @@ export default function AdminDashboardScreen({ navigation }) {
           />
         </View>
 
-        {/* Campus Participation */}
-        <SectionHeader title="Hostel Participation Rates" />
+        {/* Campus Participation — computed from real data */}
+        <SectionHeader title="College Participation Rates" />
         {loading ? (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>Loading analytics...</Text>
           </View>
+        ) : hostelParticipation.length === 0 ? (
+          <View style={styles.participationCard}>
+            <Text style={styles.signalSubtitle}>
+              No participation data yet.
+            </Text>
+          </View>
         ) : (
           <View style={styles.participationCard}>
-            {(analytics?.collegeStats || []).map((h, i) => (
+            {hostelParticipation.map((h, i) => (
               <View key={i} style={styles.participationRow}>
-                <Text style={styles.participationLabel}>{h.college}</Text>
+                <Text style={styles.participationLabel} numberOfLines={1}>
+                  {h.college}
+                </Text>
                 <ProgressBar
                   progress={h.participationRate}
                   color={COLORS.chartColors[i % COLORS.chartColors.length]}
@@ -347,6 +463,13 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "ios" ? 50 : 30,
   },
   content: { paddingBottom: SPACING.huge },
+  logoutButton: {
+    padding: SPACING.sm,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
+  },
   denied: { flex: 1, alignItems: "center", justifyContent: "center" },
   deniedEmoji: { fontSize: 48, marginBottom: SPACING.lg },
   deniedText: { color: COLORS.textSecondary, fontSize: FONT_SIZES.lg },
@@ -429,6 +552,7 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     ...FONTS.medium,
     minWidth: 70,
+    maxWidth: 100,
   },
   participationValue: {
     color: COLORS.textMuted,
@@ -447,14 +571,25 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: SPACING.xl,
   },
   loadingText: {
     fontSize: FONT_SIZES.md,
     color: COLORS.textSecondary,
     ...FONTS.medium,
+    marginTop: SPACING.sm,
+  },
+  emptyUsers: {
+    marginHorizontal: SPACING.lg,
+    padding: SPACING.lg,
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: BORDER_RADIUS.lg,
+  },
+  emptyUsersText: {
+    color: COLORS.textMuted,
+    fontSize: FONT_SIZES.sm,
+    textAlign: "center",
   },
 });
