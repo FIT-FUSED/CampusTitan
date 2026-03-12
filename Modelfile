@@ -1,4 +1,4 @@
-FROM C:\Users\YourName\Downloads\llama-3.2-3b-instruct.Q4_K_M.gguf
+FROM C:/Users/Asus/CampusTitan/Modelfile
 
 PARAMETER temperature 0.0
 
