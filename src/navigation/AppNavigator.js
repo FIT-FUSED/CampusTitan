@@ -1,6 +1,6 @@
 // App Navigator
 import React from "react";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { View, Text, StyleSheet, Platform, TouchableOpacity } from "react-native";
@@ -37,6 +37,7 @@ import CampusPulseLeaderboardScreen from "../screens/community/CampusPulseLeader
 import HealthInsightsScreen from "../screens/community/HealthInsightsScreen";
 import WellnessQuizScreen from "../screens/wellness/WellnessQuizScreen";
 import DailyWellnessCheckInScreen from "../screens/wellness/DailyWellnessCheckInScreen";
+import AIChatInterface from "../components/AIChatInterface";
 import AchievementsScreen from "../screens/fitness/AchievementsScreen";
 
 const Stack = createStackNavigator();
@@ -44,6 +45,12 @@ const Tab = createBottomTabNavigator();
 
 function CustomTabBar({ state, descriptors, navigation }) {
   const insets = useSafeAreaInsets();
+  const focusedKey = state.routes[state.index]?.key;
+  const focusedOptions = focusedKey ? descriptors?.[focusedKey]?.options : undefined;
+  const focusedTabBarStyle = focusedOptions?.tabBarStyle;
+  if (focusedTabBarStyle && focusedTabBarStyle.display === "none") {
+    return null;
+  }
   return (
     <View style={[tabStyles.wrapper, { paddingBottom: Math.max(insets.bottom, 16) }]}>
       <View style={tabStyles.pill}>
@@ -56,7 +63,10 @@ function CustomTabBar({ state, descriptors, navigation }) {
             Community: { focused: "people", unfocused: "people-outline" },
             CampusAnalytics: { focused: "analytics", unfocused: "analytics-outline" },
             Alerts: { focused: "alert", unfocused: "alert-outline" },
-            Operations: { focused: "construct", unfocused: "construct-outline" },
+            Operations: {
+              focused: "construct",
+              unfocused: "construct-outline",
+            },
           };
           const iconSet = icons[route.name] || { focused: "ellipse", unfocused: "ellipse-outline" };
           return (
@@ -82,7 +92,17 @@ function CustomTabBar({ state, descriptors, navigation }) {
 function StudentTabs() {
   return (
     <Tab.Navigator tabBar={(props) => <CustomTabBar {...props} />} screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="Home" component={HomeStack} />
+      <Tab.Screen
+        name="Home"
+        component={HomeStack}
+        options={({ route }) => {
+          const routeName = getFocusedRouteNameFromRoute(route) ?? "HomeMain";
+          const hideTabBar = routeName === "AIChat";
+          return {
+            tabBarStyle: hideTabBar ? { display: "none" } : undefined,
+          };
+        }}
+      />
       <Tab.Screen name="Fitness" component={FitnessStack} />
       <Tab.Screen name="Nutrition" component={NutritionStack} />
       <Tab.Screen name="Wellness" component={WellnessStack} />
@@ -92,7 +112,12 @@ function StudentTabs() {
 }
 
 function HomeStack() {
-  return <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="HomeMain" component={HomeScreen} /></Stack.Navigator>;
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="HomeMain" component={HomeScreen} />
+      <Stack.Screen name="AIChat" component={AIChatInterface} />
+    </Stack.Navigator>
+  );
 }
 
 function NutritionStack() {

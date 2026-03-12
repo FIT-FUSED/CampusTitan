@@ -370,6 +370,8 @@ export default function NutritionScreen({ navigation }) {
                                 <View style={styles.goalInputRow}><Text style={[styles.goalInputLabel, !editedGoals?.useCustom && styles.textDisabled]}>Carbs (g)</Text><TextInput style={[styles.goalInput, !editedGoals?.useCustom && styles.inputDisabled]} value={editedGoals?.carbs?.toString() || ''} onChangeText={(text) => handleCustomGoalChange('carbs', text)} keyboardType="numeric" editable={editedGoals?.useCustom} /></View>
                                 <View style={styles.goalInputRow}><Text style={[styles.goalInputLabel, !editedGoals?.useCustom && styles.textDisabled]}>Fat (g)</Text><TextInput style={[styles.goalInput, !editedGoals?.useCustom && styles.inputDisabled]} value={editedGoals?.fat?.toString() || ''} onChangeText={(text) => handleCustomGoalChange('fat', text)} keyboardType="numeric" editable={editedGoals?.useCustom} /></View>
 
+                            </View>
+
                             <View style={styles.mealInfo}>
                                 <Text style={styles.mealInfoLabel}>Meal Type</Text>
                                 <Text style={styles.mealInfoValue}>{selectedFood?.mealType || 'Unknown'}</Text>
@@ -386,6 +388,8 @@ export default function NutritionScreen({ navigation }) {
                             <View style={styles.goalButtons}>
                                 <TouchableOpacity style={styles.recalcButton} onPress={handleReset}><Text style={styles.recalcButtonText}>Reset</Text></TouchableOpacity>
                                 <AnimatedButton title={savingGoals ? "Saving..." : "Save Goals"} onPress={handleSaveGoals} disabled={savingGoals} style={{ flex: 1 }} />
+
+                            </View>
 
                             <View style={styles.mealInfo}>
                                 <Text style={styles.mealInfoLabel}>Date</Text>

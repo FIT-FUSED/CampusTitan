@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import pickle
+import os
 
 
 # =====================================
@@ -28,14 +29,27 @@ class Net(nn.Module):
 # LOAD ARTIFACTS ONCE (FAST)
 # =====================================
 
-scaler = pickle.load(open("scaler.pkl", "rb"))
-columns = pickle.load(open("columns.pkl", "rb"))
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-input_dim = len(columns)
+def _load_artifact(path):
+    with open(path, "rb") as f:
+        return pickle.load(f)
 
-model = Net(input_dim)
-model.load_state_dict(torch.load("best_model.pth"))
-model.eval()
+ML_READY = True
+scaler = None
+columns = None
+model = None
+
+try:
+    scaler = _load_artifact(os.path.join(_BASE_DIR, "scaler.pkl"))
+    columns = _load_artifact(os.path.join(_BASE_DIR, "columns.pkl"))
+
+    input_dim = len(columns)
+    model = Net(input_dim)
+    model.load_state_dict(torch.load(os.path.join(_BASE_DIR, "best_model.pth"), map_location="cpu"))
+    model.eval()
+except Exception:
+    ML_READY = False
 
 
 # =====================================
@@ -64,6 +78,8 @@ def integrate_walking(user_dict):
 
 def preprocess_input(user_dict):
     user_dict = integrate_walking(user_dict)
+    if not ML_READY:
+        return None
     df = pd.DataFrame([user_dict])
     df = pd.get_dummies(df)
 
@@ -94,7 +110,11 @@ def preprocess_input(user_dict):
 # =====================================
 
 def predict_wellness(user_dict):
+    if not ML_READY:
+        return 50
     processed = preprocess_input(user_dict)
+    if processed is None:
+        return 50
     X = torch.tensor(processed.to_numpy(dtype=np.float32))
 
     with torch.no_grad():

@@ -6,6 +6,52 @@ class Database {
         return supabase;
     }
 
+    subscribeToFoodLogs(userId, onChange) {
+        if (!userId) throw new Error('userId is required');
+        const channel = supabase
+            .channel(`food_logs:user:${userId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'food_logs',
+                    filter: `user_id=eq.${userId}`,
+                },
+                (payload) => {
+                    if (typeof onChange === 'function') onChange(payload);
+                },
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }
+
+    subscribeToActivities(userId, onChange) {
+        if (!userId) throw new Error('userId is required');
+        const channel = supabase
+            .channel(`activities:user:${userId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'activities',
+                    filter: `user_id=eq.${userId}`,
+                },
+                (payload) => {
+                    if (typeof onChange === 'function') onChange(payload);
+                },
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }
+
     // User-specific
     async getUsers() {
         const { data, error } = await supabase.from('users').select('*');

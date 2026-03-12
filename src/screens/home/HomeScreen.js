@@ -24,10 +24,11 @@ import {
   BORDER_RADIUS,
   SHADOWS,
 } from "../../theme";
-import { SectionHeader } from "../../components/common";
+import { SectionHeader, Avatar } from "../../components/common";
 import EnvironmentWidget from "../../components/EnvironmentWidget";
 import AIWellnessCoach from "../../components/AIWellnessCoach";
 import CampusZoneRecommender from "../../components/CampusZoneRecommender";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../services/AuthContext";
 import db from "../../services/database";
 import sensorService from "../../services/SensorService";
@@ -214,7 +215,55 @@ export default function HomeScreen({ navigation }) {
     }
   }, [user, today]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const unsubFood = db.subscribeToFoodLogs(user.id, () => {
+      loadData();
+    });
+
+    const unsubActs = db.subscribeToActivities(user.id, () => {
+      loadData();
+    });
+
+    return () => {
+      if (typeof unsubFood === "function") unsubFood();
+      if (typeof unsubActs === "function") unsubActs();
+    };
+  }, [user?.id, loadData]);
+
+  // Check Physical Activity permission on mount
+  useEffect(() => {
+    const checkStepPermission = async () => {
+      const { granted } = await sensorService.checkPermissions();
+      setStepPermissionGranted(!!granted);
+    };
+    checkStepPermission();
+  }, []);
+
+  // Load persisted steps and subscribe to live updates
+  useEffect(() => {
+    const loadAndSubscribe = async () => {
+      await sensorService.loadPersistedSteps();
+      const currentSteps = sensorService.getSteps();
+      setSteps(currentSteps);
+      setKm(sensorService.getKm().toFixed(2));
+      setCalories(Math.round(sensorService.getCalories()));
+    };
+    loadAndSubscribe();
+
+    const onSteps = (newSteps) => {
+      setSteps(newSteps);
+      setKm(sensorService.getKm().toFixed(2));
+      setCalories(Math.round(sensorService.getCalories()));
+    };
+    sensorService.addListener(onSteps);
+    return () => sensorService.removeListener(onSteps);
+  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -341,7 +390,23 @@ export default function HomeScreen({ navigation }) {
               )}
             </View>
             <View style={s.heroRight}>
-
+              <TouchableOpacity
+                style={s.chatButton}
+                onPress={() => navigation.navigate("AIChat")}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={COLORS.gradientPrimary}
+                  style={s.chatButtonGradient}
+                >
+                  <Ionicons
+                    name="chatbubbles"
+                    size={22}
+                    color={COLORS.textInverse}
+                  />
+                </LinearGradient>
+              </TouchableOpacity>
+              <Avatar name={user?.name} color={COLORS.primary} size={56} />
               <View style={s.datePill}>
                 <Text style={s.heroDate}>{format(new Date(), "dd MMM")}</Text>
               </View>
@@ -365,9 +430,7 @@ export default function HomeScreen({ navigation }) {
         >
           <LinearGradient
             colors={
-              checkInCompleted
-                ? COLORS.gradientSuccess
-                : COLORS.gradientHero
+              checkInCompleted ? COLORS.gradientSuccess : COLORS.gradientHero
             }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -377,10 +440,11 @@ export default function HomeScreen({ navigation }) {
             <View style={s.quizDecor1} />
             <View style={s.quizDecor2} />
 
-
             <View style={s.quizContent}>
               <View style={s.quizIconWrap}>
-                <Text style={s.quizEmoji}>{checkInCompleted ? "✅" : "🧠"}</Text>
+                <Text style={s.quizEmoji}>
+                  {checkInCompleted ? "✅" : "🧠"}
+                </Text>
               </View>
               <View style={{ flex: 1, marginLeft: SPACING.md }}>
                 <Text style={s.quizTitle}>
@@ -397,7 +461,7 @@ export default function HomeScreen({ navigation }) {
               {!checkInCompleted && (
                 <View style={s.quizBtn}>
                   <LinearGradient
-                    colors={['#FFFFFF', '#F3F4F6']}
+                    colors={["#FFFFFF", "#F3F4F6"]}
                     style={s.quizBtnGradient}
                   >
                     <Text style={s.quizBtnText}>Start</Text>
@@ -421,10 +485,7 @@ export default function HomeScreen({ navigation }) {
           >
             {/* Card 1: Auto Step Tracking */}
             <TouchableOpacity
-              style={[
-                s.valueCard,
-                { marginRight: SPACING.md },
-              ]}
+              style={[s.valueCard, { marginRight: SPACING.md }]}
               onPress={() => openSheet("activity")}
               activeOpacity={0.85}
             >
@@ -432,7 +493,9 @@ export default function HomeScreen({ navigation }) {
                 colors={COLORS.gradientCalm}
                 style={s.valueCardGradient}
               >
-                <Text style={{ fontSize: 32, marginBottom: SPACING.sm }}>👟</Text>
+                <Text style={{ fontSize: 32, marginBottom: SPACING.sm }}>
+                  👟
+                </Text>
                 <Text style={s.valueCardTitle}>Auto Steps</Text>
                 <Text style={s.valueCardDesc}>
                   {stepPermissionGranted ? "✓ Enabled" : "Enable Activity"}
@@ -455,7 +518,9 @@ export default function HomeScreen({ navigation }) {
                 colors={COLORS.gradientViolet}
                 style={s.valueCardGradient}
               >
-                <Text style={{ fontSize: 32, marginBottom: SPACING.sm }}>📱</Text>
+                <Text style={{ fontSize: 32, marginBottom: SPACING.sm }}>
+                  📱
+                </Text>
                 <Text style={s.valueCardTitle}>Screen Time</Text>
                 <Text style={s.valueCardDesc}>
                   {usagePermission ? "✓ Enabled" : "Enable Usage"}
@@ -471,14 +536,18 @@ export default function HomeScreen({ navigation }) {
             {/* Card 3: Quick Log */}
             <TouchableOpacity
               style={[s.valueCard]}
-              onPress={() => navigation.navigate("Wellness", { screen: "MoodLog" })}
+              onPress={() =>
+                navigation.navigate("Wellness", { screen: "MoodLog" })
+              }
               activeOpacity={0.85}
             >
               <LinearGradient
                 colors={COLORS.gradientEnergy}
                 style={s.valueCardGradient}
               >
-                <Text style={{ fontSize: 32, marginBottom: SPACING.sm }}>😊</Text>
+                <Text style={{ fontSize: 32, marginBottom: SPACING.sm }}>
+                  😊
+                </Text>
                 <Text style={s.valueCardTitle}>Log Mood</Text>
                 <Text style={s.valueCardDesc}>Track your feelings</Text>
               </LinearGradient>
@@ -537,7 +606,7 @@ export default function HomeScreen({ navigation }) {
 
           {/* Row 2: Macro strip - Premium Gradient */}
           <LinearGradient
-            colors={['#EEF2FF', '#E0E7FF']}
+            colors={["#EEF2FF", "#E0E7FF"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={s.macroStrip}
@@ -616,7 +685,7 @@ export default function HomeScreen({ navigation }) {
                 colors={
                   stepPermissionGranted
                     ? COLORS.gradientCalm
-                    : ['#F0F9FF', '#E0F2FE']
+                    : ["#F0F9FF", "#E0F2FE"]
                 }
                 style={s.valueExchangeGradient}
               >
@@ -670,7 +739,7 @@ export default function HomeScreen({ navigation }) {
                 colors={
                   usagePermission
                     ? COLORS.gradientViolet
-                    : ['#F5F3FF', '#EDE9FE']
+                    : ["#F5F3FF", "#EDE9FE"]
                 }
                 style={s.valueExchangeGradient}
               >
@@ -832,7 +901,7 @@ export default function HomeScreen({ navigation }) {
             {recentActivities.map((act, i) => (
               <View key={i} style={s.actRow}>
                 <LinearGradient
-                  colors={[COLORS.primary + '15', COLORS.primary + '08']}
+                  colors={[COLORS.primary + "15", COLORS.primary + "08"]}
                   style={s.actIconGradient}
                 >
                   <Text style={{ fontSize: 18 }}>
@@ -878,7 +947,11 @@ export default function HomeScreen({ navigation }) {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scroll: { paddingTop: Platform.OS === "ios" ? 60 : 40, paddingBottom: 140 },
+  scroll: {
+    paddingTop: Platform.OS === "ios" ? 60 : 40,
+    flexGrow: 1,
+    paddingBottom: 100,
+  },
 
   // ─── Hero ───
   hero: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.xl },
@@ -902,15 +975,15 @@ const s = StyleSheet.create({
     resizeMode: "cover",
   },
   logoGradient: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: "100%",
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
   },
   logo: { width: "80%", height: "80%" },
   logoText: {
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: "800",
     color: COLORS.textInverse,
     letterSpacing: 1,
   },
@@ -948,6 +1021,20 @@ const s = StyleSheet.create({
     ...FONTS.semiBold,
   },
   heroRight: { alignItems: "center" },
+  chatButton: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    zIndex: 10,
+    ...SHADOWS.medium,
+  },
+  chatButtonGradient: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   datePill: {
     marginTop: SPACING.sm,
     backgroundColor: COLORS.surfaceElevated,
@@ -972,34 +1059,39 @@ const s = StyleSheet.create({
   quizGradient: {
     padding: SPACING.xl,
     minHeight: 100,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   quizDecor1: {
-    position: 'absolute',
+    position: "absolute",
     top: -30,
     right: -30,
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: "rgba(255,255,255,0.1)",
   },
   quizDecor2: {
-    position: 'absolute',
+    position: "absolute",
     bottom: -20,
     left: -20,
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
-  quizContent: { flexDirection: "row", alignItems: "center", position: 'relative', zIndex: 1 },
+  quizContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    position: "relative",
+    zIndex: 1,
+  },
   quizIconWrap: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   quizEmoji: { fontSize: 28 },
   quizTitle: {
@@ -1016,7 +1108,7 @@ const s = StyleSheet.create({
   },
   quizBtn: {
     borderRadius: BORDER_RADIUS.round,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginLeft: SPACING.sm,
     ...SHADOWS.small,
   },
@@ -1035,7 +1127,7 @@ const s = StyleSheet.create({
     width: W * 0.42,
     height: 160,
     borderRadius: BORDER_RADIUS.xxl,
-    overflow: 'hidden',
+    overflow: "hidden",
     ...SHADOWS.medium,
   },
   valueCardGradient: {
@@ -1058,7 +1150,7 @@ const s = StyleSheet.create({
   },
   valueCardBadge: {
     marginTop: SPACING.sm,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: "rgba(255,255,255,0.25)",
     paddingHorizontal: SPACING.md,
     paddingVertical: 4,
     borderRadius: BORDER_RADIUS.round,
@@ -1087,7 +1179,7 @@ const s = StyleSheet.create({
     height: 4,
     backgroundColor: COLORS.surfaceElevated,
     borderRadius: 2,
-    alignSelf: 'center',
+    alignSelf: "center",
     marginBottom: SPACING.lg,
   },
   sheetTitle: { fontSize: FONT_SIZES.xl, ...FONTS.bold, color: COLORS.text },
@@ -1100,12 +1192,12 @@ const s = StyleSheet.create({
   sheetPrimary: {
     marginTop: SPACING.xl,
     borderRadius: BORDER_RADIUS.xl,
-    overflow: 'hidden',
+    overflow: "hidden",
     ...SHADOWS.medium,
   },
   sheetPrimaryGradient: {
     paddingVertical: SPACING.md,
-    alignItems: 'center',
+    alignItems: "center",
   },
   sheetPrimaryText: {
     color: COLORS.textInverse,
@@ -1131,7 +1223,7 @@ const s = StyleSheet.create({
   bentoCard: {
     backgroundColor: COLORS.surface,
     borderRadius: BORDER_RADIUS.xxl,
-    overflow: 'hidden',
+    overflow: "hidden",
     borderWidth: 1,
     borderColor: COLORS.glassBorderLight,
     ...SHADOWS.small,
@@ -1149,7 +1241,7 @@ const s = StyleSheet.create({
   // ─── Progress rings ───
   ringCardGradient: {
     padding: SPACING.lg,
-    alignItems: 'center',
+    alignItems: "center",
     borderRadius: BORDER_RADIUS.xxl,
   },
   ringValue: {
@@ -1228,16 +1320,16 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: SPACING.lg,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   stepsDecor: {
-    position: 'absolute',
+    position: "absolute",
     top: -40,
     right: -40,
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: "rgba(255,255,255,0.1)",
   },
   stepsIcon: { fontSize: 32 },
   stepsValue: {
@@ -1273,7 +1365,7 @@ const s = StyleSheet.create({
     ...FONTS.medium,
   },
   permissionBtn: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: "rgba(255,255,255,0.25)",
     paddingHorizontal: SPACING.sm,
     paddingVertical: 5,
     borderRadius: BORDER_RADIUS.round,
@@ -1288,16 +1380,16 @@ const s = StyleSheet.create({
   // ─── Mood & Burn ───
   moodCardGradient: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: SPACING.lg,
     borderRadius: BORDER_RADIUS.xxl - 1,
   },
   moodEmoji: { fontSize: 36 },
   burnCardGradient: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: SPACING.lg,
     borderRadius: BORDER_RADIUS.xxl - 1,
   },
