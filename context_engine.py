@@ -1,9 +1,4 @@
-import os
-import json
 import requests
-from dotenv import load_dotenv
-from google import genai
-from google.genai import types
 
 # ==========================================
 # Phase 1: PostgreSQL Simulation
@@ -40,98 +35,82 @@ def calculate_moving_averages(history_data: list) -> dict:
     }
 
 # ==========================================
-# Phase 3: Gemini Context Compressor
+# Phase 3: Raw History Formatter 
 # ==========================================
-def compress_historical_context(history_data: list, api_key: str) -> str:
-    """Uses a fast LLM to summarize 7 days of raw data into a 2-sentence trend."""
-    client = genai.Client(api_key=api_key)
-    raw_data_string = json.dumps(history_data, indent=2)
-    
-    prompt = f"""
-    You are a clinical data summarizer. Analyze this 7-day chronological health log:
-    {raw_data_string}
-    
-    Task: In exactly two sentences, state the objective trend in the user's mental health, nutrition, and sleep. 
-    Identify any obvious correlations. Do NOT give advice. Do NOT be conversational.
-    """
-    
-    print("-> Pinging Gemini for Context Compression...")
-    try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-            config=types.GenerateContentConfig(temperature=0.1)
-        )
-        return response.text.strip()
-    except Exception as e:
-        print(f"Compression Error: {e}")
-        return "Historical context unavailable due to API failure."
+def format_historical_log(history_data: list) -> str:
+    """Converts the raw JSON into a clean chronological text log for Llama 3.2."""
+    log_lines = []
+    for entry in history_data:
+        line = f"Day {entry['day']} - Mental: {entry['mental_score']}, Nutrition: {entry['nutrition_density']}, Sleep: {entry['sleep_hours']}h"
+        log_lines.append(line)
+    return "\n".join(log_lines)
 
 # ==========================================
 # Phase 4: Final Payload Assembly
 # ==========================================
-def build_ollama_prompt(summary: str, averages: dict, current_meal: dict, current_mental: int) -> str:
-    """Constructs the raw data string. (System tags are handled by the Modelfile)"""
+def build_ollama_prompt(raw_log: str, averages: dict, current_meal: dict, current_mental: int) -> str:
+    """Constructs the exact raw data string the model was trained on, forcing a descriptive paragraph."""
     
-    prompt = f"""[HISTORICAL CONTEXT - PAST 7 DAYS]
-Trend: {summary}
-7-Day Averages: 
-- Mental Health: {averages['avg_mental']}/100
-- Nutrition Density: {averages['avg_nutrition']}
-- Sleep: {averages['avg_sleep']} hours
+    prompt = f"""### System: You are a highly analytical wellness data coach. Provide a detailed, descriptive paragraph summarizing the user's health trend. 
+CRITICAL RULES:
+1. DO NOT output numbered lists or bullet points. Write a fluid paragraph.
+2. DO NOT perform mathematical calculations. Rely ONLY on the provided 7-DAY AVERAGES.
+3. Sentence 1: State the overall directional trend of their mental health, nutrition, and sleep.
+4. Sentence 2: Describe how today's mental score and today's meal compare to the 7-day average baseline.
+5. Sentence 3: Hypothesize the correlation between their sleep/nutrition and their current mental state.
+6. Sentence 4: Provide exactly one highly specific, actionable diet or lifestyle adjustment to correct the trajectory.
+### Input:
+[PAST 7 DAYS LOG]
+{raw_log}
 
-[TODAY'S CURRENT VECTORS]
-- Current Mental Health Score: {current_mental}/100
-- Just Ingested: {current_meal['dish_name']} ({current_meal['calories']} kcal, {current_meal['protein_g']}g Protein, {current_meal['fiber_g']}g Fiber)
-- Today's Meal Nutrition Density: {current_meal['nutrition_density']}"""
+[7-DAY AVERAGES]
+Mental: {averages['avg_mental']}, Nutrition: {averages['avg_nutrition']}, Sleep: {averages['avg_sleep']}h
+
+[TODAY'S VECTORS]
+Mental: {current_mental}, Meal: {current_meal['dish_name']} ({current_meal['calories']} kcal, {current_meal['protein_g']}g Protein)
+### Output:"""
     
     return prompt
 
 # ==========================================
-# Phase 5: Inference Server Connection
+# Phase 5: Local Inference Server Connection
 # ==========================================
 def get_health_coach_advice(prompt_payload: str) -> str:
-    """Sends the data to the local Ollama Llama 3 model."""
-    print("-> Sending contextual payload to the local Titan Coach model...")
+    """Sends the data to the local Ollama Llama 3.2 3B model."""
+    print("-> Sending contextual payload to the local Titan Coach 3B model...")
     
     url = "http://localhost:11434/api/generate"
     data = {
-        "model": "titan-coach", # Must match the name you used in 'ollama create'
+        "model": "titan-coach-3b",
         "prompt": prompt_payload,
-        "stream": False 
+        "stream": False,
+        "raw": True  # <--- CRITICAL FIX: This disables Ollama's auto-formatting
     }
     
     try:
         response = requests.post(url, json=data)
         response.raise_for_status()
         result = response.json()
-        return result.get("response", "Error: No response generated.")
+        return result.get("response", "Error: No response generated.").strip()
     except requests.exceptions.RequestException as e:
-        return f"CRITICAL: Failed to connect to local Ollama server. Is it running? Error: {e}"
+        return f"CRITICAL: Failed to connect to local Ollama server. Error: {e}"
 
 # ==========================================
 # Execution Block
 # ==========================================
 if __name__ == "__main__":
-    # 1. Environment Setup
-    load_dotenv()
-    GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
     
-    if not GEMINI_KEY:
-        print("CRITICAL: GEMINI_API_KEY missing from .env file.")
-        exit(1)
-
-    # 2. Data Pipeline
+    # 1. Data Pipeline
     print("\n[Step 1] Fetching Mock PostgreSQL Data...")
     history_logs = fetch_mock_postgres_data()
     
     print("\n[Step 2] Calculating Moving Averages...")
     averages = calculate_moving_averages(history_logs)
     
-    print("\n[Step 3] Running LLM Context Compression...")
-    trend_summary = compress_historical_context(history_logs, GEMINI_KEY)
+    print("\n[Step 3] Formatting Raw Log for Local LLM...")
+    raw_log_string = format_historical_log(history_logs)
     
-    print("\n[Step 4] Assembling Raw Prompt...")
+    print("\n[Step 4] Assembling Final Prompt...")
     mock_todays_meal = {
         "dish_name": "2 rotis",
         "calories": 207.9,
@@ -141,9 +120,9 @@ if __name__ == "__main__":
     }
     todays_mental_score = 42
     
-    final_prompt = build_ollama_prompt(trend_summary, averages, mock_todays_meal, todays_mental_score)
+    final_prompt = build_ollama_prompt(raw_log_string, averages, mock_todays_meal, todays_mental_score)
     
-    # 3. Model Inference
+    # 2. Model Inference
     print("\n[Step 5] Awaiting AI Coach Response...")
     final_advice = get_health_coach_advice(final_prompt)
 
