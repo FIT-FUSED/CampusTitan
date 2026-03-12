@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 import tempfile
 import time
+from urllib.parse import urljoin
 
 # Add the parent directory to the path to import nutrition_score
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -32,6 +33,58 @@ CORS(app)
 
 UPLOAD_FOLDER = tempfile.gettempdir()
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+PYTHON_AGENT_URL = os.getenv('PYTHON_AGENT_URL', 'http://127.0.0.1:5002')
+
+def _forward_to_agent(method, path, *, json_body=None, params=None, headers=None, timeout=30):
+    url = urljoin(PYTHON_AGENT_URL.rstrip('/') + '/', path.lstrip('/'))
+    f_headers = {}
+    if headers:
+        f_headers.update(headers)
+    auth = request.headers.get('Authorization') or request.headers.get('authorization')
+    if auth:
+        f_headers['Authorization'] = auth
+    try:
+        resp = http_requests.request(
+            method,
+            url,
+            json=json_body,
+            params=params,
+            headers=f_headers,
+            timeout=timeout,
+        )
+        try:
+            data = resp.json()
+            return jsonify(data), resp.status_code
+        except Exception:
+            return resp.text, resp.status_code
+    except Exception as e:
+        return jsonify({'success': False, 'error': 'Python agent unavailable', 'message': str(e)}), 503
+
+
+@app.route('/api/agent/health', methods=['GET'])
+def agent_health_proxy():
+    return _forward_to_agent('GET', '/health', timeout=10)
+
+
+@app.route('/api/agent/query', methods=['POST'])
+def agent_query_proxy():
+    data = request.get_json() or {}
+    return _forward_to_agent('POST', '/agent/query', json_body=data, timeout=60)
+
+
+@app.route('/api/agent/log', methods=['POST'])
+def agent_log_proxy():
+    data = request.get_json() or {}
+    return _forward_to_agent('POST', '/agent/log', json_body=data, timeout=60)
+
+
+@app.route('/api/agent/quick', methods=['GET'])
+def agent_quick_proxy():
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({'success': False, 'error': 'user_id is required'}), 400
+    return _forward_to_agent('GET', '/agent/quick', params={'user_id': user_id}, timeout=20)
 
 @app.route('/api/nutrition/analyze', methods=['POST'])
 def analyze_nutrition():

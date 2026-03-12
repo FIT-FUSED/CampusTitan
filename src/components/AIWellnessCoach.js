@@ -466,7 +466,7 @@ export default function AIWellnessCoach({ navigation }) {
                         </TouchableOpacity>
 
                         {/* Environment Quick View - Redesigned */}
-                        {envData && envData.zones && (
+                        {envData && Array.isArray(envData.zones) && (
                             <View style={styles.envQuickView}>
                                 <View style={styles.envHeader}>
                                     <Text style={styles.envLabel}>🔥 Popular Campus Zones</Text>

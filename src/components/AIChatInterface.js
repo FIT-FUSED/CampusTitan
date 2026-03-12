@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -16,10 +16,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS } from "../theme";
 import { askAgent, EXAMPLE_QUERIES } from "../services/AgentService";
 import { useAuth } from "../services/AuthContext";
+import { useNavigation } from "@react-navigation/native";
 
 export default function AIChatInterface({ onClose }) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+  const close = useMemo(() => {
+    if (typeof onClose === "function") return onClose;
+    if (navigation?.canGoBack?.() || navigation?.goBack) {
+      return () => navigation.goBack();
+    }
+    return null;
+  }, [navigation, onClose]);
   const [messages, setMessages] = useState([
     {
       id: "welcome",
@@ -161,14 +170,17 @@ export default function AIChatInterface({ onClose }) {
       {
         style: styles.body,
         behavior: Platform.OS === "ios" ? "padding" : undefined,
-        keyboardVerticalOffset: Platform.OS === "ios" ? 8 : 0,
+        keyboardVerticalOffset: Platform.OS === "ios" ? 0 : 0,
       },
       React.createElement(
         LinearGradient,
-        { colors: COLORS.gradientPrimary, style: styles.header },
+        {
+          colors: COLORS.gradientHero || COLORS.gradientPrimary,
+          style: [styles.header, { paddingTop: Math.max(insets.top, SPACING.lg) }],
+        },
         React.createElement(
           TouchableOpacity,
-          { onPress: onClose, style: styles.closeButton },
+          { onPress: close || undefined, style: styles.closeButton, disabled: !close },
           React.createElement(Ionicons, {
             name: "close",
             size: 24,
@@ -196,9 +208,10 @@ export default function AIChatInterface({ onClose }) {
         renderItem: renderMessage,
         keyExtractor: (item) => item.id,
         style: styles.list,
+        keyboardShouldPersistTaps: "handled",
         contentContainerStyle: [
           styles.messagesList,
-          { paddingBottom: (insets.bottom || 0) + 104 },
+          { paddingBottom: (insets.bottom || 0) + 120 },
         ],
         ListFooterComponent: loading
           ? React.createElement(
@@ -244,11 +257,13 @@ export default function AIChatInterface({ onClose }) {
             onPress: () => sendMessage(inputText),
             disabled: !inputText.trim() || loading,
           },
-          React.createElement(Ionicons, {
-            name: "send",
-            size: 20,
-            color: COLORS.textInverse,
-          }),
+          React.createElement(LinearGradient, { colors: COLORS.gradientPrimary, style: styles.sendButtonGradient },
+            React.createElement(Ionicons, {
+              name: "send",
+              size: 20,
+              color: COLORS.textInverse,
+            }),
+          ),
         ),
       ),
     ),
@@ -263,9 +278,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: SPACING.lg,
-    paddingTop: Platform.OS === "ios" ? 50 : 30,
   },
-  closeButton: { padding: SPACING.sm },
+  closeButton: {
+    padding: SPACING.sm,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
   headerText: { marginLeft: SPACING.md },
   headerTitle: {
     color: COLORS.textInverse,
@@ -357,13 +381,18 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
   },
   sendButton: {
-    backgroundColor: COLORS.primary,
+    marginLeft: SPACING.sm,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: "hidden",
+  },
+  sendButtonGradient: {
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: SPACING.sm,
   },
   sendButtonDisabled: { opacity: 0.5 },
 });

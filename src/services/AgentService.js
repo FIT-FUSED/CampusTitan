@@ -36,37 +36,65 @@ async function _getAuthHeaders() {
 export async function askAgent(query, userId, userContext = {}) {
   try {
     const authHeaders = await _getAuthHeaders();
-    const response = await axios.post(
-      `${BASE_URL}/agent/query`,
-      {
-        query,
-        user_id: userId,
-        user_context: {
-          name: userContext.name || "Student",
-          age: userContext.age || 22,
-          gender: userContext.gender || "male",
-          protein_goal: userContext.proteinGoal || 60,
-          weekly_goal: userContext.weeklyGoal || 150,
-          ...userContext,
-        },
+    const path = "/agent/query";
+    const requestUrl = `${BASE_URL}${path}`;
+    const payload = {
+      query,
+      user_id: userId,
+      user_context: {
+        name: userContext.name || "Student",
+        age: userContext.age || 22,
+        gender: userContext.gender || "male",
+        protein_goal: userContext.proteinGoal || 60,
+        weekly_goal: userContext.weeklyGoal || 150,
+        ...userContext,
       },
-      {
-        timeout: 30000, // Increased timeout for AI processing
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders,
-        },
-      },
-    );
+    };
 
-    return response.data;
+    console.log("[AgentService] askAgent URL:", requestUrl);
+
+    const response = await axios.post(requestUrl, payload, {
+      timeout: 30000,
+      validateStatus: () => true,
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+      },
+    });
+
+    if (response.status >= 200 && response.status < 300) {
+      return response.data;
+    }
+
+    console.error("[AgentService] askAgent non-2xx status:", response.status);
+    console.error("[AgentService] askAgent response data:", response.data);
+
+    const message =
+      response.status === 404
+        ? "Agent endpoint not found (404). Check backend route /api/agent/query and BASE_URL."
+        : "Sorry, I could not process your request right now.";
+
+    return {
+      success: false,
+      status: response.status,
+      error: `Request failed with status ${response.status}`,
+      answer: message,
+      data: response.data,
+    };
   } catch (error) {
     console.error("Agent query error:", error.message);
     if (error?.response) {
       console.error("Agent query status:", error.response.status);
       console.error("Agent query data:", JSON.stringify(error.response.data));
+      console.error(
+        "[AgentService] askAgent request URL (axios):",
+        error.config?.baseURL
+          ? `${error.config.baseURL}${error.config.url || ""}`
+          : error.config?.url,
+      );
     } else {
       console.error("Error details:", error);
+      console.error("[AgentService] askAgent request URL:", `${BASE_URL}/agent/query`);
     }
     return {
       success: false,
@@ -83,8 +111,13 @@ export async function askAgent(query, userId, userContext = {}) {
  */
 export async function getQuickStats(userId) {
   try {
-    const response = await axios.get(`${BASE_URL}/agent/quick/${userId}`, {
+    const authHeaders = await _getAuthHeaders();
+    const response = await axios.get(`${BASE_URL}/agent/quick`, {
+      params: { user_id: userId },
       timeout: 10000,
+      headers: {
+        ...authHeaders,
+      },
     });
 
     return response.data;

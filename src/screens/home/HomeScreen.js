@@ -24,7 +24,7 @@ import {
   BORDER_RADIUS,
   SHADOWS,
 } from "../../theme";
-import { SectionHeader } from "../../components/common";
+import { SectionHeader, Avatar } from "../../components/common";
 import EnvironmentWidget from "../../components/EnvironmentWidget";
 import AIWellnessCoach from "../../components/AIWellnessCoach";
 import CampusZoneRecommender from "../../components/CampusZoneRecommender";

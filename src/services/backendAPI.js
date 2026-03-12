@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 // For physical device testing, use your laptop's local IP address
 // You can find this by running 'ipconfig getifaddr en0' on Mac
@@ -8,6 +9,15 @@ import { Platform } from 'react-native';
 // For physical device testing, use your laptop's local IP address
 // You can find this by running 'ipconfig getifaddr en0' on Mac
 const LOCAL_IP = '10.149.124.163';
+
+const getLanHost = () => {
+  const hostUri = Constants?.expoConfig?.hostUri || Constants?.manifest2?.extra?.expoGo?.hostUri;
+  if (typeof hostUri === 'string' && hostUri.length > 0) {
+    const host = hostUri.split(':')[0];
+    if (host) return host;
+  }
+  return LOCAL_IP;
+};
 
 // For Android emulator: use 10.0.2.2 to access host localhost
 // For iOS simulator: use localhost
@@ -21,11 +31,12 @@ const getBackendUrl = () => {
   // Android emulator accesses host via 10.0.2.2
   // Physical Android device uses the computer's IP
   if (Platform.OS === 'android') {
-    console.log('[BackendAPI] Using Android IP:', LOCAL_IP);
-    return `http://${LOCAL_IP}:5001`;
+    const host = getLanHost();
+    console.log('[BackendAPI] Using Android host:', host);
+    return `http://${host}:5001`;
   }
   
-  return `http://${LOCAL_IP}:5001`;
+  return `http://${getLanHost()}:5001`;
 };
 
 const BACKEND_URL = getBackendUrl();

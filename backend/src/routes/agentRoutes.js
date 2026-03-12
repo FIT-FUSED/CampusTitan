@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 
-// Python Agent runs on port 5002 (to avoid conflict with Node.js backend on 5001)
+// Python Agent runs on port 5002
 const PYTHON_AGENT_URL =
   process.env.PYTHON_AGENT_URL || "http://localhost:5002";
 
@@ -121,6 +121,31 @@ router.post("/log", async (req, res) => {
 router.get("/quick/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
+
+    const response = await axios.get(`${PYTHON_AGENT_URL}/agent/quick`, {
+      params: { user_id: userId },
+    });
+
+    res.json(response.data);
+  } catch (error) {
+    console.error("Quick stats error:", error.message);
+    res.status(500).json({
+      success: false,
+      error: "Failed to get stats",
+    });
+  }
+});
+
+// Quick stats endpoint (query param version)
+router.get("/quick", async (req, res) => {
+  try {
+    const userId = req.query.user_id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: "user_id is required",
+      });
+    }
 
     const response = await axios.get(`${PYTHON_AGENT_URL}/agent/quick`, {
       params: { user_id: userId },
