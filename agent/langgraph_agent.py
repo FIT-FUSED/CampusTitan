@@ -1023,6 +1023,11 @@ class RouterAgent:
                 if text.endswith("```"):
                     text = text[:-3]
                 result = json.loads(text.strip())
+                # Defensive: ensure we always return a valid primary tool and known category
+                if not isinstance(result, dict) or not result.get("primary_tool"):
+                    return self._keyword_based_routing(query)
+                if result.get("primary_tool") not in self.tools:
+                    return self._keyword_based_routing(query)
                 return result
             except Exception as e:
                 print(f"Router classification error: {e}")
@@ -1033,12 +1038,22 @@ class RouterAgent:
     
     def _keyword_based_routing(self, query: str) -> Dict[str, Any]:
         query_lower = query.lower()
+        # Questions about totals/progress should go to analysis (NOT logging)
+        if any(k in query_lower for k in [
+            "how much did i exercise",
+            "how much did i workout",
+            "how much exercise",
+            "how much workout",
+            "how much did i run",
+            "how much did i walk",
+        ]):
+            return {"primary_tool": "Goal Progress Query", "confidence": 0.8}
         if any(k in query_lower for k in ["what should i eat", "what to eat", "suggest", "suggestion", "plan my diet", "meal plan", "dinner", "tonight"]):
             if any(k in query_lower for k in ["dinner", "tonight", "meal plan", "plan my diet", "what should i eat", "suggest"]):
                 return {"primary_tool": "Diet Planning", "confidence": 0.85}
-        if "ate" in query_lower or "eat" in query_lower or "had" in query_lower and ("lunch" in query_lower or "breakfast" in query_lower or "dinner" in query_lower):
+        if ("ate" in query_lower or "eat" in query_lower or "had" in query_lower) and ("lunch" in query_lower or "breakfast" in query_lower or "dinner" in query_lower):
             return {"primary_tool": "Food Logging", "confidence": 0.8}
-        if "played" in query_lower or "ran" in query_lower or "minutes" in query_lower or "hours" in query_lower:
+        if ("played" in query_lower or "ran" in query_lower) and ("minutes" in query_lower or "hours" in query_lower or "mins" in query_lower or "hrs" in query_lower):
             return {"primary_tool": "Activity Logging", "confidence": 0.8}
         if "protein" in query_lower or "diet" in query_lower:
             return {"primary_tool": "Nutrition Analysis", "confidence": 0.8}
