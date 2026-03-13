@@ -231,6 +231,210 @@ def _build_supabase_headers(*, supabase_key: str, user_jwt: Optional[str]) -> Di
     return {"apikey": supabase_key, "Authorization": f"Bearer {auth}"}
 
 
+class DietPlannerTool(BaseTool):
+    """Generates a personalized dinner plan based on today's intake and user goal."""
+
+    name = "diet_planner"
+    description = "Plans a meal (typically dinner) based on user goal, daily targets, and remaining macros"
+    required_params = ["user_id"]
+
+    def __init__(self):
+        self.cohere_api_key = os.environ.get("COHERE_API_KEY")
+        self._co = ClientV2(api_key=self.cohere_api_key) if self.cohere_api_key else None
+
+    def _safe_num(self, v: Any, default: float = 0.0) -> float:
+        try:
+            if v is None:
+                return default
+            if isinstance(v, (int, float)):
+                return float(v)
+            return float(str(v).strip())
+        except Exception:
+            return default
+
+    def execute(self, params: Dict[str, Any], user_id: str) -> ToolResult:
+        try:
+            query = params.get("query") or ""
+            date = params.get("date", datetime.now().strftime("%Y-%m-%d"))
+
+            stats_tool = params.get("_user_stats_tool")
+            nutrition_tool = params.get("_nutrition_tool")
+            if not isinstance(stats_tool, BaseTool) or not isinstance(nutrition_tool, BaseTool):
+                stats_tool = UserStatsTool()
+                nutrition_tool = NutritionTool()
+
+            supabase_url = os.environ.get("SUPABASE_URL")
+            supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+            db_configured = bool(supabase_url and supabase_key)
+
+            stats_res = ToolResult(tool_name="user_stats", success=False, data={}, error="DB not configured")
+            nutr_res = ToolResult(tool_name="nutrition", success=False, data={}, error="DB not configured")
+
+            if db_configured:
+                stats_res = stats_tool.execute(
+                    {"user_id": user_id, "date": date, "user_jwt": params.get("user_jwt")},
+                    user_id,
+                )
+                nutr_res = nutrition_tool.execute(
+                    {"user_id": user_id, "date": date, "time_range": "day", "user_jwt": params.get("user_jwt")},
+                    user_id,
+                )
+
+            user = (stats_res.data or {}).get("user") or {}
+            today = (stats_res.data or {}).get("today_stats") or {}
+            totals = (nutr_res.data or {}).get("totals") or {}
+            food_logs = (nutr_res.data or {}).get("food_logs") or []
+
+            user_goals = user.get("goals") or {}
+            dietary_preference = (user.get("dietary_preference") or params.get("dietary_preference") or "").strip()
+
+            consumed_calories = self._safe_num(totals.get("calories"), self._safe_num(today.get("calories_consumed"), 0.0))
+            consumed_protein = self._safe_num(totals.get("protein"), self._safe_num(today.get("protein_consumed"), 0.0))
+            consumed_carbs = self._safe_num(totals.get("carbs"), 0.0)
+            consumed_fat = self._safe_num(totals.get("fat"), 0.0)
+
+            daily_calorie_target = self._safe_num(
+                user_goals.get("calories"),
+                self._safe_num(params.get("calorie_goal"), self._safe_num(params.get("daily_calorie_target"), 2400.0)),
+            )
+            daily_protein_target = self._safe_num(
+                user_goals.get("protein"),
+                self._safe_num(params.get("protein_goal"), 160.0),
+            )
+            daily_carbs_target = self._safe_num(user_goals.get("carbs"), self._safe_num(params.get("carbs_goal"), 250.0))
+            daily_fat_target = self._safe_num(user_goals.get("fat"), self._safe_num(params.get("fat_goal"), 70.0))
+
+            remaining_calories = max(0.0, daily_calorie_target - consumed_calories)
+            remaining_protein = max(0.0, daily_protein_target - consumed_protein)
+            remaining_carbs = max(0.0, daily_carbs_target - consumed_carbs)
+            remaining_fat = max(0.0, daily_fat_target - consumed_fat)
+
+            user_goal = (user.get("diet_type") or "").strip() or (params.get("goal") or "") or "Maintenance"
+
+            diet_constraint = ""
+            if dietary_preference:
+                pref_lower = dietary_preference.lower()
+                if "veg" in pref_lower and "non" not in pref_lower:
+                    diet_constraint = "The user is vegetarian. Suggest ONLY vegetarian meals. Do not suggest eggs, chicken, fish, or meat."
+                elif "non" in pref_lower and "veg" in pref_lower:
+                    diet_constraint = "The user is non-vegetarian. You may include eggs, chicken, fish, or meat."
+                elif "vegan" in pref_lower:
+                    diet_constraint = "The user is vegan. Suggest ONLY vegan meals (no dairy, no eggs, no meat)."
+
+            prompt = f"""
+You are a nutrition coach.
+
+Create a personalized dinner plan that helps the user match their remaining daily macros and calories.
+
+User Diet Preference: {dietary_preference or "Not specified"}
+{diet_constraint}
+
+User Goal: {user_goal}
+
+Daily Target Calories: {daily_calorie_target:.0f}
+Calories Consumed Today: {consumed_calories:.0f}
+
+Protein Target: {daily_protein_target:.0f}g
+Protein Consumed Today: {consumed_protein:.0f}g
+
+Carbs Target: {daily_carbs_target:.0f}g
+Carbs Consumed Today: {consumed_carbs:.0f}g
+
+Fat Target: {daily_fat_target:.0f}g
+Fat Consumed Today: {consumed_fat:.0f}g
+
+Remaining Calories: {remaining_calories:.0f}
+Remaining Protein: {remaining_protein:.0f}g
+Remaining Carbs: {remaining_carbs:.0f}g
+Remaining Fat: {remaining_fat:.0f}g
+
+Foods logged today (may be partial): {json.dumps(food_logs)[:1200]}
+
+User Query:
+\"{query}\"
+
+Return exactly:
+- meal suggestion
+- ingredients
+- estimated calories
+- estimated protein
+- estimated carbs
+- estimated fat
+- why it fits the user's goal
+""".strip()
+
+            if not self._co:
+                fallback_answer = (
+                    f"Dinner suggestion: Paneer bhurji + 2 chapatis + salad\n"
+                    f"Ingredients: paneer, onion, tomato, spices, whole wheat chapati, cucumber\n"
+                    f"Estimated calories: {min(700, int(remaining_calories) or 600)}\n"
+                    f"Estimated protein: {min(45, int(remaining_protein) or 30)}g\n"
+                    f"Why: High protein and fits within your remaining calories for today."
+                )
+                return ToolResult(
+                    tool_name=self.name,
+                    success=True,
+                    data={
+                        "answer": fallback_answer,
+                        "user_goal": user_goal,
+                        "dietary_preference": dietary_preference or None,
+                        "targets": {
+                            "calories": daily_calorie_target,
+                            "protein": daily_protein_target,
+                            "carbs": daily_carbs_target,
+                            "fat": daily_fat_target,
+                        },
+                        "consumed": {
+                            "calories": consumed_calories,
+                            "protein": consumed_protein,
+                            "carbs": consumed_carbs,
+                            "fat": consumed_fat,
+                        },
+                        "remaining": {
+                            "calories": remaining_calories,
+                            "protein": remaining_protein,
+                            "carbs": remaining_carbs,
+                            "fat": remaining_fat,
+                        },
+                    },
+                )
+
+            resp = self._co.chat(
+                model="command-r-plus-08-2024",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.4,
+                max_tokens=500,
+            )
+            text = ""
+            if hasattr(resp, "message") and resp.message.content:
+                text = resp.message.content[0].text
+            text = (text or "").strip()
+
+            return ToolResult(
+                tool_name=self.name,
+                success=True,
+                data={
+                    "answer": text,
+                    "user_goal": user_goal,
+                    "targets": {"calories": daily_calorie_target, "protein": daily_protein_target},
+                    "consumed": {
+                        "calories": consumed_calories,
+                        "protein": consumed_protein,
+                        "carbs": consumed_carbs,
+                        "fat": consumed_fat,
+                    },
+                    "remaining": {
+                        "calories": remaining_calories,
+                        "protein": remaining_protein,
+                        "carbs": remaining_carbs,
+                        "fat": remaining_fat,
+                    },
+                },
+            )
+        except Exception as e:
+            return ToolResult(tool_name=self.name, success=False, data={}, error=str(e))
+
+
 class UserStatsTool(BaseTool):
     """Fetches user profile + today's aggregated nutrition/activity stats from Supabase."""
 
@@ -254,7 +458,7 @@ class UserStatsTool(BaseTool):
                 headers=headers,
                 params={
                     "id": f"eq.{user_id}",
-                    "select": "id,weight,goal_weight,diet_type,diet",
+                    "select": "id,weight,goal_weight,diet_type,diet,dietary_preferences,diet_preference,protein_goal,carbs_goal,fat_goal,calorie_goal",
                     "limit": 1,
                 },
             )
@@ -271,6 +475,11 @@ class UserStatsTool(BaseTool):
             weight = _first_present(user_row, "weight")
             goal_weight = _first_present(user_row, "goal_weight")
             diet_type = _first_present(user_row, "diet_type", "diet")
+            dietary_preference = _first_present(user_row, "dietary_preferences", "diet_preference")
+            protein_goal = _first_present(user_row, "protein_goal")
+            carbs_goal = _first_present(user_row, "carbs_goal")
+            fat_goal = _first_present(user_row, "fat_goal")
+            calorie_goal = _first_present(user_row, "calorie_goal")
 
             # Today's food totals
             food_resp = requests.get(
@@ -305,6 +514,13 @@ class UserStatsTool(BaseTool):
                     "weight": weight,
                     "goal_weight": goal_weight,
                     "diet_type": diet_type,
+                    "dietary_preference": dietary_preference,
+                    "goals": {
+                        "calories": calorie_goal,
+                        "protein": protein_goal,
+                        "carbs": carbs_goal,
+                        "fat": fat_goal,
+                    },
                 },
                 "today_stats": {
                     "calories_consumed": calories_consumed,
@@ -666,76 +882,6 @@ class PredictionTool(BaseTool):
                 error=f"ML prediction error: {str(e)}"
             )
 
-class UserStatsTool(BaseTool):
-    """
-    UserStatsTool - Fetches personalized user data and today's summary
-    """
-    name = "user_stats"
-    description = "Fetches user profile, goals, and today's stats"
-    required_params = ["user_id"]
-    
-    def __init__(self):
-        self.supabase_url = os.environ.get("SUPABASE_URL")
-        self.supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-    
-    def execute(self, params: Dict[str, Any], user_id: str) -> ToolResult:
-        try:
-            date = params.get("date", datetime.now().strftime("%Y-%m-%d"))
-            headers = {
-                "apikey": self.supabase_key,
-                "Authorization": f"Bearer {self.supabase_key}"
-            }
-            
-            # Fetch user data
-            user_resp = requests.get(
-                f"{self.supabase_url}/rest/v1/users?id=eq.{user_id}",
-                headers=headers
-            )
-            user_data = user_resp.json()[0] if user_resp.status_code == 200 and user_resp.json() else {}
-            
-            # Extract basic profile
-            weight = user_data.get("weight", 60)
-            goal_weight = user_data.get("goal_weight", 50)
-            diet_type = user_data.get("diet_type", "vegetarian")
-            
-            # Fetch today's food logs
-            food_resp = requests.get(
-                f"{self.supabase_url}/rest/v1/food_logs?user_id=eq.{user_id}&date=eq.{date}",
-                headers=headers
-            )
-            food_logs = food_resp.json() if food_resp.status_code == 200 else []
-            calories_consumed = sum(log.get("calories", 0) for log in food_logs)
-            protein_consumed = sum(log.get("protein", 0) for log in food_logs)
-            
-            # Fetch today's activity logs
-            activity_resp = requests.get(
-                f"{self.supabase_url}/rest/v1/activities?user_id=eq.{user_id}&date=eq.{date}",
-                headers=headers
-            )
-            activity_logs = activity_resp.json() if activity_resp.status_code == 200 else []
-            calories_burned = sum(log.get("calories_burned", 0) for log in activity_logs)
-            
-            data = {
-                "user": {
-                    "weight": weight,
-                    "diet_type": diet_type,
-                    "goal_weight": goal_weight
-                },
-                "today_stats": {
-                    "calories_consumed": calories_consumed,
-                    "calories_burned": calories_burned,
-                    "protein_consumed": protein_consumed
-                }
-            }
-            
-            return ToolResult(
-                tool_name=self.name,
-                success=True,
-                data=data
-            )
-        except Exception as e:
-            return ToolResult(tool_name=self.name, success=False, data={}, error=str(e))
-
 class RecommendationTool(BaseTool):
     """
     Recommendation Tool - Uses LLM to generate personalized recommendations
@@ -829,7 +975,8 @@ class RouterAgent:
             "Activity Logging": "User wants to log an activity or exercise (e.g. 'I played badminton for 3 hours', 'Ran 5km').",
             "Nutrition Analysis": "User asking about their diet, protein, macros, or calories consumed.",
             "Workout Recommendation": "User asking for advice on exercise, how to burn calories, or activity tips.",
-            "Goal Progress Query": "User asking about their goals, remaining goals today (e.g. 'How much more protein do I need today?', 'How many calories should I burn to reach my goal weight?')."
+            "Goal Progress Query": "User asking about their goals, remaining goals today (e.g. 'How much more protein do I need today?', 'How many calories should I burn to reach my goal weight?').",
+            "Diet Planning": "User wants suggestions for what to eat (especially dinner/tonight) based on their diet/goals and what they already ate (e.g. 'plan my diet for today's dinner', 'what should I eat tonight?').",
         }
     
     def classify_query(self, query: str) -> Dict[str, Any]:
@@ -886,6 +1033,9 @@ class RouterAgent:
     
     def _keyword_based_routing(self, query: str) -> Dict[str, Any]:
         query_lower = query.lower()
+        if any(k in query_lower for k in ["what should i eat", "what to eat", "suggest", "suggestion", "plan my diet", "meal plan", "dinner", "tonight"]):
+            if any(k in query_lower for k in ["dinner", "tonight", "meal plan", "plan my diet", "what should i eat", "suggest"]):
+                return {"primary_tool": "Diet Planning", "confidence": 0.85}
         if "ate" in query_lower or "eat" in query_lower or "had" in query_lower and ("lunch" in query_lower or "breakfast" in query_lower or "dinner" in query_lower):
             return {"primary_tool": "Food Logging", "confidence": 0.8}
         if "played" in query_lower or "ran" in query_lower or "minutes" in query_lower or "hours" in query_lower:
@@ -1162,7 +1312,8 @@ class CampusTitanAgent:
             "activity": ActivityTool(),
             "wellness": WellnessTool(),
             "prediction": PredictionTool(),
-            "recommendation": RecommendationTool()
+            "recommendation": RecommendationTool(),
+            "diet_planner": DietPlannerTool(),
         }
         
         # Initialize router and response generator
@@ -1181,12 +1332,48 @@ class CampusTitanAgent:
         primary_tool_name = routing["primary_tool"]
         print(f"   → Primary tool: {primary_tool_name}")
         print(f"   → Confidence: {routing.get('confidence', 0.5)}")
+
+        if primary_tool_name == "Diet Planning":
+            params = {
+                "user_id": user_id,
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "query": query,
+            }
+            if isinstance(user_context, dict) and user_context.get("user_jwt"):
+                params["user_jwt"] = user_context.get("user_jwt")
+            if user_context:
+                params.update(user_context)
+            params["_user_stats_tool"] = self.tools.get("user_stats")
+            params["_nutrition_tool"] = self.tools.get("nutrition")
+
+            result = self.tools["diet_planner"].execute(params, user_id)
+            if result.success:
+                return AgentResponse(
+                    answer=(result.data or {}).get("answer") or "",
+                    tool_used="diet_planner",
+                    confidence=0.9,
+                    data={"diet_planner": result.data},
+                    sources=["Supabase Database", "LLM"],
+                )
+            return AgentResponse(
+                answer=(
+                    "I couldn't generate a meal plan right now. "
+                    "Please try again in a moment, or tell me your goal (weight loss/muscle gain) and what you ate today."
+                ),
+                tool_used="diet_planner",
+                confidence=0.2,
+                data={"diet_planner": result.data, "error": result.error},
+                sources=["Supabase Database"],
+            )
         
         # Route to Logging Agent if it's a logging task
         if primary_tool_name in ["Food Logging", "Activity Logging"]:
             print(f"   → Forwarding to Logging Agent...")
             try:
-                from logging_agent import process_logging_query
+                try:
+                    from logging_agent import process_logging_query
+                except Exception:
+                    from agent.logging_agent import process_logging_query
                 res = process_logging_query(query, user_id, params.get("date") if 'params' in locals() else None)
                 if res.get("success"):
                     return AgentResponse(
@@ -1198,19 +1385,26 @@ class CampusTitanAgent:
                     )
                 else:
                     return AgentResponse(
-                        answer=res.get("error", "Failed to log."),
+                        answer=(
+                            res.get("answer")
+                            or "I couldn't understand that as a food/activity log. "
+                            "Try something like: 'I ate 2 eggs for breakfast' or 'I ran for 20 minutes'."
+                        ),
                         tool_used="none",
                         confidence=0.1,
-                        data={},
+                        data={"logging": res, "error": res.get("error")},
                         sources=[]
                     )
             except Exception as e:
                 print(f"Logging Agent Error: {e}")
                 return AgentResponse(
-                    answer="Logging Agent Error: " + str(e),
+                    answer=(
+                        "I had trouble processing that logging request. "
+                        "Please rephrase it with a clear food/activity and quantity/duration."
+                    ),
                     tool_used="none",
                     confidence=0.1,
-                    data={},
+                    data={"error": str(e)},
                     sources=[]
                 )
         
