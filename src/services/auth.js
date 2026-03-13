@@ -6,6 +6,33 @@ import { calculateNutritionGoals, getActivityLevelFromFitness } from "../utils/n
 const isWeb = Platform.OS === "web";
 
 class AuthService {
+  async requestEmailOtp(email) {
+    try {
+      const { data, error } = await supabase.auth.signInWithOtp({
+        email,
+      });
+      if (error) throw error;
+      return { data };
+    } catch (error) {
+      throw new Error(error.message || "Failed to send OTP");
+    }
+  }
+
+  async verifyEmailOtp(email, otp) {
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token: otp,
+        type: "email",
+      });
+      if (error) throw error;
+      const accessToken = data?.session?.access_token;
+      return { user: data.user, session: data.session, accessToken };
+    } catch (error) {
+      throw new Error(error.message || "OTP verification failed");
+    }
+  }
+
   async register(userData) {
     try {
       // 1. Sign up with Supabase Auth
