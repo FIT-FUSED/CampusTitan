@@ -13,6 +13,7 @@ import tempfile
 import time
 from datetime import datetime, timezone
 from urllib.parse import urljoin
+from functools import wraps
 
 # Add the parent directory to the path to import nutrition_score
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -48,6 +49,117 @@ HEALTH_CACHE_DB_PATH = os.getenv(
 )
 
 print(f"Health cache DB path: {HEALTH_CACHE_DB_PATH}")
+
+
+_SUPABASE_JWKS_CACHE = {
+    "jwks": None,
+    "fetched_at": 0.0,
+}
+
+
+def _get_supabase_project_url() -> str:
+    url = os.getenv("SUPABASE_URL") or os.getenv("EXPO_PUBLIC_SUPABASE_URL")
+    return (url or "").strip().rstrip("/")
+
+
+def _get_supabase_jwks_url() -> str:
+    explicit = os.getenv("SUPABASE_JWKS_URL")
+    if explicit:
+        return explicit.strip()
+    project_url = _get_supabase_project_url()
+    if not project_url:
+        return ""
+    return f"{project_url}/auth/v1/.well-known/jwks.json"
+
+
+def _get_supabase_issuer() -> str:
+    project_url = _get_supabase_project_url()
+    if not project_url:
+        return ""
+    return f"{project_url}/auth/v1"
+
+
+def _fetch_supabase_jwks():
+    jwks_url = _get_supabase_jwks_url()
+    if not jwks_url:
+        raise RuntimeError("SUPABASE_URL or SUPABASE_JWKS_URL must be configured")
+    now = time.time()
+    if _SUPABASE_JWKS_CACHE["jwks"] and (now - float(_SUPABASE_JWKS_CACHE["fetched_at"])) < 3600:
+        return _SUPABASE_JWKS_CACHE["jwks"]
+    resp = http_requests.get(jwks_url, timeout=10)
+    resp.raise_for_status()
+    jwks = resp.json()
+    _SUPABASE_JWKS_CACHE["jwks"] = jwks
+    _SUPABASE_JWKS_CACHE["fetched_at"] = now
+    return jwks
+
+
+def _get_bearer_token(req) -> str:
+    auth = req.headers.get("Authorization") or req.headers.get("authorization")
+    if not auth:
+        return ""
+    parts = str(auth).split(" ", 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return ""
+    return parts[1].strip()
+
+
+def _verify_supabase_jwt(token: str) -> dict:
+    try:
+        import jwt
+        from jwt import algorithms
+    except Exception as e:
+        raise RuntimeError("Missing dependency: PyJWT. Install with: pip install PyJWT cryptography") from e
+
+    jwks = _fetch_supabase_jwks() or {}
+    keys = jwks.get("keys") or []
+    if not keys:
+        raise RuntimeError("Supabase JWKS returned no keys")
+
+    header = jwt.get_unverified_header(token)
+    kid = header.get("kid")
+    if not kid:
+        raise RuntimeError("JWT header missing kid")
+
+    jwk = next((k for k in keys if k.get("kid") == kid), None)
+    if not jwk:
+        raise RuntimeError("No matching JWK for kid")
+
+    public_key = algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk)) if jwk.get("kty") == "RSA" else algorithms.ECAlgorithm.from_jwk(json.dumps(jwk))
+
+    issuer = _get_supabase_issuer()
+    options = {
+        "verify_aud": False,
+    }
+    decoded = jwt.decode(
+        token,
+        public_key,
+        algorithms=["RS256", "ES256"],
+        issuer=issuer or None,
+        options=options,
+    )
+    return decoded
+
+
+def require_supabase_auth(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        token = _get_bearer_token(request)
+        if not token:
+            return jsonify({"error": "Unauthorized", "message": "Missing Bearer token"}), 401
+        try:
+            decoded = _verify_supabase_jwt(token)
+        except Exception as e:
+            return jsonify({"error": "Unauthorized", "message": str(e)}), 401
+        request.supabase_user = {
+            "id": decoded.get("sub"),
+            "claims": decoded,
+        }
+        if not request.supabase_user.get("id"):
+            return jsonify({"error": "Unauthorized", "message": "Token missing sub"}), 401
+        return fn(*args, **kwargs)
+
+    return wrapper
 
 
 def _init_health_cache_db():
@@ -783,6 +895,15 @@ def health_check():
         'serverFile': __file__,
         'healthCacheDbPath': HEALTH_CACHE_DB_PATH,
         'hasHealthCacheDebugRoute': has_cache_debug,
+    })
+
+
+@app.route('/api/protected', methods=['GET'])
+@require_supabase_auth
+def protected():
+    return jsonify({
+        "ok": True,
+        "user_id": request.supabase_user.get("id"),
     })
 
 if __name__ == '__main__':
