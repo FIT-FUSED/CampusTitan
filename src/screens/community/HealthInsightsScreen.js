@@ -104,7 +104,7 @@ export default function HealthInsightsScreen({ navigation }) {
 
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  const fetchSummary = useCallback(async () => {
+  const fetchSummary = useCallback(async ({ forceRefresh = false } = {}) => {
     if (!user) return;
     setError(null);
 
@@ -119,6 +119,8 @@ export default function HealthInsightsScreen({ navigation }) {
       const todayMood = allMoods.find((m) => m.date === today);
 
       const payload = {
+        user_id: user.id,
+        force_refresh: forceRefresh,
         user: {
           name: user.name,
           age: user.age,
@@ -173,7 +175,7 @@ export default function HealthInsightsScreen({ navigation }) {
     setRefreshing(true);
     setLoading(true);
     fadeAnim.setValue(0);
-    await fetchSummary();
+    await fetchSummary({ forceRefresh: true });
     setRefreshing(false);
   }, [fadeAnim, fetchSummary]);
 
