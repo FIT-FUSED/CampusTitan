@@ -8,9 +8,15 @@ try:
     agent = CampusTitanAgent()
     
     queries = [
-        "Give me a plan to complete 100g protein today",
-        "How can I burn 800 calories today?",
-        "Give me a vegetarian meal plan for 60g protein"
+        "plan my diet for today's dinner",
+        "suggest dinner for me based on what I ate today",
+        "I ate 3 chapatis",
+        "I ate 2 eggs and a banana",
+        "I played badminton for 3 hrs",
+        "I drank 2 banana shakes and ate an apple",
+        "I drank pineapple juice and played cricket for 4 hrs",
+        "I drank two glass banana shake and a glass of pineapple juice and ate a apple and played cricket for 4 hrs",
+        "I played cricket for 4 hrs",
     ]
     
     user_context = {
