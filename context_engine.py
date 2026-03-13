@@ -2,8 +2,6 @@ import os
 import json
 import requests
 from dotenv import load_dotenv
-import google.generativeai as genai
-from google.generativeai import types
 
 # ==========================================
 # Phase 1: PostgreSQL Simulation
@@ -40,32 +38,42 @@ def calculate_moving_averages(history_data: list) -> dict:
     }
 
 # ==========================================
-# Phase 3: Gemini Context Compressor
+# Phase 3: Offline Trend Summarizer
 # ==========================================
-def compress_historical_context(history_data: list, api_key: str) -> str:
-    """Uses a fast LLM to summarize 7 days of raw data into a 2-sentence trend."""
-    genai.configure(api_key=api_key)
-    raw_data_string = json.dumps(history_data, indent=2)
-    
-    prompt = f"""
-    You are a clinical data summarizer. Analyze this 7-day chronological health log:
-    {raw_data_string}
-    
-    Task: In exactly two sentences, state the objective trend in the user's mental health, nutrition, and sleep. 
-    Identify any obvious correlations. Do NOT give advice. Do NOT be conversational.
+def compress_historical_context(history_data: list) -> str:
+    """Offline trend summary (deterministic).
+
+    Note: The function name is kept for backwards compatibility with existing callers,
+    but it intentionally does NOT call Gemini.
     """
-    
-    print("-> Pinging Gemini for Context Compression...")
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        response = model.generate_content(
-            contents=prompt,
-            generation_config=types.GenerateContentConfig(temperature=0.1)
+        averages = calculate_moving_averages(history_data)
+        if not history_data:
+            return "No historical context available."
+
+        first = history_data[0]
+        last = history_data[-1]
+
+        def _delta(label: str, key: str):
+            try:
+                a = float(first.get(key, 0))
+                b = float(last.get(key, 0))
+                d = round(b - a, 1)
+                direction = "improved" if d > 0 else "declined" if d < 0 else "remained stable"
+                return f"{label} {direction} ({d:+})."
+            except Exception:
+                return f"{label} trend unavailable."
+
+        sentence1 = (
+            f"7-day averages — mental {averages['avg_mental']}/100, nutrition density {averages['avg_nutrition']}, "
+            f"sleep {averages['avg_sleep']}h."
         )
-        return response.text.strip()
+        sentence2 = (
+            f"Trend — {_delta('Mental', 'mental_score')} {_delta('Nutrition', 'nutrition_density')} {_delta('Sleep', 'sleep_hours')}"
+        )
+        return f"{sentence1} {sentence2}".strip()
     except Exception as e:
-        print(f"Compression Error: {e}")
-        return "Historical context unavailable due to API failure."
+        return f"Historical context unavailable due to offline summariser error: {e}"
 
 # ==========================================
 # Phase 4: Final Payload Assembly
@@ -94,20 +102,30 @@ def get_health_coach_advice(prompt_payload: str) -> str:
     """Sends the data to the local Ollama Llama 3 model."""
     print("-> Sending contextual payload to the local Titan Coach model...")
     
-    url = "http://localhost:11434/api/generate"
+    ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
+    env_model = (os.getenv("OLLAMA_MODEL") or "").strip()
+    ollama_model = "titan-coach-3b" if (not env_model or env_model in {"my-llama:latest", "titan-coach"}) else env_model
+
+    url = f"{ollama_url}/api/generate"
     data = {
-        "model": "titan-coach", # Must match the name you used in 'ollama create'
+        "model": ollama_model,
         "prompt": prompt_payload,
-        "stream": False 
+        "stream": False,
+        "raw": True,
+        "options": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "num_predict": 400,
+        },
     }
     
     try:
-        response = requests.post(url, json=data)
+        response = requests.post(url, json=data, timeout=180)
         response.raise_for_status()
         result = response.json()
-        return result.get("response", "Error: No response generated.")
+        return result.get("response", "Error: No response generated.").strip()
     except requests.exceptions.RequestException as e:
-        return f"CRITICAL: Failed to connect to local Ollama server. Is it running? Error: {e}"
+        return f"CRITICAL: Failed to connect to local Ollama server. Error: {e}"
 
 # ==========================================
 # Execution Block
@@ -115,11 +133,6 @@ def get_health_coach_advice(prompt_payload: str) -> str:
 if __name__ == "__main__":
     # 1. Environment Setup
     load_dotenv()
-    GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
-    
-    if not GEMINI_KEY:
-        print("CRITICAL: GEMINI_API_KEY missing from .env file.")
-        exit(1)
 
     # 2. Data Pipeline
     print("\n[Step 1] Fetching Mock PostgreSQL Data...")
@@ -128,8 +141,8 @@ if __name__ == "__main__":
     print("\n[Step 2] Calculating Moving Averages...")
     averages = calculate_moving_averages(history_logs)
     
-    print("\n[Step 3] Running LLM Context Compression...")
-    trend_summary = compress_historical_context(history_logs, GEMINI_KEY)
+    print("\n[Step 3] Building offline trend summary...")
+    trend_summary = compress_historical_context(history_logs)
     
     print("\n[Step 4] Assembling Raw Prompt...")
     mock_todays_meal = {

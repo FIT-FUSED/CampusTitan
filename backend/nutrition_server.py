@@ -4,12 +4,14 @@ from flask_cors import CORS
 import os
 import sys
 import json
+import sqlite3
 import random
 import requests as http_requests
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 import tempfile
 import time
+from datetime import datetime, timezone
 from urllib.parse import urljoin
 
 # Add the parent directory to the path to import nutrition_score
@@ -28,11 +30,126 @@ except ImportError as e:
     print(f"Failed to load nutrition_score.py: {e}")
     nutrition_score = None
 
+try:
+    from titan_ml_interface import TitanHealthAI
+except Exception as e:
+    TitanHealthAI = None
+    print(f"Failed to load TitanHealthAI from titan_ml_interface.py: {e}")
+
 app = Flask(__name__)
 CORS(app)
 
 UPLOAD_FOLDER = tempfile.gettempdir()
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+HEALTH_CACHE_DB_PATH = os.getenv(
+    'HEALTH_CACHE_DB_PATH',
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'health_cache.sqlite3')
+)
+
+print(f"Health cache DB path: {HEALTH_CACHE_DB_PATH}")
+
+
+def _init_health_cache_db():
+    try:
+        conn = sqlite3.connect(HEALTH_CACHE_DB_PATH)
+        cur = conn.cursor()
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA synchronous=NORMAL")
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS daily_health_summaries (
+              user_id TEXT NOT NULL,
+              date TEXT NOT NULL,
+              result_json TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL,
+              PRIMARY KEY (user_id, date)
+            )
+            """
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Health cache DB init failed: {e}")
+
+
+def _get_today_key():
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+def _health_cache_get(user_id: str, date_key: str):
+    try:
+        conn = sqlite3.connect(HEALTH_CACHE_DB_PATH)
+        cur = conn.cursor()
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute(
+            "SELECT result_json, updated_at FROM daily_health_summaries WHERE user_id=? AND date=?",
+            (user_id, date_key),
+        )
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return None
+        result_json, updated_at = row
+        return {"result_json": result_json, "updated_at": updated_at}
+    except Exception as e:
+        print(f"Health cache read failed: {e}")
+        return None
+
+
+def _health_cache_upsert(user_id: str, date_key: str, result: dict):
+    try:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        conn = sqlite3.connect(HEALTH_CACHE_DB_PATH)
+        cur = conn.cursor()
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute(
+            """
+            INSERT INTO daily_health_summaries(user_id, date, result_json, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, date) DO UPDATE SET
+              result_json=excluded.result_json,
+              updated_at=excluded.updated_at
+            """,
+            (user_id, date_key, json.dumps(result), now_iso, now_iso),
+        )
+        conn.commit()
+        conn.close()
+        print(f"Health cache upsert ok user_id={user_id} date={date_key}")
+        return True
+    except Exception as e:
+        print(f"Health cache write failed: {e}")
+        return False
+
+
+@app.route('/api/health-cache/debug', methods=['GET'])
+def health_cache_debug():
+    try:
+        conn = sqlite3.connect(HEALTH_CACHE_DB_PATH)
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM daily_health_summaries")
+        count = cur.fetchone()[0]
+        cur.execute(
+            "SELECT user_id, date, updated_at, LENGTH(result_json) FROM daily_health_summaries ORDER BY updated_at DESC LIMIT 5"
+        )
+        rows = cur.fetchall()
+        conn.close()
+        return jsonify({
+            'ok': True,
+            'dbPath': HEALTH_CACHE_DB_PATH,
+            'count': count,
+            'recent': rows,
+        })
+    except Exception as e:
+        return jsonify({
+            'ok': False,
+            'dbPath': HEALTH_CACHE_DB_PATH,
+            'error': str(e),
+        }), 500
+
+
+_init_health_cache_db()
 
 PYTHON_AGENT_URL = os.getenv('PYTHON_AGENT_URL', 'http://127.0.0.1:5002')
 
@@ -380,17 +497,30 @@ def analyze_mess_menu():
 # ============================================
 
 OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://localhost:11434')
-OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'my-llama:latest')
+_env_ollama_model = os.getenv('OLLAMA_MODEL')
+if not _env_ollama_model or _env_ollama_model.strip() in {'my-llama:latest', 'titan-coach'}:
+    OLLAMA_MODEL = 'titan-coach-3b'
+else:
+    OLLAMA_MODEL = _env_ollama_model.strip()
 print(f"Ollama Model Configured: {OLLAMA_MODEL}")
 
 try:
-    from context_engine import compress_historical_context, build_ollama_prompt, calculate_moving_averages
+    from context_engine import compress_historical_context, calculate_moving_averages
     from engine import EMATracker
     ema_tracker = EMATracker(alpha=0.3)
     print("context_engine.py and engine.py loaded successfully")
 except ImportError as e:
     print(f"Failed to load context_engine/engine: {e}")
     ema_tracker = None
+
+titan_ai = None
+if TitanHealthAI:
+    try:
+        titan_ai = TitanHealthAI()
+        print("TitanHealthAI initialized for health summariser")
+    except Exception as e:
+        titan_ai = None
+        print(f"Failed to initialize TitanHealthAI: {e}")
 
 def _generate_arbitrary_activity():
     activities = [
@@ -431,55 +561,10 @@ def _generate_mock_history(today_data):
         })
     return history
 
-def _call_ollama(prompt, timeout=180):
-    try:
-        print(f"  → Calling Ollama at {OLLAMA_URL}/api/generate with model={OLLAMA_MODEL}")
-        
-        max_prompt_len = 400
-        if len(prompt) > max_prompt_len:
-            prompt = prompt[-max_prompt_len:]
-        
-        payload = {
-            'model': OLLAMA_MODEL,
-            'prompt': prompt,
-            'stream': False,
-            'options': {
-                'num_predict': 80,
-                'temperature': 0.5,
-                'num_ctx': 256,
-                'num_batch': 8,
-                'repeat_penalty': 1.1,
-            },
-        }
-        
-        for attempt in range(2):
-            try:
-                resp = http_requests.post(
-                    f'{OLLAMA_URL}/api/generate',
-                    json=payload,
-                    timeout=timeout
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                return data.get('response', '')
-            except http_requests.exceptions.HTTPError as e:
-                if e.response.status_code == 500 and 'model runner has unexpectedly stopped' in str(e):
-                    if attempt == 0:
-                        print(f"  → Model runner crashed, retrying in 3s...")
-                        time.sleep(3)
-                        continue
-                    else:
-                        raise Exception('Ollama model runner crashed twice.')
-                raise
-    except http_requests.exceptions.ConnectionError:
-        raise Exception(f'Cannot connect to Ollama at {OLLAMA_URL}.')
-    except http_requests.exceptions.Timeout:
-        raise Exception('Ollama request timed out.')
-    except Exception as e:
-        raise Exception(f'Ollama error: {str(e)} (model: {OLLAMA_MODEL})')
-
 import threading
 import uuid
+
+SERVER_BUILD_ID = str(uuid.uuid4())
 
 _health_jobs = {}
 
@@ -534,24 +619,7 @@ def _run_health_pipeline(job_id, data, gemini_key):
         averages = calculate_moving_averages(history_data)
         print(f"  [{job_id[:8]}] 7-day averages: {averages}")
 
-        trend_summary = None
-        if gemini_key:
-            print(f"  [{job_id[:8]}] Calling Gemini for context compression...")
-            try:
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    future = pool.submit(compress_historical_context, history_data, gemini_key)
-                    trend_summary = future.result(timeout=20)
-                print(f"  [{job_id[:8]}] Gemini trend: {trend_summary[:80]}...")
-            except Exception as ge:
-                print(f"  [{job_id[:8]}] Gemini failed: {ge}")
-
-        if not trend_summary:
-            trend_summary = (
-                f"Over the past 7 days, mental health averaged {averages['avg_mental']}/100, "
-                f"nutrition density averaged {averages['avg_nutrition']}, and sleep averaged "
-                f"{averages['avg_sleep']} hours per night."
-            )
+        trend_summary = compress_historical_context(history_data)
 
         current_meal = {
             'dish_name': ', '.join(meal_names[:3]) if meal_names else 'No meals logged',
@@ -561,12 +629,12 @@ def _run_health_pipeline(job_id, data, gemini_key):
             'nutrition_density': nutrition_density,
         }
         current_mental = int(mental_score_raw * 10)
-        structured_prompt = build_ollama_prompt(trend_summary, averages, current_meal, current_mental)
-        print(f"  [{job_id[:8]}] Structured prompt assembled ({len(structured_prompt)} chars)")
+        if not titan_ai:
+            raise Exception("TitanHealthAI is not available; summariser cannot run")
 
-        print(f"  [{job_id[:8]}] Sending to Ollama '{OLLAMA_MODEL}'...")
-        ai_response = _call_ollama(structured_prompt)
-        print(f"  [{job_id[:8]}] Ollama response received ({len(ai_response)} chars)")
+        print(f"  [{job_id[:8]}] Generating daily report via TitanHealthAI (local Ollama)...")
+        ai_response = titan_ai.generate_daily_report(history_data, current_meal, float(current_mental))
+        print(f"  [{job_id[:8]}] Local model response received ({len(ai_response)} chars)")
 
         _health_jobs[job_id] = {
             'status': 'done',
@@ -600,11 +668,32 @@ def _run_health_pipeline(job_id, data, gemini_key):
 @app.route('/api/health-summary', methods=['POST'])
 def health_summary_start():
     data = request.get_json() or {}
-    gemini_key = os.getenv('GEMINI_API_KEY')
+    force_refresh = bool(data.get('force_refresh') or data.get('forceRefresh'))
+    user_id = (
+        data.get('user_id')
+        or data.get('userId')
+        or (data.get('user') or {}).get('id')
+        or (data.get('user') or {}).get('user_id')
+    )
+    date_key = _get_today_key()
+
+    if user_id and not force_refresh:
+        cached = _health_cache_get(str(user_id), date_key)
+        if cached and cached.get('result_json'):
+            try:
+                cached_result = json.loads(cached['result_json'])
+                if isinstance(cached_result, dict) and cached_result.get('summary'):
+                    cached_result['cached'] = True
+                    cached_result['cachedDate'] = date_key
+                    cached_result['cachedAt'] = cached.get('updated_at')
+                    return jsonify({'status': 'done', **cached_result})
+            except Exception as e:
+                print(f"Health cache parse failed (async start will regenerate): {e}")
+
     job_id = str(uuid.uuid4())
     _health_jobs[job_id] = {'status': 'processing'}
 
-    t = threading.Thread(target=_run_health_pipeline, args=(job_id, data, gemini_key))
+    t = threading.Thread(target=_run_health_pipeline, args=(job_id, data, None))
     t.daemon = True
     t.start()
 
@@ -614,11 +703,32 @@ def health_summary_start():
 @app.route('/api/health_summary', methods=['POST'])
 def health_summary_sync():
     data = request.get_json() or {}
-    gemini_key = os.getenv('GEMINI_API_KEY')
+    force_refresh = bool(data.get('force_refresh') or data.get('forceRefresh'))
+    user_id = (
+        data.get('user_id')
+        or data.get('userId')
+        or (data.get('user') or {}).get('id')
+        or (data.get('user') or {}).get('user_id')
+    )
+    date_key = _get_today_key()
+
+    if user_id and not force_refresh:
+        cached = _health_cache_get(str(user_id), date_key)
+        if cached and cached.get('result_json'):
+            try:
+                cached_result = json.loads(cached['result_json'])
+                if isinstance(cached_result, dict) and cached_result.get('summary'):
+                    cached_result['cached'] = True
+                    cached_result['cachedDate'] = date_key
+                    cached_result['cachedAt'] = cached.get('updated_at')
+                    return jsonify(cached_result)
+            except Exception as e:
+                print(f"Health cache parse failed (will regenerate): {e}")
+
     job_id = str(uuid.uuid4())
     _health_jobs[job_id] = {'status': 'processing'}
 
-    t = threading.Thread(target=_run_health_pipeline, args=(job_id, data, gemini_key))
+    t = threading.Thread(target=_run_health_pipeline, args=(job_id, data, None))
     t.daemon = True
     t.start()
 
@@ -630,6 +740,11 @@ def health_summary_sync():
             break
         if job.get('status') == 'done':
             result = job['result']
+            result['cached'] = False
+            result['cachedDate'] = date_key
+            result['generatedAt'] = datetime.now(timezone.utc).isoformat()
+            if user_id:
+                _health_cache_upsert(str(user_id), date_key, result)
             del _health_jobs[job_id]
             return jsonify(result)
         if job.get('status') == 'error':
@@ -657,9 +772,17 @@ def health_summary_poll(job_id):
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
+    has_cache_debug = any(
+        getattr(rule, 'rule', '') == '/api/health-cache/debug'
+        for rule in getattr(app, 'url_map', []).iter_rules()
+    )
     return jsonify({
         'status': 'healthy',
         'nutrition_score_available': nutrition_score is not None,
+        'buildId': SERVER_BUILD_ID,
+        'serverFile': __file__,
+        'healthCacheDbPath': HEALTH_CACHE_DB_PATH,
+        'hasHealthCacheDebugRoute': has_cache_debug,
     })
 
 if __name__ == '__main__':

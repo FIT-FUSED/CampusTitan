@@ -28,9 +28,6 @@ class TitanHealthAI:
         self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
         self.usda_api_key = os.environ.get("USDA_API_KEY")
 
-        if not self.gemini_api_key or not self.usda_api_key:
-            raise EnvironmentError("CRITICAL: Missing GEMINI_API_KEY or USDA_API_KEY in .env file.")
-
     # ==========================================
     # Endpoint 1: Meal Processing (Called during the day)
     # ==========================================
@@ -46,6 +43,9 @@ class TitanHealthAI:
             dict: The nutritional matrix including 'Nutrition Density', or None if failed.
         """
         print(f"-> AI Interface: Processing meal image from {image_filepath}...")
+
+        if not self.gemini_api_key or not self.usda_api_key:
+            raise EnvironmentError("CRITICAL: Missing GEMINI_API_KEY or USDA_API_KEY in .env file.")
         
         nutritional_data = execute_ml_vision_pipeline(
             image_path=image_filepath,
@@ -98,8 +98,8 @@ class TitanHealthAI:
         # 1. Math computation
         averages = calculate_moving_averages(history_logs)
         
-        # 2. Context Compression via Gemini
-        trend_summary = compress_historical_context(history_logs, self.gemini_api_key)
+        # 2. Offline Trend Summarizer (no external API)
+        trend_summary = compress_historical_context(history_logs)
         
         # 3. Prompt Assembly
         final_prompt = build_ollama_prompt(
