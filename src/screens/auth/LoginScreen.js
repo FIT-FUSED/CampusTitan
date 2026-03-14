@@ -149,6 +149,19 @@ export default function LoginScreen({ navigation }) {
                 />
 
                 {!isAdminLogin && (
+                    <TouchableOpacity
+                        style={s.otpLink}
+                        onPress={() => navigation.navigate('OtpLogin')}
+                        disabled={loading}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={s.otpText}>
+                            Use <Text style={s.otpBold}>Email OTP</Text> instead
+                        </Text>
+                    </TouchableOpacity>
+                )}
+
+                {!isAdminLogin && (
                     <TouchableOpacity style={s.registerLink} onPress={() => navigation.navigate('Register')}>
                         <Text style={s.registerText}>
                             Don't have an account? <Text style={s.registerBold}>Sign Up</Text>
@@ -303,6 +316,10 @@ const s = StyleSheet.create({
     registerLink: { alignItems: 'center', marginTop: SPACING.xl },
     registerText: { color: COLORS.textSecondary, fontSize: FONT_SIZES.md },
     registerBold: { color: COLORS.primary, ...FONTS.bold },
+
+    otpLink: { alignItems: 'center', marginTop: SPACING.md },
+    otpText: { color: COLORS.textSecondary, fontSize: FONT_SIZES.md },
+    otpBold: { color: COLORS.primary, ...FONTS.bold },
 
     // ─── Demo ───
     demoBar: {

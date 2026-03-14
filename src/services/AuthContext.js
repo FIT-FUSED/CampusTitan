@@ -61,6 +61,21 @@ export function AuthProvider({ children }) {
         return result;
     }
 
+    async function requestEmailOtp(email) {
+        return authService.requestEmailOtp(email);
+    }
+
+    async function verifyEmailOtp(email, otp) {
+        const result = await authService.verifyEmailOtp(email, otp);
+        const userWithMeta = await authService.getCurrentUser();
+        if (userWithMeta) {
+            setUser(userWithMeta);
+            setIsOnboarded(true);
+            await loadUserBadges(userWithMeta.id);
+        }
+        return result;
+    }
+
     // Admin login - sets user role to admin without needing Supabase authentication
     async function adminLogin() {
         // Create a mock admin user object
@@ -140,6 +155,8 @@ export function AuthProvider({ children }) {
             isOnboarded,
             setIsOnboarded,
             login,
+            requestEmailOtp,
+            verifyEmailOtp,
             adminLogin,
             register,
             logout,

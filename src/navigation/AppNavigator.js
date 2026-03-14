@@ -14,6 +14,7 @@ import * as Haptics from "expo-haptics";
 import LoginScreen from "../screens/auth/LoginScreen";
 import RegisterScreen from "../screens/auth/RegisterScreen";
 import OnboardingScreen from "../screens/auth/OnboardingScreen";
+import OtpLoginScreen from "../screens/auth/OtpLoginScreen";
 
 // Main screens
 import HomeScreen from "../screens/home/HomeScreen";
@@ -243,7 +244,11 @@ export default function AppNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false, animationEnabled: Platform.OS !== "web" }}>
         {!user ? (
           isOnboarded ? (
-            <><Stack.Screen name="Login" component={LoginScreen} /><Stack.Screen name="Register" component={RegisterScreen} /></>
+            <>
+              <Stack.Screen name="Login" component={LoginScreen} />
+              <Stack.Screen name="OtpLogin" component={OtpLoginScreen} />
+              <Stack.Screen name="Register" component={RegisterScreen} />
+            </>
           ) : (
             <Stack.Screen name="Onboarding" component={OnboardingScreen} />
           )
