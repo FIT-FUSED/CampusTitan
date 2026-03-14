@@ -28,6 +28,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const AGE_DATA = Array.from({ length: 83 }, (_, i) => i + 18); // 18-100
 const HEIGHT_DATA = Array.from({ length: 101 }, (_, i) => i + 120); // 120-220 cm
 const WEIGHT_DATA = Array.from({ length: 151 }, (_, i) => i + 30); // 30-180 kg
+const DIETARY_PREFERENCES = ["Vegetarian", "Non-Vegetarian", "Vegan"];
 
 // Default dummy values for rapid testing
 const DEFAULT_COLLEGE = "MNNIT Allahabad";
@@ -49,6 +50,7 @@ export default function RegisterScreen({ navigation }) {
     height: 170,
     weight: 65,
     gender: "male",
+    dietaryPreferences: "Vegetarian",
     isAdmin: false, // Admin registration option
   });
   const [loading, setLoading] = useState(false);
@@ -57,6 +59,7 @@ export default function RegisterScreen({ navigation }) {
   const [showCollegePicker, setShowCollegePicker] = useState(false);
   const [showBranchPicker, setShowBranchPicker] = useState(false);
   const [showHostelPicker, setShowHostelPicker] = useState(false);
+  const [showDietaryPicker, setShowDietaryPicker] = useState(false);
 
   const { register } = useAuth();
 
@@ -353,7 +356,7 @@ export default function RegisterScreen({ navigation }) {
           </View>
         </View>
 
-        <View style={{ marginTop: SPACING.md }}>
+        <View style={[{ marginTop: SPACING.lg }, styles.weightPickerContainer]}>
           <ScrollPicker
             label="Weight (kg)"
             data={WEIGHT_DATA}
@@ -361,6 +364,21 @@ export default function RegisterScreen({ navigation }) {
             onValueChange={(v) => updateForm("weight", v)}
             height={160}
           />
+        </View>
+
+        {/* Dietary Preference Picker */}
+        <View style={{ marginTop: SPACING.lg }}>
+          <Text style={styles.fieldLabel}>Dietary Preference</Text>
+          <TouchableOpacity
+            style={styles.pickerButton}
+            onPress={() => setShowDietaryPicker(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.pickerButtonText} numberOfLines={1}>
+              🥗 {form.dietaryPreferences}
+            </Text>
+            <Text style={styles.pickerChevron}>▼</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Admin Toggle */}
@@ -435,13 +453,27 @@ export default function RegisterScreen({ navigation }) {
             </ScrollView>
           )}
           {step === 3 && (
-            <View style={styles.stepViewContent}>
+            <ScrollView
+              contentContainerStyle={styles.stepScrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
               {renderStep3()}
               <LoginLink navigation={navigation} />
-            </View>
+            </ScrollView>
           )}
         </View>
       </KeyboardAvoidingView>
+      
+      {/* Dietary Preference Picker Modal - Root Level */}
+      <ListPickerModal
+        visible={showDietaryPicker}
+        title="Select Dietary Preference"
+        data={DIETARY_PREFERENCES}
+        value={form.dietaryPreferences}
+        onSelect={(v) => updateForm("dietaryPreferences", v)}
+        onClose={() => setShowDietaryPicker(false)}
+      />
     </LinearGradient>
   );
 }
@@ -468,7 +500,6 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "ios" ? 60 : 40,
   },
   stepScrollContent: { paddingBottom: SPACING.huge },
-  stepViewContent: { flex: 1, paddingBottom: SPACING.huge },
 
   // Progress
   progressContainer: { marginBottom: SPACING.xl },
@@ -649,6 +680,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: SPACING.md,
+  },
+  weightPickerContainer: {
+    paddingHorizontal: SPACING.xs,
   },
 
   // Nav

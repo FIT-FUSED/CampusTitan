@@ -334,6 +334,42 @@ class NutritionLoggingTool:
         try:
             date = date or datetime.now().strftime("%Y-%m-%d")
 
+            if not self.supabase_url or not self.supabase_key:
+                extraction = meal_data.get("extraction")
+                if not extraction:
+                    original_text = meal_data.get("raw_query") or meal_data.get("text") or meal_data.get("query")
+                    if original_text:
+                        extraction = self._extract_meals_with_llm(original_text)
+                meals = extraction.get("meals") if isinstance(extraction, dict) else []
+                normalized_meals: List[Dict[str, Any]] = []
+                for m in meals or []:
+                    if not isinstance(m, dict):
+                        continue
+                    food_name = (m.get("food_name") or m.get("food") or "").strip().lower()
+                    if not food_name:
+                        continue
+                    quantity = int(_safe_number(m.get("quantity"), 1.0) or 1)
+                    if quantity <= 0:
+                        quantity = 1
+                    meal_type = _normalize_meal_type(m.get("meal_type"))
+                    nutrition = m.get("nutrition") or {}
+                    normalized_meals.append(
+                        {
+                            "food_name": food_name,
+                            "quantity": quantity,
+                            "meal_type": meal_type,
+                            "calories": int(round(_safe_number(nutrition.get("calories"), 0.0))),
+                            "protein": float(round(_safe_number(nutrition.get("protein"), 0.0), 1)),
+                            "carbs": float(round(_safe_number(nutrition.get("carbs"), 0.0), 1)),
+                            "fat": float(round(_safe_number(nutrition.get("fat"), 0.0), 1)),
+                        }
+                    )
+                return {
+                    "success": True,
+                    "tool_name": "nutrition_logging_tool",
+                    "data": {"logged": False, "date": date, "meals": normalized_meals, "rows": []},
+                }
+
             extraction = meal_data.get("extraction")
             if not extraction:
                 original_text = meal_data.get("raw_query") or meal_data.get("text") or meal_data.get("query")
@@ -510,6 +546,23 @@ class ActivityLoggingTool:
         """Execute activity logging"""
         try:
             date = date or datetime.now().strftime("%Y-%m-%d")
+
+            if not self.supabase_url or not self.supabase_key:
+                activity_type = (activity_data.get("type") or "").lower().strip()
+                duration_minutes = int(activity_data.get("duration_minutes") or 0)
+                cals_per_hour = ACTIVITY_CALORIES.get(activity_type)
+                calories_burned = int((float(cals_per_hour or 300) / 60.0) * max(0, duration_minutes))
+                return {
+                    "success": True,
+                    "tool_name": "activity_logging_tool",
+                    "data": {
+                        "logged": False,
+                        "activity": activity_type,
+                        "duration_minutes": duration_minutes,
+                        "calories_burned": calories_burned,
+                        "date": date,
+                    },
+                }
             activity_type = activity_data.get("type", "").lower()
             duration_minutes = activity_data.get("duration_minutes", 30)
             
@@ -572,10 +625,15 @@ class LoggingResponseGenerator:
     def generate_response(self, results: List[Dict], parsed_intent: Dict) -> str:
         """Generate friendly response for logged data"""
         parts = []
+        had_error = False
         
         for result in results:
             if not result.get("success", False):
-                parts.append(f"Error: {result.get('error', 'Unknown error')}")
+                had_error = True
+                parts.append(
+                    "I couldn't log one of the items from that message. "
+                    "Try again with a clear quantity/duration (e.g., '2 eggs', '30 minutes walking')."
+                )
                 continue
             
             data = result.get("data", {})
@@ -603,7 +661,8 @@ class LoggingResponseGenerator:
         if not parts:
             return "Nothing was logged. Please try again!"
         
-        parts.append("Your daily stats have been updated!")
+        if not had_error:
+            parts.append("Your daily stats have been updated!")
         return " | ".join(parts)
 
 

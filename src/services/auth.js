@@ -50,6 +50,7 @@ class AuthService {
             height: userData.height,
             weight: userData.weight,
             gender: userData.gender,
+            dietary_preferences: userData.dietaryPreferences,
             role: userData.isAdmin ? "admin" : "student",
           },
         },
@@ -99,6 +100,7 @@ class AuthService {
             height: height,
             weight: weight,
             gender: gender,
+            dietary_preferences: userData.dietaryPreferences,
             role: userData.isAdmin ? "admin" : "student",
             // Nutrition goals
             calorie_goal: nutritionGoals.calories,
@@ -177,6 +179,7 @@ class AuthService {
         height: user.user_metadata?.height,
         weight: user.user_metadata?.weight,
         gender: user.user_metadata?.gender,
+        dietaryPreferences: user.user_metadata?.dietary_preferences || "Vegetarian",
         role: user.user_metadata?.role || "student",
       };
     } catch (error) {

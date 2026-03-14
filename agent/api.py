@@ -10,6 +10,7 @@ import sys
 import re
 from datetime import datetime
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 _repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _repo_root)
@@ -26,6 +27,7 @@ app = Flask(__name__)
 CORS(app)
 
 agent = None
+_executor = ThreadPoolExecutor(max_workers=8)
 
 def get_agent():
     global agent
@@ -51,8 +53,39 @@ def process_query():
         if not query or not user_id:
             return jsonify({"success": False, "error": "Query and user_id required"}), 400
         
-        result = handle_agent_request(query, user_id, user_context)
-        return jsonify(result)
+        # Use a single global agent (avoids reloading models and reduces stalls)
+        agent_instance = get_agent()
+
+        # Hard timeout so requests never hang indefinitely
+        def _run():
+            response = agent_instance.process_query(query, user_id, user_context)
+            return {
+                "success": True,
+                "answer": response.answer,
+                "tool_used": response.tool_used,
+                "confidence": response.confidence,
+                "data": response.data,
+                "sources": response.sources,
+                "timestamp": datetime.now().isoformat(),
+            }
+
+        fut = _executor.submit(_run)
+        try:
+            result = fut.result(timeout=25)
+            return jsonify(result)
+        except TimeoutError:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "answer": "I'm taking too long to process that request right now. Please try again.",
+                        "error": "timeout",
+                        "where": "agent/query",
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ),
+                504,
+            )
     except Exception as e:
         return jsonify({"success": False, "error": str(e), "where": "agent/query"}), 500
 
@@ -117,4 +150,4 @@ def log_natural_language():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5002))
     print(f"Starting CampusTitan Agent API on port {port}")
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False, threaded=True)
