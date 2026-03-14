@@ -1,9 +1,10 @@
 // App Navigator
 import React from "react";
-import { NavigationContainer, getFocusedRouteNameFromRoute } from "@react-navigation/native";
+import { NavigationContainer, getFocusedRouteNameFromRoute, useNavigationContainerRef } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { View, Text, StyleSheet, Platform, TouchableOpacity } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS } from "../theme";
@@ -228,8 +229,35 @@ function RootNavigator() {
   return userRole === "admin" ? <AdminTabs /> : <StudentTabs />;
 }
 
+// Global Floating Agent Button
+function FloatingAgentButton({ navRef }) {
+  const { user, userRole } = useAuth();
+
+  if (!user || userRole === "admin") return null;
+
+  return (
+    <TouchableOpacity
+      style={floatingStyles.button}
+      activeOpacity={0.8}
+      onPress={() => {
+        if (navRef.isReady()) {
+          navRef.navigate("MainApp", { screen: "Home", params: { screen: "AIChat" } });
+        }
+      }}
+    >
+      <LinearGradient
+        colors={COLORS.gradientPrimary}
+        style={floatingStyles.gradient}
+      >
+        <Ionicons name="chatbubbles" size={24} color={COLORS.textInverse} />
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+}
+
 export default function AppNavigator() {
   const { user, loading, isOnboarded } = useAuth();
+  const navRef = useNavigationContainerRef();
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: COLORS.background, alignItems: "center", justifyContent: "center" }}>
@@ -239,7 +267,7 @@ export default function AppNavigator() {
     );
   }
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navRef}>
       <Stack.Navigator screenOptions={{ headerShown: false, animationEnabled: Platform.OS !== "web" }}>
         {!user ? (
           isOnboarded ? (
@@ -251,6 +279,7 @@ export default function AppNavigator() {
           <><Stack.Screen name="MainApp" component={RootNavigator} /><Stack.Screen name="WellnessQuiz" component={WellnessQuizScreen} /></>
         )}
       </Stack.Navigator>
+      <FloatingAgentButton navRef={navRef} />
     </NavigationContainer>
   );
 }
@@ -268,5 +297,25 @@ const moreStyles = StyleSheet.create({
   iconBg: { width: 40, height: 40, borderRadius: BORDER_RADIUS.md, alignItems: "center", justifyContent: "center", marginRight: SPACING.md },
   label: { flex: 1, fontSize: FONT_SIZES.lg, color: COLORS.text, ...FONTS.medium },
   arrow: { fontSize: 24, color: COLORS.textMuted },
+});
+
+const floatingStyles = StyleSheet.create({
+  button: {
+    position: "absolute",
+    bottom: 90, // Above the tab bar
+    right: SPACING.lg,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    ...SHADOWS.large,
+    zIndex: 999,
+  },
+  gradient: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 28,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 });
 

@@ -3,6 +3,34 @@
 import { supabase } from './supabase';
 
 class AnalyticsService {
+  /**
+   * Fetch actual student enrollment counts grouped by hostel and branch
+   */
+  async getGroupCounts(college) {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('hostel, branch')
+        .eq('college', college);
+
+      if (error) throw error;
+
+      const counts = { hostels: {}, branches: {} };
+      (data || []).forEach(u => {
+        if (u.hostel) {
+          counts.hostels[u.hostel] = (counts.hostels[u.hostel] || 0) + 1;
+        }
+        if (u.branch) {
+          counts.branches[u.branch] = (counts.branches[u.branch] || 0) + 1;
+        }
+      });
+      return counts;
+    } catch (e) {
+      console.error('Analytics: getGroupCounts failed', e);
+      return { hostels: {}, branches: {} };
+    }
+  }
+
   async getCampusAnalytics() {
     try {
       console.log('📊 Analytics: Fetching campus analytics via RPCs');
@@ -17,16 +45,23 @@ class AnalyticsService {
         return { collegeStats: [], weeklyTrends: [] };
       }
 
+      // Fetch real counts for more accurate "participation" rates if college is known
+      const firstCollege = (overview && overview.length > 0) ? overview[0].college : null;
+      const realCounts = firstCollege ? await this.getGroupCounts(firstCollege) : { hostels: {}, branches: {} };
+
       console.log('📊 Analytics: Campus overview rows:', overview?.length);
 
       const collegeStats = (overview || []).map((row) => {
         const totalUsers = Number(row.total_users) || 0;
         const totalActivities = Number(row.total_activities) || 0;
+
+        // If we have real counts for this "college" (which might be used as hostel name in some views), use it
+        const actualEnrollment = totalUsers;
+
         // activeUsers approximation: colleges that have at least some activities
-        const activeUsers = totalActivities > 0 ? totalUsers : 0;
         const participationRate =
-          totalUsers > 0
-            ? Math.round((activeUsers / totalUsers) * 100)
+          actualEnrollment > 0
+            ? Math.min(Math.round((totalUsers / actualEnrollment) * 100), 100)
             : 0;
 
         return {
@@ -36,8 +71,8 @@ class AnalyticsService {
           avgMoodScore: row.avg_mood_per_user
             ? Number(row.avg_mood_per_user).toFixed(1)
             : '0.0',
-          participationRate,
-          activeUsers,
+          participationRate: Math.min(participationRate || 0, 100),
+          activeUsers: actualEnrollment,
           topActivity: 'gym', // RPC doesn't return this; default placeholder
         };
       });

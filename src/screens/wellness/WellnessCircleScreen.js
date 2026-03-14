@@ -1,82 +1,124 @@
 // Wellness Circle Screen
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity, Alert, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS } from '../../theme';
-import { Header, AnimatedButton, ProgressBar, Chip } from '../../components/common';
+import { COLORS, SPACING, FONT_SIZES, FONTS, BORDER_RADIUS, SHADOWS } from '../../theme';
+import { Header, Chip } from '../../components/common';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import db from '../../services/database';
 
+const DEMO_CIRCLES = [
+    {
+        id: 'demo-1',
+        name: 'Morning Meditation',
+        description: 'Start your campus day with 15 mins of mindfulness. Great for focus and stress.',
+        category: 'Meditation',
+        schedule: 'Daily, 7:30 AM',
+        location: 'Central Lawn',
+    },
+    {
+        id: 'demo-2',
+        name: 'Yoga for Beginners',
+        description: 'Relaxing yoga flows to improve flexibility and mental clarity.',
+        category: 'Yoga',
+        schedule: 'Mon/Wed/Fri, 5:30 PM',
+        location: 'Activity Center',
+    },
+    {
+        id: 'demo-3',
+        name: 'Campus Runners',
+        description: 'Morning group runs around the campus perimeter. All levels welcome!',
+        category: 'Running',
+        schedule: 'Tue/Thu, 6:30 AM',
+        location: 'Main Gate',
+    },
+    {
+        id: 'demo-4',
+        name: 'Library Focus Hub',
+        description: 'Productive study sessions with pomodoro technique and focus music.',
+        category: 'Study',
+        schedule: 'Daily, 4:00 PM',
+        location: 'Library Floor 3',
+    },
+    {
+        id: 'demo-5',
+        name: 'Healthy Eaters Titan',
+        description: 'Share healthy meal options available on campus and nutrition tips.',
+        category: 'Nutrition',
+        schedule: 'Saturdays, 11:00 AM',
+        location: 'Main Canteen',
+    }
+];
+
 export default function WellnessCircleScreen({ navigation }) {
-    const [circles, setCircles] = useState([]);
+    const [circles, setCircles] = useState(DEMO_CIRCLES);
     const [selectedCategory, setSelectedCategory] = useState('All');
-    const [joinedCircles, setJoinedCircles] = useState([]);
 
     const loadData = useCallback(async () => {
-        const c = await db.getWellnessCircles();
-        setCircles(c);
+        try {
+            const dbCircles = await db.getWellnessCircles();
+            if (dbCircles && dbCircles.length > 0) {
+                // Combine demo with DB, or just use DB
+                setCircles([...DEMO_CIRCLES, ...dbCircles]);
+            }
+        } catch (error) {
+            console.warn('WellnessCircle fetch error:', error);
+        }
     }, []);
 
     useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-    const categories = ['All', 'Meditation', 'Yoga', 'Running', 'Study', 'Nutrition'];
-    const filtered = selectedCategory === 'All' ? circles : circles.filter(c => c.category === selectedCategory);
+    const categories = ['All', 'Meditation', 'Yoga', 'Running', 'Study', 'Nutrition', 'Finance'];
+    const filtered = (circles || []).filter(c =>
+        selectedCategory === 'All' ? true : c.category === selectedCategory
+    );
 
-    function handleJoin(circleId) {
-        if (joinedCircles.includes(circleId)) {
-            setJoinedCircles(prev => prev.filter(id => id !== circleId));
-            Alert.alert('Left Circle', 'You have left this wellness circle');
-        } else {
-            setJoinedCircles(prev => [...prev, circleId]);
-            Alert.alert('Joined! 🎉', 'You have joined this wellness circle');
-        }
-    }
+    const handleJoin = (circle) => {
+        const cat = (circle.category || 'general').toLowerCase();
+        const whatsappLink = `https://chat.whatsapp.com/demo-${cat}`;
+        Linking.openURL(whatsappLink).catch(() => {
+            Alert.alert('Error', 'Could not open WhatsApp link');
+        });
+    };
 
     const gradients = [COLORS.gradientPrimary, COLORS.gradientAccent, COLORS.gradientSunset, COLORS.gradientOcean, COLORS.gradientCoral];
 
     return (
         <View style={styles.container}>
             <Header title="Wellness Circles" subtitle="Join a community" onBack={() => navigation.goBack()} />
-            <ScrollView contentContainerStyle={styles.content}>
-                {/* Categories */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll} contentContainerStyle={{ paddingHorizontal: SPACING.lg }}>
+
+            <View style={styles.catWrapper}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catScroll}>
                     {categories.map(cat => (
                         <Chip key={cat} label={cat} selected={selectedCategory === cat} onPress={() => setSelectedCategory(cat)} color={COLORS.primary} />
                     ))}
                 </ScrollView>
+            </View>
 
-                {/* Stats */}
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 <View style={styles.statsRow}>
                     <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{circles.length}</Text>
-                        <Text style={styles.statLabel}>Circles</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{joinedCircles.length}</Text>
-                        <Text style={styles.statLabel}>Joined</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{circles.reduce((s, c) => s + c.participants, 0)}</Text>
-                        <Text style={styles.statLabel}>Members</Text>
+                        <Text style={styles.statValue}>{filtered.length}</Text>
+                        <Text style={styles.statLabel}>Active Communities</Text>
                     </View>
                 </View>
 
-                {/* Circles */}
-                {filtered.map((circle, i) => {
-                    const isJoined = joinedCircles.includes(circle.id);
-                    const fillPercentage = (circle.participants / circle.maxParticipants) * 100;
-                    return (
-                        <View key={circle.id} style={styles.circleCard}>
-                            <LinearGradient
-                                colors={gradients[i % gradients.length]}
-                                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                                style={styles.circleGradient}
-                            >
-                                <Text style={styles.circleCategory}>{circle.category}</Text>
-                            </LinearGradient>
-                            <View style={styles.circleBody}>
-                                <Text style={styles.circleName}>{circle.name}</Text>
-                                <Text style={styles.circleDesc}>{circle.description}</Text>
+                {filtered.map((circle, i) => (
+                    <View key={circle.id} style={styles.circleCard}>
+                        <LinearGradient
+                            colors={gradients[i % gradients.length]}
+                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                            style={styles.circleGradient}
+                        >
+                            <Text style={styles.circleCategory}>{circle.category}</Text>
+                        </LinearGradient>
+
+                        <View style={styles.circleBody}>
+                            <Text style={styles.circleName}>{circle.name}</Text>
+                            <Text style={styles.circleDesc}>{circle.description}</Text>
+
+                            <View style={styles.detailList}>
                                 <View style={styles.circleDetail}>
                                     <Text style={styles.circleIcon}>📅</Text>
                                     <Text style={styles.circleDetailText}>{circle.schedule}</Text>
@@ -86,24 +128,34 @@ export default function WellnessCircleScreen({ navigation }) {
                                     <Text style={styles.circleDetailText}>{circle.location}</Text>
                                 </View>
                                 <View style={styles.circleDetail}>
-                                    <Text style={styles.circleIcon}>👥</Text>
-                                    <Text style={styles.circleDetailText}>{circle.participants}/{circle.maxParticipants} members</Text>
-                                </View>
-                                <ProgressBar progress={fillPercentage} color={gradients[i % gradients.length][0]} height={4} style={{ marginTop: SPACING.sm }} />
-                                <TouchableOpacity
-                                    style={[styles.joinBtn, isJoined && styles.joinedBtn]}
-                                    onPress={() => handleJoin(circle.id)}
-                                >
-                                    <Text style={[styles.joinBtnText, isJoined && styles.joinedBtnText]}>
-                                        {isJoined ? '✓ Joined' : 'Join Circle'}
+                                    <View style={styles.waIconBox}>
+                                        <Ionicons name="logo-whatsapp" size={12} color="#FFF" />
+                                    </View>
+                                    <Text style={styles.waLinkText}>
+                                        https://chat.whatsapp.com/demo-{circle.category?.toLowerCase() || 'group'}
                                     </Text>
-                                </TouchableOpacity>
+                                </View>
                             </View>
-                        </View>
-                    );
-                })}
 
-                <View style={{ height: 40 }} />
+                            <TouchableOpacity
+                                style={styles.joinBtn}
+                                activeOpacity={0.8}
+                                onPress={() => handleJoin(circle)}
+                            >
+                                <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
+                                <Text style={styles.joinBtnText}>Join WhatsApp Group</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                ))}
+
+                {filtered.length === 0 && (
+                    <View style={styles.emptyContainer}>
+                        <Text style={styles.emptyText}>No communities found for this category.</Text>
+                    </View>
+                )}
+
+                <View style={{ height: 60 }} />
             </ScrollView>
         </View>
     );
@@ -111,12 +163,14 @@ export default function WellnessCircleScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background, paddingTop: Platform.OS === 'ios' ? 50 : 30 },
-    content: { paddingBottom: SPACING.huge },
-    catScroll: { marginBottom: SPACING.lg },
+    content: { paddingBottom: 100 },
+    catWrapper: { marginVertical: SPACING.lg },
+    catScroll: { paddingHorizontal: SPACING.lg, gap: SPACING.xs },
     statsRow: {
-        flexDirection: 'row', justifyContent: 'space-around', marginHorizontal: SPACING.lg,
+        flexDirection: 'row', justifyContent: 'center', marginHorizontal: SPACING.lg,
         backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg, borderWidth: 1, borderColor: COLORS.glassBorder, marginBottom: SPACING.lg,
+        ...SHADOWS.small
     },
     statItem: { alignItems: 'center' },
     statValue: { color: COLORS.text, fontSize: FONT_SIZES.xxl, ...FONTS.bold },
@@ -125,21 +179,25 @@ const styles = StyleSheet.create({
         marginHorizontal: SPACING.lg, marginBottom: SPACING.lg,
         backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg,
         borderWidth: 1, borderColor: COLORS.glassBorder, overflow: 'hidden',
+        ...SHADOWS.small
     },
-    circleGradient: { paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg },
-    circleCategory: { color: COLORS.text, fontSize: FONT_SIZES.xs, ...FONTS.bold, textTransform: 'uppercase' },
+    circleGradient: { paddingVertical: SPACING.xs, paddingHorizontal: SPACING.lg },
+    circleCategory: { color: COLORS.text, fontSize: 10, ...FONTS.bold, textTransform: 'uppercase' },
     circleBody: { padding: SPACING.lg },
     circleName: { color: COLORS.text, fontSize: FONT_SIZES.lg, ...FONTS.bold },
-    circleDesc: { color: COLORS.textSecondary, fontSize: FONT_SIZES.sm, marginTop: SPACING.sm, lineHeight: 20 },
-    circleDetail: { flexDirection: 'row', alignItems: 'center', marginTop: SPACING.sm },
+    circleDesc: { color: COLORS.textSecondary, fontSize: FONT_SIZES.sm, marginTop: 4, lineHeight: 18, marginBottom: SPACING.md },
+    detailList: { gap: 8 },
+    circleDetail: { flexDirection: 'row', alignItems: 'center' },
     circleIcon: { fontSize: 14, marginRight: SPACING.sm },
     circleDetailText: { color: COLORS.textMuted, fontSize: FONT_SIZES.sm },
+    waIconBox: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#25D366', alignItems: 'center', justifyContent: 'center', marginRight: SPACING.sm },
+    waLinkText: { color: '#128C7E', fontSize: 12, ...FONTS.medium },
     joinBtn: {
         marginTop: SPACING.lg, paddingVertical: SPACING.md,
-        borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: COLORS.primary,
-        alignItems: 'center',
+        borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: '#25D366',
+        backgroundColor: COLORS.surface, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10
     },
-    joinedBtn: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-    joinBtnText: { color: COLORS.primary, fontSize: FONT_SIZES.md, ...FONTS.semiBold },
-    joinedBtnText: { color: COLORS.text },
+    joinBtnText: { color: '#25D366', fontSize: FONT_SIZES.md, ...FONTS.bold },
+    emptyContainer: { padding: 40, alignItems: 'center' },
+    emptyText: { color: COLORS.textMuted, fontSize: FONT_SIZES.md },
 });

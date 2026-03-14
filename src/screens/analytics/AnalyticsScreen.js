@@ -23,7 +23,7 @@ import analyticsService from "../../services/AnalyticsService";
 const { width } = Dimensions.get('window');
 
 export default function AnalyticsScreen({ navigation }) {
-  const [selectedView, setSelectedView] = useState("college");
+  const [selectedView, setSelectedView] = useState("hostel");
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -154,19 +154,19 @@ export default function AnalyticsScreen({ navigation }) {
         </View>
 
         {/* ── College Comparison ── */}
-        {selectedView === "college" && (
+        {selectedView === "hostel" && (
           <>
-            <SectionHeader title="College Activity (min/day)" />
+            <SectionHeader title="Students Tracked by College 🏛️" />
             <View style={styles.barChart}>
               {processedData.hostelStats.map((h, i) => {
-                const maxMin = Math.max(
-                  ...processedData.hostelStats.map((s) => s.avgActivityMinutes),
+                const maxVal = Math.max(
+                  ...processedData.hostelStats.map((s) => s.activeUsers),
                   1
                 );
-                const barH = Math.max((h.avgActivityMinutes / maxMin) * 100, 4);
+                const barH = Math.max((h.activeUsers / maxVal) * 100, 4);
                 return (
                   <View key={i} style={styles.barItem}>
-                    <Text style={styles.barValue}>{h.avgActivityMinutes}</Text>
+                    <Text style={styles.barValue}>{h.activeUsers}</Text>
                     <LinearGradient
                       colors={
                         COLORS.chartColors && COLORS.chartColors[i]
@@ -216,7 +216,7 @@ export default function AnalyticsScreen({ navigation }) {
                   <Text style={styles.hostelName} numberOfLines={1}>
                     {h.hostel}
                   </Text>
-                  <Text style={styles.hostelUsers}>{h.activeUsers} active</Text>
+                  <Text style={styles.hostelUsers}>{h.activeUsers} students</Text>
                 </View>
 
                 <View style={styles.hostelStats}>

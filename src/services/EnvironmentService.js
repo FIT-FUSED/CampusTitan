@@ -10,12 +10,12 @@ class EnvironmentService {
     console.log('  - app.json extra:', Constants.expoConfig?.extra?.weatherApiKey ? 'FOUND' : 'NOT FOUND');
     console.log('  - .env EXPO_PUBLIC_WEATHER_API_KEY:', process.env.EXPO_PUBLIC_WEATHER_API_KEY ? 'FOUND' : 'NOT FOUND');
     console.log('  - manifest extra:', Constants.manifest?.extra?.weatherApiKey ? 'FOUND' : 'NOT FOUND');
-    
+
     // Priority: .env file first (most reliable), then app.json
-    this.apiKey = process.env.EXPO_PUBLIC_WEATHER_API_KEY || 
-                  Constants.expoConfig?.extra?.weatherApiKey || 
-                  Constants.manifest?.extra?.weatherApiKey;
-    
+    this.apiKey = process.env.EXPO_PUBLIC_WEATHER_API_KEY ||
+      Constants.expoConfig?.extra?.weatherApiKey ||
+      Constants.manifest?.extra?.weatherApiKey;
+
     // DEBUG: Log the actual key being used (first few chars for security)
     if (this.apiKey) {
       console.log('[EnvironmentService] Using API key:', this.apiKey.substring(0, 8) + '...');
@@ -23,7 +23,7 @@ class EnvironmentService {
     } else {
       console.warn('[EnvironmentService] No API key found!');
     }
-    
+
     this.baseUrl = 'https://api.openweathermap.org/data/2.5';
   }
 
@@ -94,14 +94,14 @@ class EnvironmentService {
       console.error('  - Response status:', error.response?.status);
       console.error('  - Response data:', error.response?.data);
       console.error('  - Request URL:', error.config?.url);
-      
+
       // Handle 401 Unauthorized - API key is invalid
       if (error.response?.status === 401) {
         console.error('[EnvironmentService] Weather API key is invalid (401)');
         console.error('[EnvironmentService] The key being used was:', this.apiKey);
         return this.getFallbackWeatherData();
       }
-      
+
       console.error('[EnvironmentService] Weather fetch failed:', error.message);
       return this.getFallbackWeatherData();
     }
@@ -140,6 +140,14 @@ class EnvironmentService {
 
     const data = response.data;
 
+    // Extract rain data if available
+    let rain = null;
+    if (data.rain && typeof data.rain['1h'] === 'number') {
+      rain = data.rain['1h'];
+    } else if (data.rain && typeof data.rain['3h'] === 'number') {
+      rain = data.rain['3h'];
+    }
+
     return {
       temperature: Math.round(data.main.temp),
       humidity: data.main.humidity,
@@ -148,6 +156,7 @@ class EnvironmentService {
       location: data.name,
       description: data.weather[0].description,
       windSpeed: data.wind?.speed || 0,
+      rain: data.rain ? data.rain['1h'] || 0 : 0,
       timestamp: new Date().toISOString(),
     };
   }
@@ -162,6 +171,7 @@ class EnvironmentService {
       location: 'Campus',
       description: 'Clear',
       windSpeed: 5,
+      rain: 0,
       timestamp: new Date().toISOString(),
       isFallback: true,
     };

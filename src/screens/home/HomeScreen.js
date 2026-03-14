@@ -390,23 +390,6 @@ export default function HomeScreen({ navigation }) {
               )}
             </View>
             <View style={s.heroRight}>
-              <TouchableOpacity
-                style={s.chatButton}
-                onPress={() => navigation.navigate("AIChat")}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={COLORS.gradientPrimary}
-                  style={s.chatButtonGradient}
-                >
-                  <Ionicons
-                    name="chatbubbles"
-                    size={22}
-                    color={COLORS.textInverse}
-                  />
-                </LinearGradient>
-              </TouchableOpacity>
-              <Avatar name={user?.name} color={COLORS.primary} size={56} />
               <View style={s.datePill}>
                 <Text style={s.heroDate}>{format(new Date(), "dd MMM")}</Text>
               </View>

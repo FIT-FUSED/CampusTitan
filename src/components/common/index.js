@@ -348,11 +348,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: SPACING.md + 4,
+        paddingVertical: SPACING.md,
         paddingHorizontal: SPACING.xxl,
         borderRadius: BORDER_RADIUS.xl,
         ...SHADOWS.medium,
         borderWidth: 0,
+        minHeight: 52,
     },
     buttonText: {
         color: COLORS.text,
@@ -563,8 +564,8 @@ const styles = StyleSheet.create({
     },
     scrollPickerSelection: {
         position: 'absolute',
-        top: '50%',
-        marginTop: -20,
+        top: '50%', // Center it vertically in the 5-item window
+        marginTop: -20, // Half of height (40px) to center perfectly
         height: 40,
         width: '100%',
         backgroundColor: COLORS.primary + '12',
@@ -601,11 +602,27 @@ export function ScrollPicker({ data, value, onValueChange, label, height = 150 }
         }
     }, [data, value]);
 
+    const computeSelectedIndex = (y) => {
+        // For 5 visible items, select the 3rd one (middle)
+        const firstVisibleIndex = Math.floor(y / itemHeight);
+        const selectedIndex = firstVisibleIndex + 2;
+        return Math.max(0, Math.min(data.length - 1, selectedIndex));
+    };
+
     const onMomentumScrollEnd = (event) => {
         const y = event.nativeEvent.contentOffset.y;
-        const index = Math.round(y / itemHeight);
-        if (data[index] !== undefined && data[index] !== value) {
-            onValueChange(data[index]);
+        const selectedIndex = computeSelectedIndex(y);
+        if (data[selectedIndex] !== undefined && data[selectedIndex] !== value) {
+            onValueChange(data[selectedIndex]);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+    };
+
+    const onScrollEndDrag = (event) => {
+        const y = event.nativeEvent.contentOffset.y;
+        const selectedIndex = computeSelectedIndex(y);
+        if (data[selectedIndex] !== undefined && data[selectedIndex] !== value) {
+            onValueChange(data[selectedIndex]);
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
     };
@@ -614,7 +631,6 @@ export function ScrollPicker({ data, value, onValueChange, label, height = 150 }
         <View style={[styles.scrollPickerContainer, { height }]}>
             {label && <Text style={styles.scrollPickerLabel}>{label}</Text>}
             <View style={styles.scrollPickerFrame}>
-                <View style={styles.scrollPickerSelection} />
                 <FlatList
                     ref={flatListRef}
                     data={data}
@@ -623,6 +639,7 @@ export function ScrollPicker({ data, value, onValueChange, label, height = 150 }
                     snapToInterval={itemHeight}
                     decelerationRate="fast"
                     onMomentumScrollEnd={onMomentumScrollEnd}
+                    onScrollEndDrag={onScrollEndDrag}
                     contentContainerStyle={{ paddingVertical: padding }}
                     getItemLayout={(_, index) => ({
                         length: itemHeight,

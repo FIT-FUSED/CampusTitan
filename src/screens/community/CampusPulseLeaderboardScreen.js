@@ -26,6 +26,7 @@ import {
 } from "../../theme";
 import db from "../../services/database";
 import { useAuth } from "../../services/AuthContext";
+import analyticsService from "../../services/AnalyticsService";
 
 const { width: W } = Dimensions.get("window");
 
@@ -274,8 +275,14 @@ export default function CampusPulseLeaderboardScreen({ navigation }) {
     async function loadLeaderboard() {
       setLoading(true);
       try {
-        const { data: rpcData, error } = await db.supabase.rpc('get_leaderboard', { college_param: user?.college || null });
+        const [leaderboardRes, counts] = await Promise.all([
+          db.supabase.rpc('get_leaderboard', { college_param: user?.college || null }),
+          user?.college ? analyticsService.getGroupCounts(user.college) : { hostels: {}, branches: {} }
+        ]);
+
+        const { data: rpcData, error } = leaderboardRes;
         if (error) throw error;
+
         // Transform RPC data to coherent UI rows (one row per group, not per metric)
         const filteredRows = (rpcData || []).filter(row => {
           const label = row.branch_or_hostel || '';
@@ -308,6 +315,11 @@ export default function CampusPulseLeaderboardScreen({ navigation }) {
             // Composite ranking score from DB-backed metrics only
             const score = (avgActiveMins * 0.4) + (avgMood * 0.35) + (avgNutritionNum * 0.25);
 
+            // Fetch actual count from the counts object we retrieved
+            const studentCount = activeTab === 'hostel'
+              ? (counts.hostels[group.name] || 0)
+              : (counts.branches[group.name] || 0);
+
             return {
               id: `${activeTab}-${group.name}`,
               name: group.name,
@@ -318,7 +330,7 @@ export default function CampusPulseLeaderboardScreen({ navigation }) {
               avgNutrition: nutritionGrade(avgNutritionNum),
               nutritionNum: avgNutritionNum,
               trend: computeTrend(),
-              studentCount: 0,
+              studentCount,
               _score: score,
             };
           })
@@ -334,7 +346,7 @@ export default function CampusPulseLeaderboardScreen({ navigation }) {
       }
     }
     loadLeaderboard();
-  }, [activeTab, user?.college]);
+  }, [activeTab, user?.college, activeTab]);
 
   const tabLabel = activeTab === "hostel" ? "Hostel Showdown 🏠" : "Branch Clash 🎓";
 

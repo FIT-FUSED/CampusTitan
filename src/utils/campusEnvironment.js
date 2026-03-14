@@ -13,10 +13,10 @@ const WEATHER_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export const getCurrentCampusEnvironment = async () => {
     const hour = new Date().getHours();
-    
+
     let timePeriod;
     let zones;
-    
+
     if (hour >= 6 && hour < 9) {
         // Morning (06:00 - 09:00)
         timePeriod = 'morning';
@@ -50,7 +50,7 @@ export const getCurrentCampusEnvironment = async () => {
             { name: 'Main Gym', crowdLevel: 'N/A', noiseLevel: 'N/A', status: 'Closed' },
         ];
     }
-    
+
     // Get real weather data from EnvironmentService
     let weather;
     try {
@@ -67,6 +67,8 @@ export const getCurrentCampusEnvironment = async () => {
                     temperature: envData.weather.temperature,
                     humidity: envData.weather.humidity,
                     condition: envData.weather.description,
+                    windSpeed: envData.weather.windSpeed,
+                    rain: envData.weather.rain, // Add rain data
                 };
                 lastWeatherFetch = now;
                 weather = cachedWeatherData;
@@ -76,6 +78,8 @@ export const getCurrentCampusEnvironment = async () => {
                     aqi: 120,
                     temperature: 32,
                     humidity: 65,
+                    windSpeed: 5,
+                    rain: 0,
                     condition: 'Partly Cloudy',
                 };
             }
@@ -87,10 +91,12 @@ export const getCurrentCampusEnvironment = async () => {
             aqi: 120,
             temperature: 32,
             humidity: 65,
+            windSpeed: 5,
+            rain: 0,
             condition: 'Partly Cloudy',
         };
     }
-    
+
     return {
         timePeriod,
         hour,
@@ -104,7 +110,7 @@ export const getCurrentCampusEnvironment = async () => {
 export const getZoneRecommendation = async (preference = 'quiet') => {
     const env = await getCurrentCampusEnvironment();
     const openZones = env.zones.filter(z => z.status === 'Open');
-    
+
     if (preference === 'quiet') {
         return openZones.find(z => z.noiseLevel.includes('35') || z.noiseLevel.includes('30') || z.noiseLevel.includes('40')) || openZones[0];
     }

@@ -389,7 +389,7 @@ export default function AIWellnessCoach({ navigation }) {
                             {loading
                                 ? "Processing your wellness data..."
                                 : envData
-                                    ? `${getGreeting()} • ${envData.weather?.temperature || '--'}°C • ${envData.timePeriod || 'Now'}`
+                                    ? `${getGreeting()} • ${envData.weather?.temperature || '--'}°C • ${envData.weather?.humidity ? `${envData.weather.humidity}% Humidity` : envData.timePeriod || 'Now'}${envData.weather?.rain ? ` • ${envData.weather.rain}mm Rain` : ''}`
                                     : "Your personal wellness companion"
                             }
                         </Text>
@@ -416,6 +416,22 @@ export default function AIWellnessCoach({ navigation }) {
                                     value={envData.zones?.[0]?.crowdLevel || "Quiet"}
                                     color={COLORS.violet}
                                 />
+                                {envData.weather?.humidity && (
+                                    <QuickStatChip
+                                        icon="💧"
+                                        label="Humidity"
+                                        value={`${envData.weather.humidity}%`}
+                                        color={COLORS.info}
+                                    />
+                                )}
+                                {envData.weather?.rain && (
+                                    <QuickStatChip
+                                        icon="🌧️"
+                                        label="Rain"
+                                        value={`${envData.weather.rain}mm`}
+                                        color={COLORS.primaryLight}
+                                    />
+                                )}
                             </View>
                         )}
 

@@ -49,7 +49,6 @@ export default function RegisterScreen({ navigation }) {
     height: 170,
     weight: 65,
     gender: "male",
-    isAdmin: false, // Admin registration option
   });
   const [loading, setLoading] = useState(false);
 
@@ -305,88 +304,79 @@ export default function RegisterScreen({ navigation }) {
         <Text style={styles.stepTitle}>Body Metrics</Text>
         <Text style={styles.stepSubtitle}>Step 3 of 3 — Personal Details</Text>
 
-        <View style={styles.genderRow}>
-          {[
-            { key: "male", emoji: "👨", label: "Male" },
-            { key: "female", emoji: "👩", label: "Female" },
-            { key: "other", emoji: "🧑", label: "Other" },
-          ].map((g) => (
-            <TouchableOpacity
-              key={g.key}
-              style={[
-                styles.genderBtn,
-                form.gender === g.key && styles.genderBtnActive,
-              ]}
-              onPress={() => updateForm("gender", g.key)}
-            >
-              <Text style={styles.genderEmoji}>{g.emoji}</Text>
-              <Text
+        <View style={styles.formContent}>
+          <View style={styles.genderRow}>
+            {[
+              { key: "male", emoji: "👨", label: "Male" },
+              { key: "female", emoji: "👩", label: "Female" },
+              { key: "other", emoji: "🧑", label: "Other" },
+            ].map((g) => (
+              <TouchableOpacity
+                key={g.key}
                 style={[
-                  styles.genderLabel,
-                  form.gender === g.key && styles.genderLabelActive,
+                  styles.genderBtn,
+                  form.gender === g.key && styles.genderBtnActive,
                 ]}
+                onPress={() => updateForm("gender", g.key)}
               >
-                {g.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.metricsRow}>
-          <View style={{ flex: 1, marginRight: SPACING.md }}>
-            <ScrollPicker
-              label="Age"
-              data={AGE_DATA}
-              value={form.age}
-              onValueChange={(v) => updateForm("age", v)}
-              height={160}
-            />
+                <Text style={styles.genderEmoji}>{g.emoji}</Text>
+                <Text
+                  style={[
+                    styles.genderLabel,
+                    form.gender === g.key && styles.genderLabelActive,
+                  ]}
+                >
+                  {g.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
-          <View style={{ flex: 1 }}>
-            <ScrollPicker
-              label="Height (cm)"
-              data={HEIGHT_DATA}
-              value={form.height}
-              onValueChange={(v) => updateForm("height", v)}
-              height={160}
-            />
-          </View>
-        </View>
 
-        <View style={{ marginTop: SPACING.md }}>
-          <ScrollPicker
-            label="Weight (kg)"
-            data={WEIGHT_DATA}
-            value={form.weight}
-            onValueChange={(v) => updateForm("weight", v)}
-            height={160}
-          />
-        </View>
-
-        {/* Admin Toggle */}
-        <View style={styles.adminRow}>
-          <TouchableOpacity
-            style={styles.adminToggle}
-            onPress={() => updateForm("isAdmin", !form.isAdmin)}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.adminCheckbox, form.isAdmin && styles.adminCheckboxActive]}>
-              {form.isAdmin && <Text style={styles.adminCheck}>✓</Text>}
+          <View style={styles.metricsRow}>
+            <View style={{ flex: 1, marginRight: SPACING.md }}>
+              <ScrollPicker
+                label="Age"
+                data={AGE_DATA}
+                value={form.age}
+                onValueChange={(v) => updateForm("age", v)}
+                height={140}
+              />
             </View>
-            <Text style={styles.adminLabel}>Register as Admin</Text>
-          </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <ScrollPicker
+                label="Height (cm)"
+                data={HEIGHT_DATA}
+                value={form.height}
+                onValueChange={(v) => updateForm("height", v)}
+                height={140}
+              />
+            </View>
+          </View>
+
+          <View style={styles.weightContainer}>
+            <ScrollPicker
+              label="Weight (kg)"
+              data={WEIGHT_DATA}
+              value={form.weight}
+              onValueChange={(v) => updateForm("weight", v)}
+              height={220}
+            />
+          </View>
         </View>
 
-        <View style={[styles.navButtons, { marginTop: SPACING.xl }]}>
-          <TouchableOpacity onPress={() => setStep(2)} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>← Back</Text>
-          </TouchableOpacity>
-          <AnimatedButton
-            title={loading ? "Creating..." : "Complete Signup"}
-            onPress={handleRegister}
-            disabled={loading}
-            style={{ flex: 1 }}
-          />
+        <View style={styles.bottomSection}>
+          <View style={styles.navButtons}>
+            <TouchableOpacity onPress={() => setStep(2)} style={styles.backBtn}>
+              <Text style={styles.backBtnText}>← Back</Text>
+            </TouchableOpacity>
+            <AnimatedButton
+              title={loading ? "Creating..." : "Complete Signup"}
+              onPress={handleRegister}
+              disabled={loading}
+              style={{ flex: 1 }}
+            />
+          </View>
+          <LoginLink navigation={navigation} />
         </View>
       </>
     );
@@ -437,7 +427,6 @@ export default function RegisterScreen({ navigation }) {
           {step === 3 && (
             <View style={styles.stepViewContent}>
               {renderStep3()}
-              <LoginLink navigation={navigation} />
             </View>
           )}
         </View>
@@ -468,7 +457,21 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "ios" ? 60 : 40,
   },
   stepScrollContent: { paddingBottom: SPACING.huge },
-  stepViewContent: { flex: 1, paddingBottom: SPACING.huge },
+  stepViewContent: { 
+    flex: 1, 
+    paddingBottom: SPACING.md,
+  },
+  formContent: {
+    flex: 1,
+    justifyContent: 'flex-start',
+  },
+  bottomSection: {
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.lg,
+  },
+  weightContainer: {
+    marginTop: SPACING.md,
+  },
 
   // Progress
   progressContainer: { marginBottom: SPACING.xl },
@@ -655,7 +658,6 @@ const styles = StyleSheet.create({
   navButtons: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: SPACING.xxl,
     gap: SPACING.md,
   },
   backBtn: {
@@ -671,7 +673,7 @@ const styles = StyleSheet.create({
   // Bottom link
   loginLink: {
     alignItems: "center",
-    marginTop: SPACING.xxl,
+    marginTop: SPACING.md,
   },
   loginText: {
     color: COLORS.textSecondary,

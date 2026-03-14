@@ -102,17 +102,17 @@ export default function AIChatInterface({ onClose }) {
           ],
         },
         !isUser &&
+        React.createElement(
+          View,
+          { style: styles.agentHeader },
+          React.createElement(Text, { style: styles.agentName }, "Titan AI"),
+          item.tool &&
           React.createElement(
-            View,
-            { style: styles.agentHeader },
-            React.createElement(Text, { style: styles.agentName }, "Titan AI"),
-            item.tool &&
-              React.createElement(
-                Text,
-                { style: styles.toolUsed },
-                "via " + item.tool,
-              ),
+            Text,
+            { style: styles.toolUsed },
+            "via " + item.tool,
           ),
+        ),
         React.createElement(
           Text,
           {
@@ -162,111 +162,75 @@ export default function AIChatInterface({ onClose }) {
     );
   };
 
-  return React.createElement(
-    SafeAreaView,
-    { style: styles.container, edges: ["top", "left", "right", "bottom"] },
-    React.createElement(
-      KeyboardAvoidingView,
-      {
-        style: styles.body,
-        behavior: Platform.OS === "ios" ? "padding" : undefined,
-        keyboardVerticalOffset: Platform.OS === "ios" ? 0 : 0,
-      },
-      React.createElement(
-        LinearGradient,
-        {
-          colors: COLORS.gradientHero || COLORS.gradientPrimary,
-          style: [styles.header, { paddingTop: Math.max(insets.top, SPACING.lg) }],
-        },
-        React.createElement(
-          TouchableOpacity,
-          { onPress: close || undefined, style: styles.closeButton, disabled: !close },
-          React.createElement(Ionicons, {
-            name: "close",
-            size: 24,
-            color: COLORS.textInverse,
-          }),
-        ),
-        React.createElement(
-          View,
-          { style: styles.headerText },
-          React.createElement(
-            Text,
-            { style: styles.headerTitle },
-            "Titan AI Coach",
-          ),
-          React.createElement(
-            Text,
-            { style: styles.headerSubtitle },
-            "Ask me anything",
-          ),
-        ),
-      ),
-      React.createElement(FlatList, {
-        ref: flatListRef,
-        data: messages,
-        renderItem: renderMessage,
-        keyExtractor: (item) => item.id,
-        style: styles.list,
-        keyboardShouldPersistTaps: "handled",
-        contentContainerStyle: [
-          styles.messagesList,
-          { paddingBottom: (insets.bottom || 0) + 120 },
-        ],
-        ListFooterComponent: loading
-          ? React.createElement(
-              View,
-              { style: styles.loadingContainer },
-              React.createElement(ActivityIndicator, { color: COLORS.primary }),
-              React.createElement(
-                Text,
-                { style: styles.loadingText },
-                "Thinking...",
-              ),
+  return (
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <LinearGradient
+        colors={COLORS.gradientHero || COLORS.gradientPrimary}
+        style={styles.header}
+      >
+        <TouchableOpacity onPress={close} style={styles.closeButton}>
+          <Ionicons name="close" size={24} color={COLORS.textInverse} />
+        </TouchableOpacity>
+        <View style={styles.headerText}>
+          <Text style={styles.headerTitle}>Titan AI Coach</Text>
+          <Text style={styles.headerSubtitle}>Ask me anything</Text>
+        </View>
+      </LinearGradient>
+
+      <KeyboardAvoidingView
+        style={styles.body}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      >
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item) => item.id}
+          style={styles.list}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[
+            styles.messagesList,
+            { paddingBottom: SPACING.lg }
+          ]}
+          ListFooterComponent={loading
+            ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator color={COLORS.primary} />
+                <Text style={styles.loadingText}>Thinking...</Text>
+              </View>
             )
-          : null,
-        ListHeaderComponent: messages.length === 1 ? renderSuggestions : null,
-        onContentSizeChange: () => flatListRef.current?.scrollToEnd({ animated: true }),
-      }),
-      React.createElement(
-        View,
-        {
-          style: [
-            styles.inputContainer,
-            {
-              paddingBottom: Math.max(insets.bottom, SPACING.md),
-            },
-          ],
-        },
-        React.createElement(TextInput, {
-          style: styles.input,
-          value: inputText,
-          onChangeText: setInputText,
-          placeholder: "Ask...",
-          placeholderTextColor: COLORS.textMuted,
-          multiline: true,
-          maxLength: 500,
-        }),
-        React.createElement(
-          TouchableOpacity,
-          {
-            style: [
+            : null
+          }
+          ListHeaderComponent={messages.length === 1 ? renderSuggestions : null}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        />
+
+        <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, SPACING.md) }]}>
+          <TextInput
+            style={styles.input}
+            value={inputText}
+            onChangeText={setInputText}
+            placeholder="Ask..."
+            placeholderTextColor={COLORS.textMuted}
+            multiline={true}
+            maxLength={500}
+          />
+          <TouchableOpacity
+            style={[
               styles.sendButton,
               (!inputText.trim() || loading) && styles.sendButtonDisabled,
-            ],
-            onPress: () => sendMessage(inputText),
-            disabled: !inputText.trim() || loading,
-          },
-          React.createElement(LinearGradient, { colors: COLORS.gradientPrimary, style: styles.sendButtonGradient },
-            React.createElement(Ionicons, {
-              name: "send",
-              size: 20,
-              color: COLORS.textInverse,
-            }),
-          ),
-        ),
-      ),
-    ),
+            ]}
+            onPress={() => sendMessage(inputText)}
+            disabled={!inputText.trim() || loading}
+          >
+            <LinearGradient colors={COLORS.gradientPrimary} style={styles.sendButtonGradient}>
+              <Ionicons name="send" size={20} color={COLORS.textInverse} />
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 

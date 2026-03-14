@@ -77,32 +77,32 @@ function parseAIResponse(response: string): any {
     try {
         // Try to find JSON in the response
         let jsonStr = response.trim();
-        
+
         // Remove markdown code blocks if present
         if (jsonStr.startsWith("```json")) {
             jsonStr = jsonStr.slice(7);
         } else if (jsonStr.startsWith("```")) {
             jsonStr = jsonStr.slice(3);
         }
-        
+
         if (jsonStr.endsWith("```")) {
             jsonStr = jsonStr.slice(0, -3);
         }
-        
+
         // Also try to find JSON object in the text
         const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             jsonStr = jsonMatch[0];
         }
-        
+
         const parsed = JSON.parse(jsonStr);
-        
+
         // Validate required keys
         if (!parsed.briefing || !parsed.routing || !parsed.socialPush) {
             console.warn("AI response missing required keys, using fallback");
             return FALLBACK_RESPONSE;
         }
-        
+
         return parsed;
     } catch (e) {
         console.warn("Failed to parse AI JSON response:", e);
@@ -128,7 +128,7 @@ async function getCachedProactiveTip(): Promise<any | null> {
         const raw = await AsyncStorage.getItem(STUDENT_TIP_KEY);
         if (!raw) return null;
         const payload = JSON.parse(raw);
-        
+
         // Check if cached for today
         const today = new Date().toISOString().slice(0, 10);
         if (payload?.date === today && payload?.data) {
@@ -140,7 +140,7 @@ async function getCachedProactiveTip(): Promise<any | null> {
     }
 }
 
-// Aggregate all context for the proactive AI coach
+// Aggregate all contexts for the proactive AI coach
 async function aggregateContext(): Promise<ProactiveContext> {
     // 1. Personal Context - Fetch user's last wellness entry
     let personalContext: WellnessData | null = null;
@@ -152,10 +152,10 @@ async function aggregateContext(): Promise<ProactiveContext> {
     } catch (e) {
         console.warn("Failed to fetch personal wellness data:", e);
     }
-    
+
     // 2. Environment Context - Get current campus environment
-    const environmentContext = getCurrentCampusEnvironment();
-    
+    const environmentContext = await getCurrentCampusEnvironment();
+
     // 3. Gamification Context - Mock department standing
     // In production, this would come from the leaderboard data
     const gamificationContext: DeptStanding = {
@@ -163,7 +163,7 @@ async function aggregateContext(): Promise<ProactiveContext> {
         rivalDept: 'CS',
         pointDeficit: 45,
     };
-    
+
     return {
         personalContext,
         environmentContext,
@@ -174,22 +174,22 @@ async function aggregateContext(): Promise<ProactiveContext> {
 export async function generateProactiveActionPlan(): Promise<any> {
     // Check cache first
     const cached = await getCachedProactiveTip();
-    
+
     // Aggregate all contexts
     const context = await aggregateContext();
-    
+
     const { personalContext, environmentContext, gamificationContext } = context;
-    
+
     // Build the context string for the LLM
     const sleepHours = personalContext?.sleepHrs ?? "unknown";
     const stressLevel = personalContext?.stressLevel ?? 5;
     const { timePeriod, zones, weather } = environmentContext;
-    
+
     // Format zones for the prompt
     const zonesInfo = zones
-        .map(z => `- ${z.name}: ${z.crowdLevel}, ${z.noiseLevel}, ${z.status}`)
+        .map((z: any) => `- ${z.name}: ${z.crowdLevel}, ${z.noiseLevel}, ${z.status}`)
         .join("\n");
-    
+
     const prompt = `
 You are a hyper-aware campus wellness coach for MNNIT students. Based on the user's recent sleep, the current campus environment matrix, and their department's standing on the leaderboard, generate a 3-part proactive action plan.
 
@@ -197,7 +197,7 @@ Current Context:
 - User's last sleep: ${sleepHours} hours
 - User's stress level: ${stressLevel}/10
 - Current time period: ${timePeriod}
-- Weather: AQI ${weather.aqi}, ${weather.temperature}°C, ${weather.condition}
+- Weather: AQI ${weather.aqi}, ${weather.temperature}°C, ${weather.humidity}% Humidity, ${weather.rain > 0 ? weather.rain + 'mm Rain' : 'No Rain'}, Wind ${weather.windSpeed}m/s, ${weather.condition}
 - Campus Zones:
 ${zonesInfo}
 - User's Department: ${gamificationContext.userDept}
@@ -206,8 +206,8 @@ ${zonesInfo}
 
 Return EXACTLY a JSON object with these keys (no other text):
 {
-  "briefing": "1 sentence combining their sleep/wellness with current weather.",
-  "routing": "1 sentence suggesting which campus zone to visit or avoid right now based on the noise/crowd matrix.",
+  "briefing": "1 sentence combining their sleep/wellness with current weather (mention humidity or rain if notable).",
+  "routing": "1 sentence suggesting which campus zone to visit or avoid right now based on the noise/crowd matrix and weather.",
   "socialPush": "1 sentence motivating them to log an activity to help their department beat their rival."
 }
 
@@ -216,12 +216,12 @@ Respond ONLY with the JSON object, no markdown formatting.
 
     const result = await callCohere(prompt);
     const parsed = parseAIResponse(result);
-    
+
     // Cache the result
     if (parsed !== FALLBACK_RESPONSE) {
         await cacheProactiveTip(parsed);
     }
-    
+
     return parsed;
 }
 
@@ -231,7 +231,7 @@ export async function generateStudentActionPlan(
     environment: { zone?: string; noise?: string; crowding?: string } | null,
 ): Promise<string> {
     const proactiveResult = await generateProactiveActionPlan();
-    
+
     return `${proactiveResult.briefing} ${proactiveResult.routing} ${proactiveResult.socialPush}`;
 }
 

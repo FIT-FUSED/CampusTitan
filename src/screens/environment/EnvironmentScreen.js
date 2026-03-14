@@ -137,6 +137,39 @@ export default function EnvironmentScreen({ navigation }) {
                 contentContainerStyle={styles.content}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
             >
+                {/* Live Weather Section */}
+                {liveEnv?.weather && (
+                    <>
+                        <SectionHeader title="Live Weather" />
+                        <View style={styles.liveCard}>
+                            <View style={styles.liveTopRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.liveTitle}>Weather</Text>
+                                    <Text style={styles.liveSub}>{liveEnv.weather.location || 'Your location'}</Text>
+                                </View>
+                                <View style={styles.liveWeatherPill}>
+                                    <Text style={styles.liveWeatherValue}>{liveEnv.weather.temperature}°C</Text>
+                                    <Text style={styles.liveWeatherLabel}>{liveEnv.weather.description}</Text>
+                                </View>
+                            </View>
+                            
+                            <View style={styles.weatherGrid}>
+                                {[
+                                    { emoji: '💧', label: 'Humidity', value: `${liveEnv.weather.humidity}%`, color: COLORS.info },
+                                    { emoji: '💨', label: 'Wind Speed', value: `${liveEnv.weather.windSpeed} m/s`, color: COLORS.accentLight },
+                                    ...(liveEnv.weather.rain ? [{ emoji: '🌧️', label: 'Rain', value: `${liveEnv.weather.rain}mm`, color: COLORS.primaryLight }] : []),
+                                ].map((item, i) => (
+                                    <View key={i} style={styles.weatherItem}>
+                                        <Text style={styles.weatherEmoji}>{item.emoji}</Text>
+                                        <Text style={[styles.weatherValue, { color: item.color }]}>{item.value}</Text>
+                                        <Text style={styles.weatherLabel}>{item.label}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+                    </>
+                )}
+
                 {/* Live AQI + Activity Suggestions */}
                 {liveEnv?.weather && (
                     <>
@@ -299,6 +332,9 @@ const styles = StyleSheet.create({
     liveAqiPill: { alignItems: 'flex-end' },
     liveAqiValue: { fontSize: FONT_SIZES.xl, ...FONTS.extraBold },
     liveAqiLabel: { fontSize: FONT_SIZES.sm, ...FONTS.semiBold },
+    liveWeatherPill: { alignItems: 'flex-end' },
+    liveWeatherValue: { fontSize: FONT_SIZES.xl, ...FONTS.extraBold },
+    liveWeatherLabel: { fontSize: FONT_SIZES.sm, ...FONTS.semiBold },
     liveRecoText: { color: COLORS.textMuted, fontSize: FONT_SIZES.sm, lineHeight: 20, marginBottom: SPACING.md },
     liveBullet: { color: COLORS.textMuted, fontSize: FONT_SIZES.sm, lineHeight: 20 },
     recoCard: { marginHorizontal: SPACING.lg, alignItems: 'center', paddingVertical: SPACING.xxl },
