@@ -1,82 +1,191 @@
-# FitFusion — Campus Wellness & Fitness Tracker
+# FitFusion (CampusTitan)
 
-A comprehensive React Native (Expo) application designed for holistic campus wellness, featuring advanced tracking for nutrition, physical activity, mental wellness, environmental metrics, and AI-driven coaching.
+Campus wellness and fitness companion built with **Expo / React Native**, backed by a **Flask nutrition API** and a **Python agent service** for natural-language coaching.
 
-## Core Features
+## Features
 
-- **Advanced Nutrition Tracking**
-  - Vision-based food logging utilizing the Gemini API for autonomous portion estimation and dish identification.
-  - Integration with the USDA API to calculate exact macronutrients and the Nutrient Rich Foods (NRF9.3) density score.
-  - Barcode scanner for quick manual entry.
-  - Daily caloric and macronutrient goal management.
+- **Authentication (Supabase)**
+  - Email OTP login (request OTP → verify OTP)
+  - JWT session support; app sends `Authorization: Bearer <access_token>` to protected backend routes
 
-- **Activity & Step Tracking**
-  - Real-time pedometer tracking with native permission handling via Expo Sensors.
-  - On-demand step increment fallback for Expo Go compatibility.
-  - Manual workout logging with calorie burn estimation.
-  - Weekly activity visualization and sparklines.
+- **Food scanning (camera → nutrition)**
+  - Image capture via `expo-camera`
+  - Vision-based food identification + portion estimation (Gemini Vision)
+  - USDA FoodData Central lookup for nutrition facts
+  - Nutrient density scoring (**NRF9.3**)
 
-- **Mental Wellness & Journaling**
-  - Predictive mental wellness scoring powered by a custom PyTorch Neural Network based on user behavioral data (screen time, sleep quality, activity levels).
-  - Daily qualitative mood check-ins.
-  - Secure personal journal entries.
+- **Health insights (daily summary + caching)**
+  - Daily summary endpoint with SQLite-backed caching (`backend/health_cache.sqlite3`)
+  - Debug endpoint to inspect cache state (`/api/health-cache/debug`)
 
-- **Autonomous AI Health Coach**
-  - A locally hosted, LoRA-fine-tuned Llama 3 (8B) model providing strict, personalized health adjustments.
-  - Asynchronous daily report generation utilizing a 7-day rolling context window, compressed via Gemini to eliminate LLM hallucination.
+- **AI Agent (natural language Q&A + logging)**
+  - Ask questions like “Did I eat enough protein today?”
+  - Natural language logging (food/activity)
+  - Routing + tool execution + response generation via the Python agent service
 
-- **Environmental Awareness**
-  - Real-time campus API integration for AQI, temperature, humidity, and noise levels.
-  - Contextual health recommendations based on current environmental conditions.
+- **Wellness & community**
+  - Wellness circles screen with join links
+
+## Architecture
+
+- **Mobile App (Expo / React Native)**
+  - Location: `src/`
+  - Key modules:
+    - `src/screens/` (UI screens)
+    - `src/services/` (`backendAPI`, `AgentService`, `AuthContext`, `supabase`)
+
+- **Flask Backend (Nutrition + Health Summary + Agent Proxy)**
+  - Location: `backend/nutrition_server.py`
+  - Default port: `5001`
+  - Responsibilities:
+    - `/api/nutrition/analyze` (image upload → nutrition)
+    - `/api/health_summary` (daily summary + cache)
+    - `/api/agent/*` proxy routes to Python agent service
+    - Supabase JWT verification (JWKS)
+
+- **Python Agent Service (LangGraph-style agent API)**
+  - Location: `agent/api.py`
+  - Default port: `5002`
+  - Endpoints:
+    - `POST /agent/query`
+    - `POST /agent/log`
+    - `GET /agent/quick`
 
 ## Tech Stack
 
-- **Frontend:** React Native, Expo (~54), Expo Router, Expo Sensors, Expo Secure Store
-- **Application Backend:** Node.js, Express, SQLite
-- **Machine Learning Microservices:** Python, PyTorch, Ollama (GGUF Inference)
-- **External APIs:** Google Gemini 2.5 Flash, USDA FoodData Central
-- **UI Architecture:** Custom theme system, expo-linear-gradient, expo-blur
+- **Frontend**
+  - Expo SDK `~54`
+  - React `19`
+  - `expo-camera`, `expo-secure-store`, `expo-sensors`
+  - `axios`, React Navigation
+  - Supabase JS `@supabase/supabase-js`
 
-## Development
+- **Backend / Services**
+  - Flask (nutrition server + agent proxy)
+  - Python agent service (Flask)
+  - SQLite (health summary cache)
+  - External APIs: Gemini, USDA
 
-### Prerequisites
-- Node.js (npm)
-- Expo CLI
-- Expo Go or EAS Dev Client
-- Python 3.10+ (For ML Microservices)
-- Ollama (For local LLM inference)
+## Repo Structure (high-level)
 
-### Quick Start (Frontend)
+```
+.
+├── src/                      # Expo app
+├── backend/                  # Flask backend + (optional) Node backend
+│   ├── nutrition_server.py   # Flask API on :5001
+│   └── health_cache.sqlite3  # SQLite cache DB
+├── agent/                    # Python agent API on :5002
+│   ├── api.py
+│   └── requirements.txt
+├── nutrition_score.py        # Vision → USDA → NRF9.3 pipeline
+├── titan_ml_interface.py     # AI interface wrapper
+└── context_engine.py         # Trend summary + prompt assembly for local LLM paths
+```
+
+## Environment Variables
+
+### Mobile App (Expo)
+
+Set in your shell, `.env`, or EAS secrets (values depend on your setup):
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+
+Optional overrides:
+
+- `EXPO_PUBLIC_BACKEND_URL` (forces backend base URL)
+- `EXPO_PUBLIC_NUTRITION_API_URL` (alias override)
+
+### Backend (`backend/.env`)
+
+- `GEMINI_API_KEY`
+- `USDA_API_KEY`
+- `SUPABASE_URL` (or `EXPO_PUBLIC_SUPABASE_URL`)
+- `SUPABASE_JWKS_URL` (optional override)
+- `PYTHON_AGENT_URL` (default `http://127.0.0.1:5002`)
+
+### Agent (`agent/api.py`)
+
+- `AGENT_QUERY_TIMEOUT_SECONDS` (default `90`)
+
+## Getting Started (Development)
+
+### 1) Install app dependencies
 
 ```bash
 npm install
-npm start          # Run via Expo Go
+```
 
-src/
-├── components/
-│   └── common/
-├── screens/
-│   ├── auth/
-│   ├── fitness/
-│   ├── home/
-│   ├── nutrition/
-│   ├── profile/
-│   └── wellness/
-├── services/
-│   ├── AuthContext.js
-│   ├── SensorService.js
-│   ├── database.js
-│   └── config.js
-├── navigation/
-├── theme/
-└── data/
+### 2) Start the Flask backend (Nutrition API)
 
-ml_services/
-├── titan_ml_interface.py        # Unified API wrapper for backend integration
-├── context_engine.py            # Context compression and LLM prompting logic
-├── nutrition_score.py           # Vision processing and NRF9.3 calculation
-├── mental_wellness_predictor.py # PyTorch neural network inference
-├── Modelfile                    # Llama 3 system instructions and parameters
-├── best_model.pth               # Trained PyTorch weights
-└── scaler.pkl                   # Feature normalization scaler
+From `backend/`:
 
+```bash
+python -u nutrition_server.py
+```
+
+Expected:
+
+- Backend available at `http://127.0.0.1:5001`
+- Health check: `GET /api/health`
+
+### 3) Start the Python agent service
+
+From `agent/`:
+
+```bash
+pip install -r requirements.txt
+python -u api.py
+```
+
+Expected:
+
+- Agent available at `http://127.0.0.1:5002`
+- Health check: `GET /health`
+
+### 4) Start Expo
+
+```bash
+npm start
+```
+
+## Common Troubleshooting
+
+### Backend image upload issues on Windows (`WinError 32`)
+
+The backend saves uploads to **unique temporary files** and cleans up after processing to avoid Windows file-lock collisions.
+
+### Gemini quota / rate-limit
+
+If Gemini quota is exhausted, `/api/nutrition/analyze` returns a clear `429` with details. Use a paid key or wait for quota reset.
+
+### Android networking (emulator vs device)
+
+- Android emulator cannot reach your host at `localhost`; it needs `10.0.2.2`.
+- Physical devices must use your machine’s LAN IP.
+
+You can always force a known URL using `EXPO_PUBLIC_BACKEND_URL`.
+
+### Recurring `504` timeouts on agent queries
+
+Timeouts were aligned across:
+
+- Mobile `AgentService`
+- Flask proxy (`/api/agent/query`)
+- Node forwarder (if used)
+- Python agent hard timeout (`AGENT_QUERY_TIMEOUT_SECONDS`)
+
+If you still get `504`, increase `AGENT_QUERY_TIMEOUT_SECONDS` and restart the agent service.
+
+## Security Notes
+
+- Do not ship Supabase service role keys in the client.
+- The app uses the Supabase **anon key** on-device and sends the session JWT to backends using the `Authorization` header.
+
+## EAS Build
+
+Profiles are configured in `eas.json`:
+
+- `development`
+- `preview`
+- `production`
