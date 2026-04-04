@@ -66,6 +66,28 @@ Campus wellness and fitness companion built with **Expo / React Native**, backed
   - SQLite (health summary cache)
   - External APIs: Gemini, USDA
 
+## 🚀 Deployment (Production)
+- Cloud Hosting: Render (Microservices for Flask & Agent)
+
+- App Distribution: Expo EAS (Cloud Builds)
+The backends are hosted as separate Web Services on Render, and the mobile app is built via Expo EAS.
+
+### 1. Backend Microservices (Render)
+* **Agent Service (Port 5002):** * Root Directory: `agent/`
+  * Build Command: `pip install -r requirements.txt`
+  * Start Command: `python -r api.py`
+* **Nutrition API (Port 5001):**
+  * Root Directory: `backend/`
+  * Build Command: `pip install -r requirements.txt`
+  * Start Command: `python nutrition_server.py`
+  * **Environment Variables:** Must include `PYTHON_AGENT_URL` pointing to the live Agent Service, and `PYTHON_VERSION` set to `3.12.2` (required to successfully build the `pillow` image library).
+
+### 2. Mobile App (Expo EAS)
+To build a production-ready `.apk` or `.ipa` that points to the live Render servers:
+1. Ensure your Render and Supabase URLs are set inside the `env` block of your `eas.json` profile.
+2. Run the cloud build command:
+   ```bash
+   eas build -p android --profile preview
 ## Repo Structure (high-level)
 
 ```
