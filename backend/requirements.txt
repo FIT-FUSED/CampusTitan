@@ -1,13 +1,7 @@
-# CampusTitan Agent Dependencies
-flask>=2.3.0
-flask-cors>=4.0.0
-requests>=2.31.0
-python-dotenv>=1.0.0
-langchain
-langgraph
-google-genai>=0.1.0
-supabase>=2.4.0
-cohere>=5.13.0
+Flask==3.0.0
+flask-cors==4.0.0
+requests==2.31.0
+python-dotenv==1.0.0
 google-generativeai==0.3.1
 pydantic==2.5.2
 Pillow==10.1.0
